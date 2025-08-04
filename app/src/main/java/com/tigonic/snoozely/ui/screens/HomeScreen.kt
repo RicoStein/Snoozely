@@ -14,8 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ui.components.WheelSlider
 
 @Composable
@@ -46,7 +48,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SleepTimer",
+                    text = stringResource(R.string.app_name),
                     fontSize = MaterialTheme.typography.headlineLarge.fontSize,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -54,7 +56,7 @@ fun HomeScreen(
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Filled.Settings,
-                        contentDescription = "Einstellungen",
+                        contentDescription = stringResource(R.string.settings),
                         tint = Color.White
                     )
                 }
@@ -79,7 +81,7 @@ fun HomeScreen(
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    contentDescription = if (isPlaying) stringResource(R.string.pause) else stringResource(R.string.play),
                     tint = Color.Black,
                     modifier = Modifier.size(44.dp)
                 )

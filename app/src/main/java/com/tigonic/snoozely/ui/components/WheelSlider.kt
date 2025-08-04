@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.*
+import com.tigonic.snoozely.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun WheelSlider(
@@ -158,7 +160,7 @@ fun WheelSlider(
                 color = Color.White
             )
             Text(
-                text = "MINUTEN",
+                text = stringResource(R.string.minutes),
                 fontWeight = FontWeight.Normal,
                 color = Color(0xAAFFFFFF),
                 style = MaterialTheme.typography.titleMedium,

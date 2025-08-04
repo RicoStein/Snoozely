@@ -1,3 +1,29 @@
 <resources>
     <string name="app_name">Snoozely</string>
+    <string name="settings">Einstellungen</string>
+    <string name="sleep_timer">Sleep Timer</string>
+    <string name="playback">Wiedergabe</string>
+    <string name="stop_audio_video">Audio und Video stoppen</string>
+    <string name="fade_out_duration">Fade-out-Dauer</string>
+    <string name="seconds">%1$d Sekunden</string>
+    <string name="screen">Bildschirm</string>
+    <string name="turn_off_screen">Bildschirm ausschalten</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="bluetooth_android_13_removed">Diese Funktion wurde in Android 13 entfernt</string>
+    <string name="wifi">WLAN</string>
+    <string name="wifi_android_10_removed">Diese Funktion wurde von Google ab Android 10 entfernt</string>
+    <string name="notification">Benachrichtigung</string>
+    <string name="enable_notification">Benachrichtigung aktivieren</string>
+    <string name="show_remaining_time">Zeigt die verbleibende Zeit und ermöglicht Anpassungen.</string>
+    <string name="haptic_feedback">Haptisches Feedback</string>
+    <string name="timer">Timer</string>
+    <string name="device_vibrate_on_timer">Das Gerät vibriert beim Anpassen des Timers</string>
+    <string name="language">Sprache</string>
+    <string name="german">Deutsch</string>
+    <string name="english">Englisch</string>
+    <string name="french">Französisch</string>
+    <string name="pause">Pause</string>
+    <string name="play">Play</string>
+    <string name="back">Zurück</string>
+    <string name="minutes">MINUTEN</string>
 </resources>
