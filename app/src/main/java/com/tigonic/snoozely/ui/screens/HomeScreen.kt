@@ -24,7 +24,7 @@ fun HomeScreen(
     onPlayPauseClick: () -> Unit,
     isPlaying: Boolean
 ) {
-    var minutes by remember { mutableStateOf(30) }
+    var minutes by remember { mutableStateOf(0) }
 
     Box(
         modifier = Modifier

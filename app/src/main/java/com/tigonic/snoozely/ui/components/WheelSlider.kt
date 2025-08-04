@@ -34,7 +34,6 @@ fun WheelSlider(
     val size = 300.dp
     val stroke = 12.dp
 
-    // Interne States für Umdrehungen und Winkel im Kreis
     var rounds by remember { mutableStateOf(value / stepsPerCircle) }
     var angleInCircle by remember { mutableStateOf((value % stepsPerCircle) * 360f / stepsPerCircle) }
     var lastAngle by remember { mutableStateOf<Float?>(null) }
@@ -83,9 +82,7 @@ fun WheelSlider(
                                         newRounds--
                                     } else {
                                         newAngle = 0f
-                                        // **Hier die Lösung:** Drag-Startpunkt auf aktuellen Winkel setzen
                                         lastAngle = angle
-                                        // Sofort Wert setzen und abbrechen (damit alles synchron bleibt)
                                         val newValue = calcValue(newRounds, newAngle)
                                         onValueChange(newValue)
                                         return@detectDragGestures
@@ -108,25 +105,25 @@ fun WheelSlider(
                     )
                 }
         ) {
-            // Hintergrund-Kreis
-            drawCircle(
-                color = Color(0xFF222222),
-                style = Stroke(width = stroke.toPx())
+            // Schöner Verlauf: Rot → Orange → Gelb → Weiß → Rot
+            val sweepColors = listOf(
+                Color(0xFFFF2222), Color(0xFFFF531B), Color(0xFFFF851E), Color(0xFFFFB719), Color(0xFFFFEA16),
+                Color(0xFFFFFF15), Color(0xFFFFEA16), Color(0xFFFFB719), Color(0xFFFF851E), Color(0xFFFF531B), Color(0xFFFF2222)
             )
-            // Fortschritts-Bogen (fortlaufender Verlauf)
             val valueForSweep = calcValue(rounds, angleInCircle)
+            val sweep = (valueForSweep * 360f / stepsPerCircle)
+            val center = Offset(this.size.width / 2, this.size.height / 2)
+
+// "Mitziehender" Verlauf: Farbliste drehen!
+            val steps = sweepColors.size - 1
+            val rotateCount = ((steps * sweep / 360f).roundToInt() + steps) % steps
+            val rotatedColors = sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
+
             if (valueForSweep > 0) {
-                val sweep = (valueForSweep * 360f / stepsPerCircle)
                 drawArc(
                     brush = Brush.sweepGradient(
-                        listOf(
-                            Color(0xFF7F7FFF),
-                            Color(0xFF77E8FF),
-                            Color(0xFF77FFA2),
-                            Color(0xFFFFD84C),
-                            Color(0xFFFF7F7F),
-                            Color(0xFF7F7FFF)
-                        )
+                        colors = rotatedColors,
+                        center = center
                     ),
                     startAngle = -90f,
                     sweepAngle = sweep,
@@ -134,11 +131,10 @@ fun WheelSlider(
                     style = Stroke(width = stroke.toPx(), cap = StrokeCap.Round)
                 )
             }
-            // Handle-Position immer sichtbar (auch bei 0 Minuten, dann oben)
-            val sweep = (valueForSweep * 360f / stepsPerCircle)
+
+            // Handle-Position exakt auf Rand
             val radians = Math.toRadians((sweep - 90f).toDouble())
-            val radius = (size.toPx() - stroke.toPx()) / 2
-            val center = Offset(this.size.width / 2, this.size.height / 2)
+            val radius = (size.toPx() - stroke.toPx()) / 2 + stroke.toPx() / 2 - 1.dp.toPx()
             val handleCenter = Offset(
                 x = (center.x + cos(radians) * radius).toFloat(),
                 y = (center.y + sin(radians) * radius).toFloat()
