@@ -5,12 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import com.tigonic.snoozely.ui.screens.HomeScreen
 import com.tigonic.snoozely.ui.theme.SnoozelyTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +17,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SnoozelyTheme {
+                // Scaffold für Statusbar/Insets, falls gewünscht
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+                    // HomeScreen mit State und Dummy-Aktionen
+                    var isPlaying by remember { mutableStateOf(false) }
+
+                    HomeScreen(
+                        onSettingsClick = { /* TODO: Öffne Einstellungen */ },
+                        onPlayPauseClick = { isPlaying = !isPlaying },
+                        isPlaying = isPlaying
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SnoozelyTheme {
-        Greeting("Android")
     }
 }
