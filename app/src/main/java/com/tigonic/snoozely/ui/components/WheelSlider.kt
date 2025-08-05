@@ -31,7 +31,8 @@ fun WheelSlider(
     modifier: Modifier = Modifier,
     minValue: Int = 0,
     maxValue: Int = 600,
-    stepsPerCircle: Int = 60
+    stepsPerCircle: Int = 60,
+    showCenterText: Boolean = true
 ) {
     val size = 300.dp
     val stroke = 12.dp
@@ -154,24 +155,26 @@ fun WheelSlider(
             )
         }
 
-        // Minutenanzeige in der Mitte
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            val valueForText = calcValue(rounds, angleInCircle)
-            Text(
-                text = valueForText.toString(),
-                fontWeight = FontWeight.ExtraBold,
-                style = MaterialTheme.typography.displayLarge,
-                color = Color.White
-            )
-            Text(
-                text = stringResource(R.string.minutes),
-                fontWeight = FontWeight.Normal,
-                color = Color(0xAAFFFFFF),
-                style = MaterialTheme.typography.titleMedium,
-                letterSpacing = 2.sp
-            )
+        // Minutenanzeige in der Mitte (nur wenn gewünscht)
+        if (showCenterText) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val valueForText = calcValue(rounds, angleInCircle)
+                Text(
+                    text = valueForText.toString(),
+                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.displayLarge,
+                    color = Color.White
+                )
+                Text(
+                    text = stringResource(R.string.minutes),
+                    fontWeight = FontWeight.Normal,
+                    color = Color(0xAAFFFFFF),
+                    style = MaterialTheme.typography.titleMedium,
+                    letterSpacing = 2.sp
+                )
+            }
         }
     }
 }
