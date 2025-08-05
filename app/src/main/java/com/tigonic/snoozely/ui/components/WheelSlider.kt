@@ -107,7 +107,7 @@ fun WheelSlider(
                     )
                 }
         ) {
-            // Schöner Verlauf: Rot → Orange → Gelb → Weiß → Rot
+            // Farben für den Verlauf
             val sweepColors = listOf(
                 Color(0xFFFF2222), Color(0xFFFF531B), Color(0xFFFF851E), Color(0xFFFFB719), Color(0xFFFFEA16),
                 Color(0xFFFFFF15), Color(0xFFFFEA16), Color(0xFFFFB719), Color(0xFFFF851E), Color(0xFFFF531B), Color(0xFFFF2222)
@@ -116,7 +116,13 @@ fun WheelSlider(
             val sweep = (valueForSweep * 360f / stepsPerCircle)
             val center = Offset(this.size.width / 2, this.size.height / 2)
 
-// "Mitziehender" Verlauf: Farbliste drehen!
+            // Immer ein dunkler Hintergrundkreis!
+            drawCircle(
+                color = Color(0xFF22252A), // dunkelgrauer Track
+                style = Stroke(width = stroke.toPx())
+            )
+
+            // Fortschritts-Bogen wie gehabt
             val steps = sweepColors.size - 1
             val rotateCount = ((steps * sweep / 360f).roundToInt() + steps) % steps
             val rotatedColors = sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
@@ -134,7 +140,7 @@ fun WheelSlider(
                 )
             }
 
-            // Handle-Position exakt auf Rand
+            // Handle auf dem Rand
             val radians = Math.toRadians((sweep - 90f).toDouble())
             val radius = (size.toPx() - stroke.toPx()) / 2 + stroke.toPx() / 2 - 1.dp.toPx()
             val handleCenter = Offset(

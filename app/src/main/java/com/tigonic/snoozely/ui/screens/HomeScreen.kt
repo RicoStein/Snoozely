@@ -14,20 +14,74 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ui.components.WheelSlider
+import com.tigonic.snoozely.util.TimerPreferenceHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
     onSettingsClick: () -> Unit,
-    onPlayPauseClick: () -> Unit,
-    isPlaying: Boolean
 ) {
-    var minutes by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
+    // 1. DataStore liefert initial null, solange noch nicht geladen!
+    val minutesFromStorage by TimerPreferenceHelper.getTimer(context).collectAsState(initial = null)
+
+    // 2. Lokale States für Anzeige & Ablauf
+    var minutes by remember { mutableStateOf(0) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var initialMinutes by remember { mutableStateOf(0) }
+    var isInitialized by remember { mutableStateOf(false) }
+
+    // 3. Initialisiere erst, wenn Wert aus Storage geladen ist!
+    LaunchedEffect(minutesFromStorage) {
+        if (minutesFromStorage != null && !isInitialized) {
+            minutes = minutesFromStorage!!
+            initialMinutes = minutesFromStorage!!
+            isInitialized = true
+        }
+    }
+
+    // 4. Ladeanzeige, solange DataStore noch lädt!
+    if (!isInitialized) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Lade...", color = Color.White)
+        }
+        return
+    }
+
+    // 5. Timer-Logik: Start/Stop
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            var remainingTime = minutes
+            while (remainingTime > 0 && isPlaying) {
+                delay(1000)
+                remainingTime--
+                minutes = remainingTime
+            }
+            if (remainingTime == 0) {
+                isPlaying = false
+                minutes = initialMinutes
+            }
+        } else {
+            // Auf gespeicherten Wert zurück (z.B. bei Pause/Stop)
+            minutes = initialMinutes
+        }
+    }
+
+    // 6. UI
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -61,20 +115,26 @@ fun HomeScreen(
                     )
                 }
             }
+
             Spacer(modifier = Modifier.height(40.dp))
 
-            // WheelSlider
+            // WheelSlider (setzt neuen Wert, speichert im DataStore)
             WheelSlider(
                 value = minutes,
-                onValueChange = { minutes = it },
+                onValueChange = {
+                    minutes = it
+                    initialMinutes = it
+                    scope.launch {
+                        TimerPreferenceHelper.setTimer(context, it)
+                    }
+                },
                 modifier = Modifier.padding(vertical = 24.dp)
             )
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Play/Pause Button
             IconButton(
-                onClick = onPlayPauseClick,
+                onClick = { isPlaying = !isPlaying },
                 modifier = Modifier
                     .size(72.dp)
                     .background(Color.White, shape = MaterialTheme.shapes.extraLarge)
