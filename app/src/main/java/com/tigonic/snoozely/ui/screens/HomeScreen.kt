@@ -13,10 +13,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -36,52 +35,58 @@ fun HomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val minutesFromStorage by TimerPreferenceHelper.getTimer(context).collectAsState(initial = null)
-    var initialMinutes by remember { mutableStateOf(0) }
-    var isInitialized by remember { mutableStateOf(false) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var runningMinutes by remember { mutableStateOf(0) }
+    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 15)
+    val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
+    val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
 
-    LaunchedEffect(minutesFromStorage) {
-        if (minutesFromStorage != null && !isInitialized) {
-            initialMinutes = minutesFromStorage!!
-            runningMinutes = minutesFromStorage!!
-            isInitialized = true
-        }
-    }
+    var wheelValue by rememberSaveable { mutableStateOf(15) }
 
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            var remaining = initialMinutes
-            runningMinutes = remaining
-            while (remaining > 0 && isPlaying) {
+    // ---- SEKUNDEN-TICKER FÜR RECOMPOSITION ----
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(timerRunning, timerStartTime) {
+        if (timerRunning) {
+            while (true) {
+                now = System.currentTimeMillis()
                 delay(1000)
-                remaining--
-                runningMinutes = remaining
             }
-            if (remaining == 0) {
-                isPlaying = false
-                runningMinutes = initialMinutes
-            }
-        } else {
-            runningMinutes = initialMinutes
         }
     }
 
-    if (!isInitialized) {
-        Box(
-            Modifier.fillMaxSize().background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) { Text("Lade...", color = Color.White) }
-        return
+    // --- REMAINING: Jetzt als Sekunden berechnen! ---
+    val totalSeconds = if (timerRunning && timerStartTime > 0L) {
+        val elapsedMillis = now - timerStartTime
+        val elapsedSec = (elapsedMillis / 1000).toInt()
+        val rest = (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
+        rest
+    } else timerMinutes * 60
+
+    val remainingMinutes = totalSeconds / 60
+    val remainingSeconds = totalSeconds % 60
+
+    // --- Wheel folgt timerMinutes nur, wenn nicht running
+    LaunchedEffect(timerMinutes, timerRunning) {
+        if (!timerRunning && wheelValue != timerMinutes && timerMinutes > 0) {
+            wheelValue = timerMinutes
+        }
     }
 
+    val wheelAlpha by animateFloatAsState(
+        targetValue = if (timerRunning) 0f else 1f,
+        animationSpec = tween(durationMillis = 0),
+        label = "wheelAlpha"
+    )
+    val wheelScale by animateFloatAsState(
+        targetValue = if (timerRunning) 0.93f else 1f,
+        animationSpec = tween(durationMillis = 0),
+        label = "wheelScale"
+    )
+
+    // --- UI ---
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // TopBar
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -112,7 +117,6 @@ fun HomeScreen(
             }
         }
 
-        // --- Zentrale Spalte für Wheel, Timer & Button ---
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -120,50 +124,42 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(100.dp)) // ← HIER mehr/weniger für weiter unten/oben
-
-            // ---- Fading WheelSlider + IMMER zentrierte Minutenanzeige ----
-            val wheelAlpha by animateFloatAsState(
-                targetValue = if (isPlaying) 0f else 1f,
-                animationSpec = tween(durationMillis = 400),
-                label = "wheelAlpha"
-            )
-            val wheelScale by animateFloatAsState(
-                targetValue = if (isPlaying) 0.93f else 1f,
-                animationSpec = tween(durationMillis = 400),
-                label = "wheelScale"
-            )
+            Spacer(modifier = Modifier.height(100.dp))
 
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.height(320.dp) // ← Höhe des Bereichs für das Wheel, kann größer/kleiner
+                modifier = Modifier.height(320.dp)
             ) {
                 WheelSlider(
-                    value = initialMinutes,
-                    onValueChange = { value ->
-                        initialMinutes = value
-                        runningMinutes = value
-                        scope.launch { TimerPreferenceHelper.setTimer(context, value) }
+                    value = wheelValue,
+                    onValueChange = {
+                        if (!timerRunning) {
+                            wheelValue = it
+                            scope.launch { TimerPreferenceHelper.setTimer(context, it) }
+                        }
                     },
-                    showCenterText = !isPlaying,
+                    showCenterText = !timerRunning,
                     wheelAlpha = wheelAlpha,
                     wheelScale = wheelScale
                 )
-                // Die Minutenanzeige bleibt IMMER an gleicher Stelle!
+                // --- MINUTEN + SEKUNDEN ---
                 TimerCenterText(
-                    minutes = if (isPlaying) runningMinutes else initialMinutes
+                    minutes = remainingMinutes,
+                    seconds = remainingSeconds
                 )
             }
 
-            Spacer(modifier = Modifier.height(60.dp)) // ← HIER mehr/weniger für Button-Position
+            Spacer(modifier = Modifier.height(60.dp))
 
-            // Playbutton direkt UNTER dem Wheel, immer zentriert
             IconButton(
                 onClick = {
-                    if (!isPlaying && initialMinutes > 0) {
-                        isPlaying = true
-                    } else if (isPlaying) {
-                        isPlaying = false
+                    scope.launch {
+                        if (!timerRunning && wheelValue > 0) {
+                            TimerPreferenceHelper.startTimer(context, wheelValue)
+                        } else if (timerRunning) {
+                            // Hier NICHT remainingMinutes, sondern wheelValue oder timerMinutes speichern!
+                            TimerPreferenceHelper.stopTimer(context, timerMinutes)
+                        }
                     }
                 },
                 modifier = Modifier
@@ -171,8 +167,8 @@ fun HomeScreen(
                     .background(Color.White, shape = MaterialTheme.shapes.extraLarge)
             ) {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) stringResource(R.string.pause) else stringResource(R.string.play),
+                    imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (timerRunning) stringResource(R.string.pause) else stringResource(R.string.play),
                     tint = Color.Black,
                     modifier = Modifier.size(44.dp)
                 )
@@ -180,3 +176,5 @@ fun HomeScreen(
         }
     }
 }
+
+

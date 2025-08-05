@@ -12,20 +12,24 @@ import androidx.compose.ui.unit.sp
 import com.tigonic.snoozely.R
 
 @Composable
-fun TimerCenterText(minutes: Int) {
+fun TimerCenterText(
+    minutes: Int,
+    seconds: Int = 0
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = minutes.toString(),
+            text = String.format("%02d:%02d", minutes, seconds),
             fontWeight = FontWeight.ExtraBold,
             style = MaterialTheme.typography.displayLarge,
             color = Color.White
         )
         Text(
-            text = stringResource(R.string.minutes),
+            text = stringResource(R.string.minutes), // Optional, du kannst das jetzt auch ausblenden!
             fontWeight = FontWeight.Normal,
-            color = Color.White,
+            color = Color(0xAAFFFFFF),
             style = MaterialTheme.typography.titleMedium,
             letterSpacing = 2.sp
         )
     }
 }
+
