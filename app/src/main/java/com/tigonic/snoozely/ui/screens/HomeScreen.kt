@@ -120,7 +120,7 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(100.dp)) // ← HIER mehr/weniger für weiter unten/oben
 
             // ---- Fading WheelSlider + IMMER zentrierte Minutenanzeige ----
             val wheelAlpha by animateFloatAsState(
@@ -136,7 +136,7 @@ fun HomeScreen(
 
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.height(320.dp) // Platz bleibt immer gleich!
+                modifier = Modifier.height(320.dp) // ← Höhe des Bereichs für das Wheel, kann größer/kleiner
             ) {
                 WheelSlider(
                     value = initialMinutes,
@@ -155,7 +155,7 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(modifier = Modifier.height(60.dp)) // ← HIER mehr/weniger für Button-Position
 
             // Playbutton direkt UNTER dem Wheel, immer zentriert
             IconButton(
