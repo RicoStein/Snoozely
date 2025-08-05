@@ -18,17 +18,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.util.LocaleHelper
+import com.tigonic.snoozely.util.SettingsPreferenceHelper
+import kotlinx.coroutines.launch
 import android.os.Build
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    var stopAudio by remember { mutableStateOf(true) }
-    var screenOff by remember { mutableStateOf(false) }
-    var notificationEnabled by remember { mutableStateOf(false) }
-    var timerVibrate by remember { mutableStateOf(false) }
-    var fadeOut by remember { mutableStateOf(30f) }
-
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Alle States kommen aus DataStore!
+    val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
+    val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
+    val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(context).collectAsState(initial = false)
+    val timerVibrate by SettingsPreferenceHelper.getTimerVibrate(context).collectAsState(initial = false)
+    val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
+    val language by SettingsPreferenceHelper.getLanguage(context).collectAsState(initial = "de")
 
     Column(
         modifier = Modifier
@@ -73,7 +78,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             title = stringResource(R.string.playback),
             subtitle = stringResource(R.string.stop_audio_video),
             checked = stopAudio,
-            onCheckedChange = { stopAudio = it },
+            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setStopAudio(context, value) } },
             enabled = true
         )
 
@@ -91,7 +96,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         )
         Slider(
             value = fadeOut,
-            onValueChange = { fadeOut = it },
+            onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setFadeOut(context, value) } },
             valueRange = 0f..120f,
             steps = 11,
             colors = SliderDefaults.colors(
@@ -110,11 +115,11 @@ fun SettingsScreen(onBack: () -> Unit) {
             title = stringResource(R.string.screen),
             subtitle = stringResource(R.string.turn_off_screen),
             checked = screenOff,
-            onCheckedChange = { screenOff = it },
+            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setScreenOff(context, value) } },
             enabled = true
         )
 
-        // Bluetooth deaktiviert
+        // Bluetooth deaktiviert (Dummy, bleibt wie es ist)
         SettingsRow(
             icon = Icons.Default.BluetoothDisabled,
             title = stringResource(R.string.bluetooth),
@@ -124,7 +129,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             enabled = false
         )
 
-        // WLAN deaktiviert
+        // WLAN deaktiviert (Dummy, bleibt wie es ist)
         SettingsRow(
             icon = Icons.Default.WifiOff,
             title = stringResource(R.string.wifi),
@@ -151,7 +156,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             title = stringResource(R.string.enable_notification),
             subtitle = stringResource(R.string.show_remaining_time),
             checked = notificationEnabled,
-            onCheckedChange = { notificationEnabled = it },
+            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, value) } },
             enabled = true
         )
 
@@ -169,7 +174,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             title = stringResource(R.string.timer),
             subtitle = stringResource(R.string.device_vibrate_on_timer),
             checked = timerVibrate,
-            onCheckedChange = { timerVibrate = it },
+            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setTimerVibrate(context, value) } },
             enabled = true
         )
 
@@ -180,11 +185,19 @@ fun SettingsScreen(onBack: () -> Unit) {
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(vertical = 4.dp)
         )
-        LanguageDropdown()
+        LanguageDropdown(
+            selectedLangCode = language,
+            onSelect = { code ->
+                val activity = context as? Activity
+                if (activity != null) {
+                    LocaleHelper.setAppLocaleAndRestart(activity, code)
+                    scope.launch { SettingsPreferenceHelper.setLanguage(context, code) }
+                }
+            }
+        )
     }
 }
 
-// Hilfsfunktion für eine Einstellungszeile
 @Composable
 fun SettingsRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -241,37 +254,21 @@ fun SettingsRow(
 }
 
 @Composable
-fun LanguageDropdown() {
+fun LanguageDropdown(
+    selectedLangCode: String,
+    onSelect: (String) -> Unit
+) {
     val context = LocalContext.current
     val activity = context as? Activity
     var expanded by remember { mutableStateOf(false) }
 
-    // Sprachzuordnung: Anzeigename → ISO-Code
     val languageMap = mapOf(
         stringResource(R.string.german) to "de",
         stringResource(R.string.english) to "en",
         stringResource(R.string.french) to "fr"
     )
     val languages = languageMap.keys.toList()
-
-    // Hole aktuelle Sprache jedes Mal neu (immer im Compose-Kontext!)
-    val currentLangCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        context.resources.configuration.locales[0].language
-    } else {
-        @Suppress("DEPRECATION")
-        context.resources.configuration.locale.language
-    }
-    // Ermittle das aktuelle Label (aus Map, passend zum Sprach-Code)
-    val initialLabel = languageMap.entries.firstOrNull { it.value == currentLangCode }?.key ?: languages.first()
-
-    // selectedLanguage NICHT in remember block initialisieren!
-    var selectedLanguage by remember { mutableStateOf(initialLabel) }
-
-    // Update das Label, wenn sich die aktuelle Sprache geändert hat
-    LaunchedEffect(currentLangCode) {
-        val newLabel = languageMap.entries.firstOrNull { it.value == currentLangCode }?.key ?: languages.first()
-        selectedLanguage = newLabel
-    }
+    val label = languageMap.entries.firstOrNull { it.value == selectedLangCode }?.key ?: languages.first()
 
     Box(
         modifier = Modifier
@@ -288,7 +285,7 @@ fun LanguageDropdown() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = selectedLanguage,
+                text = label,
                 color = Color.White,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
@@ -307,18 +304,12 @@ fun LanguageDropdown() {
             onDismissRequest = { expanded = false },
             modifier = Modifier.background(Color(0xFF242449))
         ) {
-            languages.forEach { lang ->
+            languageMap.forEach { (name, code) ->
                 DropdownMenuItem(
-                    text = { Text(lang, color = Color.White) },
+                    text = { Text(name, color = Color.White) },
                     onClick = {
-                        selectedLanguage = lang
                         expanded = false
-                        languageMap[lang]?.let { code ->
-                            if (activity != null) {
-                                // Sprache wechseln und App neustarten
-                                LocaleHelper.setAppLocaleAndRestart(activity, code)
-                            }
-                        }
+                        onSelect(code)
                     }
                 )
             }

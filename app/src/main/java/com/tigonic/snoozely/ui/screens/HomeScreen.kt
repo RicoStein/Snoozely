@@ -41,7 +41,7 @@ fun HomeScreen(
 
     var wheelValue by rememberSaveable { mutableStateOf(15) }
 
-    // ---- SEKUNDEN-TICKER FÜR RECOMPOSITION ----
+    // Für "Sekunden-Ticker" wie vorher
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning) {
