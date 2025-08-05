@@ -1,8 +1,7 @@
 package com.tigonic.snoozely.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -16,12 +15,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.delay
@@ -79,53 +81,11 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Timerblock/Fading außerhalb der Column!
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 96.dp) // evtl. anpassen!
-                .height(300.dp)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            AnimatedVisibility(
-                visible = !isPlaying,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                WheelSlider(
-                    value = initialMinutes,
-                    onValueChange = { value ->
-                        initialMinutes = value
-                        runningMinutes = value
-                        scope.launch { TimerPreferenceHelper.setTimer(context, value) }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    showCenterText = true
-                )
-            }
-            if (isPlaying) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = runningMinutes.toString(),
-                        color = Color.White,
-                        fontWeight = FontWeight.ExtraBold,
-                        style = MaterialTheme.typography.displayLarge
-                    )
-                    Text(
-                        text = stringResource(R.string.minutes),
-                        color = Color(0xAAFFFFFF),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
-        }
-
+        // TopBar
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
                 .padding(top = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -150,9 +110,54 @@ fun HomeScreen(
                     )
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(340.dp)) // genug Platz für TimerBlock oben!
+        // --- Zentrale Spalte für Wheel, Timer & Button ---
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 0.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Spacer(modifier = Modifier.height(64.dp))
 
+            // ---- Fading WheelSlider + IMMER zentrierte Minutenanzeige ----
+            val wheelAlpha by animateFloatAsState(
+                targetValue = if (isPlaying) 0f else 1f,
+                animationSpec = tween(durationMillis = 400),
+                label = "wheelAlpha"
+            )
+            val wheelScale by animateFloatAsState(
+                targetValue = if (isPlaying) 0.93f else 1f,
+                animationSpec = tween(durationMillis = 400),
+                label = "wheelScale"
+            )
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.height(320.dp) // Platz bleibt immer gleich!
+            ) {
+                WheelSlider(
+                    value = initialMinutes,
+                    onValueChange = { value ->
+                        initialMinutes = value
+                        runningMinutes = value
+                        scope.launch { TimerPreferenceHelper.setTimer(context, value) }
+                    },
+                    showCenterText = !isPlaying,
+                    wheelAlpha = wheelAlpha,
+                    wheelScale = wheelScale
+                )
+                // Die Minutenanzeige bleibt IMMER an gleicher Stelle!
+                TimerCenterText(
+                    minutes = if (isPlaying) runningMinutes else initialMinutes
+                )
+            }
+
+            Spacer(modifier = Modifier.height(60.dp))
+
+            // Playbutton direkt UNTER dem Wheel, immer zentriert
             IconButton(
                 onClick = {
                     if (!isPlaying && initialMinutes > 0) {

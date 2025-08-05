@@ -3,13 +3,14 @@ package com.tigonic.snoozely.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -17,12 +18,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
 import kotlin.math.*
-import com.tigonic.snoozely.R
-import androidx.compose.ui.res.stringResource
+import com.tigonic.snoozely.ui.components.TimerCenterText
 
 @Composable
 fun WheelSlider(
@@ -32,10 +32,20 @@ fun WheelSlider(
     minValue: Int = 0,
     maxValue: Int = 600,
     stepsPerCircle: Int = 60,
-    showCenterText: Boolean = true
+    showCenterText: Boolean = true,
+    wheelAlpha: Float = 1f,
+    wheelScale: Float = 1f
 ) {
     val size = 300.dp
     val stroke = 12.dp
+    val handleRadius = 16.dp
+
+    val density = LocalDensity.current
+    val sizePx = with(density) { size.toPx() }
+    val strokePx = with(density) { stroke.toPx() }
+    val handlePx = with(density) { handleRadius.toPx() }
+    val wheelRadius = (sizePx - strokePx) / 2f
+    val center = Offset(sizePx / 2, sizePx / 2)
 
     var rounds by remember { mutableStateOf(value / stepsPerCircle) }
     var angleInCircle by remember { mutableStateOf((value % stepsPerCircle) * 360f / stepsPerCircle) }
@@ -46,133 +56,137 @@ fun WheelSlider(
         return (rounds * stepsPerCircle + minutesInCircle).coerceIn(minValue, maxValue)
     }
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-    ) {
-        Canvas(
-            modifier = Modifier
+    val valueForSweep = calcValue(rounds, angleInCircle)
+    val sweep = (valueForSweep * 360f / stepsPerCircle)
+    val radians = Math.toRadians((sweep - 90f).toDouble())
+    val handleCenter = Offset(
+        x = (center.x + cos(radians) * wheelRadius).toFloat(),
+        y = (center.y + sin(radians) * wheelRadius).toFloat()
+    )
+
+    if (wheelAlpha > 0f) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
                 .size(size)
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val center = this.size.width / 2f
-                            val x = offset.x - center
-                            val y = offset.y - center
-                            val angle = ((Math.toDegrees(atan2(y.toDouble(), x.toDouble())) + 450) % 360).toFloat()
-                            lastAngle = angle
-                        },
-                        onDrag = { change: PointerInputChange, _: Offset ->
-                            val center = this.size.width / 2f
-                            val x = change.position.x - center
-                            val y = change.position.y - center
-                            val angle = ((Math.toDegrees(atan2(y.toDouble(), x.toDouble())) + 450) % 360).toFloat()
-
-                            lastAngle?.let { prevAngle ->
-                                var delta = angle - prevAngle
-                                if (delta > 180f) delta -= 360f
-                                if (delta < -180f) delta += 360f
-
-                                var newAngle = angleInCircle + delta
-                                var newRounds = rounds
-
-                                if (newAngle >= 360f) {
-                                    newAngle -= 360f
-                                    newRounds++
-                                } else if (newAngle < 0f) {
-                                    if (newRounds > 0) {
-                                        newAngle += 360f
-                                        newRounds--
-                                    } else {
-                                        newAngle = 0f
-                                        lastAngle = angle
-                                        val newValue = calcValue(newRounds, newAngle)
-                                        onValueChange(newValue)
-                                        return@detectDragGestures
-                                    }
-                                }
-
-                                val newValue = calcValue(newRounds, newAngle)
-                                onValueChange(newValue)
-                                angleInCircle = newAngle
-                                rounds = newRounds
+                .clip(CircleShape)
+                .scale(wheelScale)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .matchParentSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                val cx = sizePx / 2f
+                                val cy = sizePx / 2f
+                                val x = offset.x - cx
+                                val y = offset.y - cy
+                                val angle = ((Math.toDegrees(atan2(y.toDouble(), x.toDouble())) + 450) % 360).toFloat()
                                 lastAngle = angle
-                            }
-                        },
-                        onDragEnd = {
-                            lastAngle = null
-                        },
-                        onDragCancel = {
-                            lastAngle = null
-                        }
+                            },
+                            onDrag = { change: PointerInputChange, _: Offset ->
+                                val cx = sizePx / 2f
+                                val cy = sizePx / 2f
+                                val x = change.position.x - cx
+                                val y = change.position.y - cy
+                                val angle = ((Math.toDegrees(atan2(y.toDouble(), x.toDouble())) + 450) % 360).toFloat()
+
+                                lastAngle?.let { prevAngle ->
+                                    var delta = angle - prevAngle
+                                    if (delta > 180f) delta -= 360f
+                                    if (delta < -180f) delta += 360f
+
+                                    var newAngle = angleInCircle + delta
+                                    var newRounds = rounds
+
+                                    if (newAngle >= 360f) {
+                                        newAngle -= 360f
+                                        newRounds++
+                                    } else if (newAngle < 0f) {
+                                        if (newRounds > 0) {
+                                            newAngle += 360f
+                                            newRounds--
+                                        } else {
+                                            newAngle = 0f
+                                            lastAngle = angle
+                                            val newValue = calcValue(newRounds, newAngle)
+                                            onValueChange(newValue)
+                                            return@detectDragGestures
+                                        }
+                                    }
+
+                                    val newValue = calcValue(newRounds, newAngle)
+                                    onValueChange(newValue)
+                                    angleInCircle = newAngle
+                                    rounds = newRounds
+                                    lastAngle = angle
+                                }
+                            },
+                            onDragEnd = { lastAngle = null },
+                            onDragCancel = { lastAngle = null }
+                        )
+                    }
+            ) {
+                val sweepColors = listOf(
+                    Color(0xFFFF2222), Color(0xFFFF531B), Color(0xFFFF851E), Color(0xFFFFB719), Color(0xFFFFEA16),
+                    Color(0xFFFFFF15), Color(0xFFFFEA16), Color(0xFFFFB719), Color(0xFFFF851E), Color(0xFFFF531B), Color(0xFFFF2222)
+                )
+                val steps = sweepColors.size - 1
+                val rotateCount = ((steps * sweep / 360f).roundToInt() + steps) % steps
+                val rotatedColors = sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
+
+                drawCircle(
+                    color = Color(0xFF22252A),
+                    radius = wheelRadius,
+                    center = center,
+                    style = Stroke(width = strokePx)
+                )
+                if (valueForSweep > 0) {
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            colors = rotatedColors,
+                            center = center
+                        ),
+                        startAngle = -90f,
+                        sweepAngle = sweep,
+                        useCenter = false,
+                        style = Stroke(width = strokePx, cap = StrokeCap.Round),
+                        topLeft = Offset(
+                            center.x - wheelRadius,
+                            center.y - wheelRadius
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            wheelRadius * 2,
+                            wheelRadius * 2
+                        )
                     )
                 }
-        ) {
-            // Farben für den Verlauf
-            val sweepColors = listOf(
-                Color(0xFFFF2222), Color(0xFFFF531B), Color(0xFFFF851E), Color(0xFFFFB719), Color(0xFFFFEA16),
-                Color(0xFFFFFF15), Color(0xFFFFEA16), Color(0xFFFFB719), Color(0xFFFF851E), Color(0xFFFF531B), Color(0xFFFF2222)
-            )
-            val valueForSweep = calcValue(rounds, angleInCircle)
-            val sweep = (valueForSweep * 360f / stepsPerCircle)
-            val center = Offset(this.size.width / 2, this.size.height / 2)
-
-            // Immer ein dunkler Hintergrundkreis!
-            drawCircle(
-                color = Color(0xFF22252A), // dunkelgrauer Track
-                style = Stroke(width = stroke.toPx())
-            )
-
-            // Fortschritts-Bogen wie gehabt
-            val steps = sweepColors.size - 1
-            val rotateCount = ((steps * sweep / 360f).roundToInt() + steps) % steps
-            val rotatedColors = sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
-
-            if (valueForSweep > 0) {
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        colors = rotatedColors,
-                        center = center
-                    ),
-                    startAngle = -90f,
-                    sweepAngle = sweep,
-                    useCenter = false,
-                    style = Stroke(width = stroke.toPx(), cap = StrokeCap.Round)
-                )
             }
 
-            // Handle auf dem Rand
-            val radians = Math.toRadians((sweep - 90f).toDouble())
-            val radius = (size.toPx() - stroke.toPx()) / 2 + stroke.toPx() / 2 - 1.dp.toPx()
-            val handleCenter = Offset(
-                x = (center.x + cos(radians) * radius).toFloat(),
-                y = (center.y + sin(radians) * radius).toFloat()
-            )
-            drawCircle(
-                color = Color.White,
-                radius = 16.dp.toPx(),
-                center = handleCenter
-            )
         }
 
-        // Minutenanzeige in der Mitte (nur wenn gewünscht)
-        if (showCenterText) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+        // HANDLE (Punkt)
+        Box(
+            modifier = Modifier
+                .size(size)
+                .scale(wheelScale),
+            contentAlignment = Alignment.TopStart
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .size(handleRadius * 2)
+                    .absoluteOffset {
+                        IntOffset(
+                            (handleCenter.x - handlePx).roundToInt(),
+                            (handleCenter.y - handlePx).roundToInt()
+                        )
+                    }
             ) {
-                val valueForText = calcValue(rounds, angleInCircle)
-                Text(
-                    text = valueForText.toString(),
-                    fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.displayLarge,
-                    color = Color.White
-                )
-                Text(
-                    text = stringResource(R.string.minutes),
-                    fontWeight = FontWeight.Normal,
-                    color = Color(0xAAFFFFFF),
-                    style = MaterialTheme.typography.titleMedium,
-                    letterSpacing = 2.sp
+                drawCircle(
+                    color = Color.White,
+                    radius = handlePx,
+                    center = Offset(handlePx, handlePx)
                 )
             }
         }
