@@ -46,14 +46,27 @@ fun HomeScreen(
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
-    if (timerMinutes == 0) {
-        Box(
-            Modifier.fillMaxSize().background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Lade...", color = Color.White)
+    //val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = null)
+
+    when {
+        timerMinutes == null || timerMinutes == 0 -> {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Lade...", color = Color.White)
+            }
+            return
         }
-        return
+        timerMinutes < 1 -> {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Minuten müssen mindestens 1 sein", color = Color.White)
+            }
+            return
+        }
     }
 
     // --- Turbo-Test-Ticker ---
@@ -168,14 +181,16 @@ fun HomeScreen(
                 WheelSlider(
                     value = timerMinutes,
                     onValueChange = { value ->
-                        if (!timerRunning) {
+                        if (!timerRunning && value >= 1) { // <--- MINDESTWERT 1
                             scope.launch { TimerPreferenceHelper.setTimer(context, value) }
                         }
                     },
+                    minValue = 1,
                     showCenterText = !timerRunning,
                     wheelAlpha = wheelAlpha,
                     wheelScale = wheelScale
                 )
+
                 // --- MINUTEN + SEKUNDEN ---
                 TimerCenterText(
                     minutes = remainingMinutes,

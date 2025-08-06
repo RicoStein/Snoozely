@@ -29,7 +29,7 @@ fun WheelSlider(
     value: Int,
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    minValue: Int = 0,
+    minValue: Int = 1,
     maxValue: Int = 600,
     stepsPerCircle: Int = 60,
     showCenterText: Boolean = true,

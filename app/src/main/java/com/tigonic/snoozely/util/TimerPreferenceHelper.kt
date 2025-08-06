@@ -20,6 +20,7 @@ object TimerPreferenceHelper {
         context.dataStore.data.map { it[TIMER_KEY] ?: 0 }
 
     suspend fun setTimer(context: Context, minutes: Int) {
+        if (minutes < 1) return // Niemals 0 oder negativ speichern!
         context.dataStore.edit { it[TIMER_KEY] = minutes }
     }
 
