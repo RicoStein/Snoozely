@@ -61,6 +61,6 @@ dependencies {
     implementation("androidx.compose.ui:ui:1.6.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-
+    implementation("com.google.accompanist:accompanist-navigation-animation:0.34.0")
 
 }

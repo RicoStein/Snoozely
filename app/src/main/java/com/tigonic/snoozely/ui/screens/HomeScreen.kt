@@ -1,5 +1,7 @@
 package com.tigonic.snoozely.ui.screens
 
+import android.content.Context
+import android.media.AudioManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -13,7 +15,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,6 +26,7 @@ import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.util.TimerPreferenceHelper
+import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -35,13 +37,25 @@ fun HomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 15)
+    // --- Settings (für Bildschirm ausschalten etc.) ---
+    val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
+    val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
+
+    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = null)
+    if (timerMinutes == null) {
+        // Ladeanzeige oder gar nichts anzeigen!
+        Box(
+            Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Lade...", color = Color.White)
+        }
+        return
+    }
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
 
-    var wheelValue by rememberSaveable { mutableStateOf(15) }
-
-    // Für "Sekunden-Ticker" wie vorher
+    // --- SEKUNDEN-TICKER ---
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning) {
@@ -56,19 +70,11 @@ fun HomeScreen(
     val totalSeconds = if (timerRunning && timerStartTime > 0L) {
         val elapsedMillis = now - timerStartTime
         val elapsedSec = (elapsedMillis / 1000).toInt()
-        val rest = (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
-        rest
-    } else timerMinutes * 60
+        (timerMinutes!! * 60 - elapsedSec).coerceAtLeast(0)
+    } else timerMinutes!! * 60
 
     val remainingMinutes = totalSeconds / 60
     val remainingSeconds = totalSeconds % 60
-
-    // --- Wheel folgt timerMinutes nur, wenn nicht running
-    LaunchedEffect(timerMinutes, timerRunning) {
-        if (!timerRunning && wheelValue != timerMinutes && timerMinutes > 0) {
-            wheelValue = timerMinutes
-        }
-    }
 
     val wheelAlpha by animateFloatAsState(
         targetValue = if (timerRunning) 0f else 1f,
@@ -80,6 +86,23 @@ fun HomeScreen(
         animationSpec = tween(durationMillis = 0),
         label = "wheelScale"
     )
+
+    // --- AKTIONEN nach Ablauf des Timers ---
+    var actionTriggered by remember { mutableStateOf(false) }
+    LaunchedEffect(totalSeconds, timerRunning, stopAudio) {
+        // Timer ist abgelaufen!
+        if (timerRunning && totalSeconds == 0 && !actionTriggered) {
+            actionTriggered = true
+            if (stopAudio) {
+                stopMusicPlayback(context)
+            }
+            // Bildschirm ausschalten wäre hier ebenfalls möglich, wie zuvor besprochen
+        }
+        // Reset-Flag, falls Timer gestoppt oder neu gestartet wird:
+        if (!timerRunning || totalSeconds > 0) {
+            actionTriggered = false
+        }
+    }
 
     // --- UI ---
     Box(
@@ -131,11 +154,10 @@ fun HomeScreen(
                 modifier = Modifier.height(320.dp)
             ) {
                 WheelSlider(
-                    value = wheelValue,
-                    onValueChange = {
+                    value = timerMinutes!!,
+                    onValueChange = { value ->
                         if (!timerRunning) {
-                            wheelValue = it
-                            scope.launch { TimerPreferenceHelper.setTimer(context, it) }
+                            scope.launch { TimerPreferenceHelper.setTimer(context, value) }
                         }
                     },
                     showCenterText = !timerRunning,
@@ -154,11 +176,10 @@ fun HomeScreen(
             IconButton(
                 onClick = {
                     scope.launch {
-                        if (!timerRunning && wheelValue > 0) {
-                            TimerPreferenceHelper.startTimer(context, wheelValue)
+                        if (!timerRunning && timerMinutes!! > 0) {
+                            TimerPreferenceHelper.startTimer(context, timerMinutes!!)
                         } else if (timerRunning) {
-                            // Hier NICHT remainingMinutes, sondern wheelValue oder timerMinutes speichern!
-                            TimerPreferenceHelper.stopTimer(context, timerMinutes)
+                            TimerPreferenceHelper.stopTimer(context, timerMinutes!!)
                         }
                     }
                 },
@@ -177,4 +198,15 @@ fun HomeScreen(
     }
 }
 
-
+/**
+ * Holt den Audio-Fokus transient und unterbricht damit Spotify, YouTube usw.
+ */
+fun stopMusicPlayback(context: Context) {
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    // Der Callback kann leer sein, wichtig ist nur das Requesten!
+    audioManager.requestAudioFocus(
+        { }, // Kein spezieller Listener nötig
+        AudioManager.STREAM_MUSIC,
+        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+    )
+}
