@@ -54,17 +54,14 @@ fun HomeScreen(
                 Modifier.fillMaxSize().background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Lade...", color = Color.White)
+                Text(
+                    stringResource(R.string.appLoading),
+                    color = Color.White,
+                )
             }
-            return
-        }
-        timerMinutes < 1 -> {
-            Box(
-                Modifier.fillMaxSize().background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Minuten müssen mindestens 1 sein", color = Color.White)
-            }
+
+
+
             return
         }
     }

@@ -26,4 +26,5 @@
     <string name="play">Play</string>
     <string name="back">Zurück</string>
     <string name="minutes">MINUTEN</string>
+    <string name="appLoading">Lade...</string>
 </resources>
