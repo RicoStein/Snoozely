@@ -46,10 +46,12 @@ fun HomeScreen(
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
-    //val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = null)
+    // State für Initialwert beim Start speichern!
+    var initialTimerValue by remember { mutableStateOf(timerMinutes) }
 
+    // Ladeanzeige oder Timer ungültig
     when {
-        timerMinutes == null || timerMinutes == 0 -> {
+        timerMinutes == null || timerMinutes < 1 -> {
             Box(
                 Modifier.fillMaxSize().background(Color.Black),
                 contentAlignment = Alignment.Center
@@ -59,16 +61,11 @@ fun HomeScreen(
                     color = Color.White,
                 )
             }
-
-
-
             return
         }
     }
 
     // --- "Sekunden-Ticker" ---
-
-// Ein State, der regelmäßig aktualisiert wird, um die Zeit anzuzeigen
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(timerRunning, timerStartTime) {
@@ -80,7 +77,7 @@ fun HomeScreen(
         }
     }
 
-// Berechne vergangene Sekunden
+    // Berechne vergangene Sekunden
     val startTimeValid = timerRunning && timerStartTime > 0L
     val elapsedMillis = if (startTimeValid) now - timerStartTime else 0L
     val elapsedSec = (elapsedMillis / 1000).toInt()
@@ -88,8 +85,8 @@ fun HomeScreen(
     // verbleibende Sekunden
     val totalSeconds = when {
         !timerRunning -> timerMinutes * 60
-        !startTimeValid -> timerMinutes * 60 // Initial Frame NACH Start, aber BEVOR startTime gesetzt ist
-        elapsedSec < 0 -> timerMinutes * 60  // Falls Systemzeit verrückt spielt
+        !startTimeValid -> timerMinutes * 60
+        elapsedSec < 0 -> timerMinutes * 60
         else -> (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
     }
 
@@ -107,13 +104,15 @@ fun HomeScreen(
         label = "wheelScale"
     )
 
-// --- AKTIONEN nach Ablauf des Timers ---
+    // --- AKTIONEN nach Ablauf des Timers ---
     var fadeOutStarted by remember { mutableStateOf(false) }
 
+    // State zum Merken ob Timer abgelaufen war (um Reset zu verhindern bis neuer Start)
+    var timerWasFinished by remember { mutableStateOf(false) }
 
     LaunchedEffect(totalSeconds, timerRunning, stopAudio, fadeOut) {
         if (timerRunning && stopAudio) {
-            // Fadet-out starten, sobald die Zeit erreicht ist
+            // Fade-out starten, sobald die Zeit erreicht ist
             if (!fadeOutStarted && fadeOut > 0 && totalSeconds == fadeOut.toInt()) {
                 fadeOutStarted = true
                 scope.launch {
@@ -121,18 +120,26 @@ fun HomeScreen(
                 }
             }
             // Musik richtig stoppen, wenn Timer vorbei
-            if (totalSeconds == 0) {
+            if (totalSeconds == 0 && !timerWasFinished) {
                 fadeOutStarted = false
+                timerWasFinished = true
                 stopMusicPlayback(context)
+                // Nach kurzem Delay zurücksetzen (für Animation etc.)
+                scope.launch {
+                    delay(500L)
+                    TimerPreferenceHelper.stopTimer(context, initialTimerValue)
+                }
             }
-            // Reset
+            // Reset für fadeOutStarted wenn Timer gestoppt oder wieder hochgezählt wird
             if (!timerRunning || totalSeconds > fadeOut.toInt()) {
                 fadeOutStarted = false
             }
         }
+        // Reset für timerWasFinished, wenn Timer wieder gestartet wird
+        if (!timerRunning && timerWasFinished) {
+            timerWasFinished = false
+        }
     }
-
-
 
     // --- UI ---
     Box(
@@ -186,7 +193,8 @@ fun HomeScreen(
                 WheelSlider(
                     value = timerMinutes,
                     onValueChange = { value ->
-                        if (!timerRunning && value >= 1) { // <--- MINDESTWERT 1
+                        if (!timerRunning && value >= 1) {
+                            initialTimerValue = value // Merke Startwert!
                             scope.launch { TimerPreferenceHelper.setTimer(context, value) }
                         }
                     },
@@ -196,7 +204,6 @@ fun HomeScreen(
                     wheelScale = wheelScale
                 )
 
-                // --- MINUTEN + SEKUNDEN ---
                 TimerCenterText(
                     minutes = remainingMinutes,
                     seconds = remainingSeconds
@@ -209,6 +216,7 @@ fun HomeScreen(
                 onClick = {
                     scope.launch {
                         if (!timerRunning && timerMinutes > 0) {
+                            initialTimerValue = timerMinutes // Startwert merken!
                             TimerPreferenceHelper.startTimer(context, timerMinutes)
                         } else if (timerRunning) {
                             TimerPreferenceHelper.stopTimer(context, timerMinutes)
@@ -249,8 +257,6 @@ suspend fun fadeOutMusic(context: Context, fadeOutSec: Int) {
     // Optional: originalVolume wiederherstellen, wenn du willst
     // audioManager.setStreamVolume(stream, originalVolume, 0)
 }
-
-
 
 /**
  * Holt den Audio-Fokus transient und unterbricht damit Spotify, YouTube usw.
