@@ -27,8 +27,9 @@ import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+
 
 @Composable
 fun HomeScreen(
@@ -41,8 +42,11 @@ fun HomeScreen(
     val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
     val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
 
-    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = null)
-    if (timerMinutes == null) {
+    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 0)
+    val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
+    val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
+
+    if (timerMinutes == 0) {
         // Ladeanzeige oder gar nichts anzeigen!
         Box(
             Modifier.fillMaxSize().background(Color.Black),
@@ -52,10 +56,13 @@ fun HomeScreen(
         }
         return
     }
-    val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
-    val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
+
+
+
 
     // --- SEKUNDEN-TICKER ---
+
+    /*
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning) {
@@ -65,13 +72,38 @@ fun HomeScreen(
             }
         }
     }
+    */
+
+    var simulatedElapsedSec by remember { mutableStateOf(0) }
+    val tickMillis = 100L  // <-- das L macht daraus ein Long
+
+    LaunchedEffect(timerRunning, timerStartTime) {
+        simulatedElapsedSec = 0
+        if (timerRunning) {
+            while (true) {
+                simulatedElapsedSec++
+                delay(tickMillis)
+            }
+        }
+    }
+
+
 
     // --- REMAINING: Jetzt als Sekunden berechnen! ---
+    /*
     val totalSeconds = if (timerRunning && timerStartTime > 0L) {
         val elapsedMillis = now - timerStartTime
         val elapsedSec = (elapsedMillis / 1000).toInt()
         (timerMinutes!! * 60 - elapsedSec).coerceAtLeast(0)
     } else timerMinutes!! * 60
+
+     */
+
+    val totalSeconds = if (timerRunning && timerStartTime > 0L) {
+        // Im Turbo-Test: eigene Logik verwenden!
+        (timerMinutes!! * 60 - simulatedElapsedSec).coerceAtLeast(0)
+    } else timerMinutes!! * 60
+
 
     val remainingMinutes = totalSeconds / 60
     val remainingSeconds = totalSeconds % 60
@@ -105,11 +137,13 @@ fun HomeScreen(
     }
 
     // --- UI ---
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -194,6 +228,7 @@ fun HomeScreen(
                     modifier = Modifier.size(44.dp)
                 )
             }
+
         }
     }
 }
