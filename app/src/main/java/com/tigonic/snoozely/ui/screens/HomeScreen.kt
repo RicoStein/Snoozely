@@ -66,24 +66,32 @@ fun HomeScreen(
         }
     }
 
-    // --- Turbo-Test-Ticker ---
-    var simulatedElapsedSec by remember { mutableStateOf(0) }
-    val tickMillis = 1000L  // 10x schneller
+    // --- "Sekunden-Ticker" ---
+
+// Ein State, der regelmäßig aktualisiert wird, um die Zeit anzuzeigen
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(timerRunning, timerStartTime) {
-        simulatedElapsedSec = 0
-        if (timerRunning) {
+        if (timerRunning && timerStartTime > 0L) {
             while (true) {
-                simulatedElapsedSec++
-                delay(tickMillis)
+                now = System.currentTimeMillis()
+                delay(1000)
             }
         }
     }
 
-    // --- REMAINING: Jetzt als Sekunden berechnen! ---
-    val totalSeconds = if (timerRunning && timerStartTime > 0L) {
-        (timerMinutes * 60 - simulatedElapsedSec).coerceAtLeast(0)
-    } else timerMinutes * 60
+// Berechne vergangene Sekunden
+    val startTimeValid = timerRunning && timerStartTime > 0L
+    val elapsedMillis = if (startTimeValid) now - timerStartTime else 0L
+    val elapsedSec = (elapsedMillis / 1000).toInt()
+
+    // verbleibende Sekunden
+    val totalSeconds = when {
+        !timerRunning -> timerMinutes * 60
+        !startTimeValid -> timerMinutes * 60 // Initial Frame NACH Start, aber BEVOR startTime gesetzt ist
+        elapsedSec < 0 -> timerMinutes * 60  // Falls Systemzeit verrückt spielt
+        else -> (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
+    }
 
     val remainingMinutes = totalSeconds / 60
     val remainingSeconds = totalSeconds % 60
@@ -99,9 +107,9 @@ fun HomeScreen(
         label = "wheelScale"
     )
 
-    // --- AKTIONEN nach Ablauf des Timers ---
-    // State zum Merken, ob der Fade-Out schon läuft
+// --- AKTIONEN nach Ablauf des Timers ---
     var fadeOutStarted by remember { mutableStateOf(false) }
+
 
     LaunchedEffect(totalSeconds, timerRunning, stopAudio, fadeOut) {
         if (timerRunning && stopAudio) {
