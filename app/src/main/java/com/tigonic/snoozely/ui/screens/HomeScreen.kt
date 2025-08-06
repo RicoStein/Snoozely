@@ -30,7 +30,6 @@ import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
-
 @Composable
 fun HomeScreen(
     onSettingsClick: () -> Unit,
@@ -41,13 +40,13 @@ fun HomeScreen(
     // --- Settings (für Bildschirm ausschalten etc.) ---
     val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
     val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
+    val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f) // <-- Fade-Out-Wert
 
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 0)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
     if (timerMinutes == 0) {
-        // Ladeanzeige oder gar nichts anzeigen!
         Box(
             Modifier.fillMaxSize().background(Color.Black),
             contentAlignment = Alignment.Center
@@ -57,25 +56,9 @@ fun HomeScreen(
         return
     }
 
-
-
-
-    // --- SEKUNDEN-TICKER ---
-
-    /*
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(timerRunning, timerStartTime) {
-        if (timerRunning) {
-            while (true) {
-                now = System.currentTimeMillis()
-                delay(1000)
-            }
-        }
-    }
-    */
-
+    // --- Turbo-Test-Ticker ---
     var simulatedElapsedSec by remember { mutableStateOf(0) }
-    val tickMillis = 100L  // <-- das L macht daraus ein Long
+    val tickMillis = 1000L  // 10x schneller
 
     LaunchedEffect(timerRunning, timerStartTime) {
         simulatedElapsedSec = 0
@@ -87,23 +70,10 @@ fun HomeScreen(
         }
     }
 
-
-
     // --- REMAINING: Jetzt als Sekunden berechnen! ---
-    /*
     val totalSeconds = if (timerRunning && timerStartTime > 0L) {
-        val elapsedMillis = now - timerStartTime
-        val elapsedSec = (elapsedMillis / 1000).toInt()
-        (timerMinutes!! * 60 - elapsedSec).coerceAtLeast(0)
-    } else timerMinutes!! * 60
-
-     */
-
-    val totalSeconds = if (timerRunning && timerStartTime > 0L) {
-        // Im Turbo-Test: eigene Logik verwenden!
-        (timerMinutes!! * 60 - simulatedElapsedSec).coerceAtLeast(0)
-    } else timerMinutes!! * 60
-
+        (timerMinutes * 60 - simulatedElapsedSec).coerceAtLeast(0)
+    } else timerMinutes * 60
 
     val remainingMinutes = totalSeconds / 60
     val remainingSeconds = totalSeconds % 60
@@ -120,30 +90,38 @@ fun HomeScreen(
     )
 
     // --- AKTIONEN nach Ablauf des Timers ---
-    var actionTriggered by remember { mutableStateOf(false) }
-    LaunchedEffect(totalSeconds, timerRunning, stopAudio) {
-        // Timer ist abgelaufen!
-        if (timerRunning && totalSeconds == 0 && !actionTriggered) {
-            actionTriggered = true
-            if (stopAudio) {
+    // State zum Merken, ob der Fade-Out schon läuft
+    var fadeOutStarted by remember { mutableStateOf(false) }
+
+    LaunchedEffect(totalSeconds, timerRunning, stopAudio, fadeOut) {
+        if (timerRunning && stopAudio) {
+            // Fadet-out starten, sobald die Zeit erreicht ist
+            if (!fadeOutStarted && fadeOut > 0 && totalSeconds == fadeOut.toInt()) {
+                fadeOutStarted = true
+                scope.launch {
+                    fadeOutMusic(context, fadeOut.toInt())
+                }
+            }
+            // Musik richtig stoppen, wenn Timer vorbei
+            if (totalSeconds == 0) {
+                fadeOutStarted = false
                 stopMusicPlayback(context)
             }
-            // Bildschirm ausschalten wäre hier ebenfalls möglich, wie zuvor besprochen
-        }
-        // Reset-Flag, falls Timer gestoppt oder neu gestartet wird:
-        if (!timerRunning || totalSeconds > 0) {
-            actionTriggered = false
+            // Reset
+            if (!timerRunning || totalSeconds > fadeOut.toInt()) {
+                fadeOutStarted = false
+            }
         }
     }
 
-    // --- UI ---
 
+
+    // --- UI ---
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -188,7 +166,7 @@ fun HomeScreen(
                 modifier = Modifier.height(320.dp)
             ) {
                 WheelSlider(
-                    value = timerMinutes!!,
+                    value = timerMinutes,
                     onValueChange = { value ->
                         if (!timerRunning) {
                             scope.launch { TimerPreferenceHelper.setTimer(context, value) }
@@ -210,10 +188,10 @@ fun HomeScreen(
             IconButton(
                 onClick = {
                     scope.launch {
-                        if (!timerRunning && timerMinutes!! > 0) {
-                            TimerPreferenceHelper.startTimer(context, timerMinutes!!)
+                        if (!timerRunning && timerMinutes > 0) {
+                            TimerPreferenceHelper.startTimer(context, timerMinutes)
                         } else if (timerRunning) {
-                            TimerPreferenceHelper.stopTimer(context, timerMinutes!!)
+                            TimerPreferenceHelper.stopTimer(context, timerMinutes)
                         }
                     }
                 },
@@ -228,17 +206,37 @@ fun HomeScreen(
                     modifier = Modifier.size(44.dp)
                 )
             }
-
         }
     }
 }
+
+/**
+ * Fadet die Lautstärke über fadeOutSec Sekunden auf 0 herunter und stoppt dann die Musik.
+ */
+suspend fun fadeOutMusic(context: Context, fadeOutSec: Int) {
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    val stream = AudioManager.STREAM_MUSIC
+    val originalVolume = audioManager.getStreamVolume(stream)
+    val steps = (fadeOutSec * 10).coerceAtLeast(1) // 10 Schritte pro Sekunde
+
+    for (i in steps downTo 1) {
+        val newVolume = (originalVolume * i) / steps
+        audioManager.setStreamVolume(stream, newVolume, 0)
+        delay(100L)
+    }
+    // NICHT stopMusicPlayback(context) hier!
+    // Die Musik wird nach Ablauf des Timers gestoppt!
+    // Optional: originalVolume wiederherstellen, wenn du willst
+    // audioManager.setStreamVolume(stream, originalVolume, 0)
+}
+
+
 
 /**
  * Holt den Audio-Fokus transient und unterbricht damit Spotify, YouTube usw.
  */
 fun stopMusicPlayback(context: Context) {
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    // Der Callback kann leer sein, wichtig ist nur das Requesten!
     audioManager.requestAudioFocus(
         { }, // Kein spezieller Listener nötig
         AudioManager.STREAM_MUSIC,
