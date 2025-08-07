@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.tigonic.snoozely.ui.screens
 
 import android.app.Activity
@@ -40,10 +42,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
 
-    // Status immer frisch lesen
     var isAdmin by remember { mutableStateOf(devicePolicyManager.isAdminActive(adminComponent)) }
-
-    // Settings aus DataStore
     val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
     val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
     val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(context).collectAsState(initial = false)
@@ -53,9 +52,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
     var showRemoveAdminDialog by remember { mutableStateOf(false) }
 
-    // Admin Launcher: wird benutzt zum Aktivieren
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        // Nach Rückkehr: Status prüfen & setzen
         val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
         isAdmin = nowIsAdmin
         scope.launch { SettingsPreferenceHelper.setScreenOff(context, nowIsAdmin) }
@@ -67,237 +64,241 @@ fun SettingsScreen(onBack: () -> Unit) {
         ).show()
     }
 
-    // Nach jedem Composable-Start Status prüfen
     LaunchedEffect(screenOff) {
         val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
         isAdmin = nowIsAdmin
         if (!nowIsAdmin && screenOff) {
-            // Admin wurde außerhalb entzogen → Setting auf false
             scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF101010))
-            .padding(horizontal = 16.dp)
-            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 12.dp)
-            .verticalScroll(rememberScrollState()) // <-- DAS MACHT DEN SCREEN SCROLLBAR!
-    ) {
-        // TopBar mit Back-Button
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = Color.White)
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stringResource(R.string.settings),
-                color = Color.White,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Sleep Timer
-        Text(
-            stringResource(R.string.sleep_timer),
-            color = Color(0xFF7F7FFF),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
-        )
-
-        SettingsRow(
-            icon = Icons.Default.PlayCircleFilled,
-            title = stringResource(R.string.playback),
-            subtitle = stringResource(R.string.stop_audio_video),
-            checked = stopAudio,
-            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setStopAudio(context, value) } },
-            enabled = true
-        )
-
-        // Fade-Out
-        Text(
-            stringResource(R.string.fade_out_duration),
-            color = Color.LightGray,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 12.dp)
-        )
-        Text(
-            stringResource(R.string.seconds, fadeOut.toInt()),
-            color = Color.Gray,
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Slider(
-            value = fadeOut,
-            onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setFadeOut(context, value) } },
-            valueRange = 0f..120f,
-            steps = 11,
-            colors = SliderDefaults.colors(
-                activeTrackColor = Color(0xFF7F7FFF),
-                inactiveTrackColor = Color(0x33444444),
-                thumbColor = Color(0xFF7F7FFF),
-                activeTickColor = Color.Transparent,
-                inactiveTickColor = Color.Transparent
-            ),
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
-
-        // --- Bildschirm ausschalten mit Adminrechte ---
-        SettingsRow(
-            icon = Icons.Default.Brightness2,
-            title = stringResource(R.string.screen),
-            subtitle = if (isAdmin)
-                stringResource(R.string.turn_off_screen)
-            else
-                stringResource(R.string.admin_permission_required),
-            checked = screenOff && isAdmin,
-            onCheckedChange = { value ->
-                if (value) {
-                    // Einschalten: Adminrechte holen!
-                    if (!isAdmin && activity != null) {
-                        val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                            putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
-                            putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, context.getString(R.string.device_admin_explanation))
-                        }
-                        adminLauncher.launch(intent)
-                    } else {
-                        // Schon Admin: einfach Setting setzen
-                        scope.launch { SettingsPreferenceHelper.setScreenOff(context, true) }
-                        Toast.makeText(context, context.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
+    // HIER Scaffold mit TopBar und fixiertem BottomBar!
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.settings)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
-                } else {
-                    // Ausschalten: Dialog für DeviceAdmin entfernen zeigen!
-                    if (isAdmin && activity != null) {
-                        showRemoveAdminDialog = true
-                    } else {
-                        scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
-                        Toast.makeText(context, context.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-            enabled = true
-        )
-
-        // --- Remove Device Admin Dialog ---
-        if (showRemoveAdminDialog) {
-            AlertDialog(
-                onDismissRequest = { showRemoveAdminDialog = false },
-                title = { Text(stringResource(R.string.remove_admin_title)) },
-                text = { Text(stringResource(R.string.remove_admin_message)) },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showRemoveAdminDialog = false
-                        try {
-                            devicePolicyManager.removeActiveAdmin(adminComponent)
-                            isAdmin = false
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.device_admin_disabled),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.device_admin_remove_manual_hint),
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    }) { Text(stringResource(R.string.remove_admin_confirm_button)) }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showRemoveAdminDialog = false }) {
-                        Text(stringResource(R.string.cancel))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF101010),
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                ),
+            )
+        },
+        bottomBar = {
+            // Fester Balken am unteren Rand: gleicher Farbton wie Hintergrund!
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(Color(0xFF101010))
+            )
+        },
+        containerColor = Color(0xFF101010),
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp, bottom = 8.dp) // Abstand oben/unten
+        ) {
+            // Dein Inhalt wie gehabt...
+
+            Spacer(Modifier.height(8.dp))
+
+            // Sleep Timer
+            Text(
+                stringResource(R.string.sleep_timer),
+                color = Color(0xFF7F7FFF),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+            )
+
+            SettingsRow(
+                icon = Icons.Default.PlayCircleFilled,
+                title = stringResource(R.string.playback),
+                subtitle = stringResource(R.string.stop_audio_video),
+                checked = stopAudio,
+                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setStopAudio(context, value) } },
+                enabled = true
+            )
+
+            // Fade-Out
+            Text(
+                stringResource(R.string.fade_out_duration),
+                color = Color.LightGray,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+            Text(
+                stringResource(R.string.seconds, fadeOut.toInt()),
+                color = Color.Gray,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Slider(
+                value = fadeOut,
+                onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setFadeOut(context, value) } },
+                valueRange = 0f..120f,
+                steps = 11,
+                colors = SliderDefaults.colors(
+                    activeTrackColor = Color(0xFF7F7FFF),
+                    inactiveTrackColor = Color(0x33444444),
+                    thumbColor = Color(0xFF7F7FFF),
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent
+                ),
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            // Bildschirm ausschalten mit Adminrechte
+            SettingsRow(
+                icon = Icons.Default.Brightness2,
+                title = stringResource(R.string.screen),
+                subtitle = if (isAdmin)
+                    stringResource(R.string.turn_off_screen)
+                else
+                    stringResource(R.string.admin_permission_required),
+                checked = screenOff && isAdmin,
+                onCheckedChange = { value ->
+                    if (value) {
+                        if (!isAdmin && activity != null) {
+                            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                                putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, context.getString(R.string.device_admin_explanation))
+                            }
+                            adminLauncher.launch(intent)
+                        } else {
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(context, true) }
+                            Toast.makeText(context, context.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        if (isAdmin && activity != null) {
+                            showRemoveAdminDialog = true
+                        } else {
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
+                            Toast.makeText(context, context.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                enabled = true
+            )
+
+            // Remove Device Admin Dialog
+            if (showRemoveAdminDialog) {
+                AlertDialog(
+                    onDismissRequest = { showRemoveAdminDialog = false },
+                    title = { Text(stringResource(R.string.remove_admin_title)) },
+                    text = { Text(stringResource(R.string.remove_admin_message)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showRemoveAdminDialog = false
+                            try {
+                                devicePolicyManager.removeActiveAdmin(adminComponent)
+                                isAdmin = false
+                                scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.device_admin_disabled),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.device_admin_remove_manual_hint),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }) { Text(stringResource(R.string.remove_admin_confirm_button)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRemoveAdminDialog = false }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
+                )
+            }
+
+            // Dummy Einstellungen ...
+            SettingsRow(
+                icon = Icons.Default.BluetoothDisabled,
+                title = stringResource(R.string.bluetooth),
+                subtitle = stringResource(R.string.bluetooth_android_13_removed),
+                checked = false,
+                onCheckedChange = {},
+                enabled = false
+            )
+            SettingsRow(
+                icon = Icons.Default.WifiOff,
+                title = stringResource(R.string.wifi),
+                subtitle = stringResource(R.string.wifi_android_10_removed),
+                checked = false,
+                onCheckedChange = {},
+                enabled = false
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                stringResource(R.string.notification),
+                color = Color(0xFF7F7FFF),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+
+            SettingsRow(
+                icon = Icons.Default.Notifications,
+                title = stringResource(R.string.enable_notification),
+                subtitle = stringResource(R.string.show_remaining_time),
+                checked = notificationEnabled,
+                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, value) } },
+                enabled = true
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                stringResource(R.string.haptic_feedback),
+                color = Color(0xFF7F7FFF),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            SettingsRow(
+                icon = Icons.Default.PlayCircleFilled,
+                title = stringResource(R.string.timer),
+                subtitle = stringResource(R.string.device_vibrate_on_timer),
+                checked = timerVibrate,
+                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setTimerVibrate(context, value) } },
+                enabled = true
+            )
+
+            // Sprache wählen (Dropdown)
+            Text(
+                stringResource(R.string.language),
+                color = Color(0xFF7F7FFF),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            LanguageDropdown(
+                selectedLangCode = language,
+                onSelect = { code ->
+                    if (activity != null) {
+                        LocaleHelper.setAppLocaleAndRestart(activity, code)
+                        scope.launch { SettingsPreferenceHelper.setLanguage(context, code) }
                     }
                 }
             )
+            Spacer(Modifier.height(24.dp))
         }
-
-
-        // Dummy Einstellungen ...
-        SettingsRow(
-            icon = Icons.Default.BluetoothDisabled,
-            title = stringResource(R.string.bluetooth),
-            subtitle = stringResource(R.string.bluetooth_android_13_removed),
-            checked = false,
-            onCheckedChange = {},
-            enabled = false
-        )
-        SettingsRow(
-            icon = Icons.Default.WifiOff,
-            title = stringResource(R.string.wifi),
-            subtitle = stringResource(R.string.wifi_android_10_removed),
-            checked = false,
-            onCheckedChange = {},
-            enabled = false
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        Text(
-            stringResource(R.string.notification),
-            color = Color(0xFF7F7FFF),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-        )
-
-        SettingsRow(
-            icon = Icons.Default.Notifications,
-            title = stringResource(R.string.enable_notification),
-            subtitle = stringResource(R.string.show_remaining_time),
-            checked = notificationEnabled,
-            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, value) } },
-            enabled = true
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        // Haptisches Feedback
-        Text(
-            stringResource(R.string.haptic_feedback),
-            color = Color(0xFF7F7FFF),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(vertical = 4.dp)
-        )
-        SettingsRow(
-            icon = Icons.Default.PlayCircleFilled,
-            title = stringResource(R.string.timer),
-            subtitle = stringResource(R.string.device_vibrate_on_timer),
-            checked = timerVibrate,
-            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setTimerVibrate(context, value) } },
-            enabled = true
-        )
-
-        // Sprache wählen (Dropdown)
-        Text(
-            stringResource(R.string.language),
-            color = Color(0xFF7F7FFF),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(vertical = 4.dp)
-        )
-        LanguageDropdown(
-            selectedLangCode = language,
-            onSelect = { code ->
-                if (activity != null) {
-                    LocaleHelper.setAppLocaleAndRestart(activity, code)
-                    scope.launch { SettingsPreferenceHelper.setLanguage(context, code) }
-                }
-            }
-        )
     }
 }
-
-// --- UNVERÄNDERT: SettingsRow und LanguageDropdown bleiben wie gehabt ---
 
 @Composable
 fun SettingsRow(
