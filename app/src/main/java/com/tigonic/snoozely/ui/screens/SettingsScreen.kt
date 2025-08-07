@@ -11,6 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -81,6 +83,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             .background(Color(0xFF101010))
             .padding(horizontal = 16.dp)
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 12.dp)
+            .verticalScroll(rememberScrollState()) // <-- DAS MACHT DEN SCREEN SCROLLBAR!
     ) {
         // TopBar mit Back-Button
         Row(
@@ -194,8 +197,14 @@ fun SettingsScreen(onBack: () -> Unit) {
                     TextButton(onClick = {
                         showRemoveAdminDialog = false
                         try {
-                            val intent = Intent("android.settings.ACTION_DEVICE_ADMIN_SETTINGS")
-                            context.startActivity(intent)
+                            devicePolicyManager.removeActiveAdmin(adminComponent)
+                            isAdmin = false
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.device_admin_disabled),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         } catch (e: Exception) {
                             Toast.makeText(
                                 context,
@@ -203,7 +212,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 Toast.LENGTH_LONG
                             ).show()
                         }
-                    }) { Text(stringResource(R.string.open_settings)) }
+                    }) { Text(stringResource(R.string.remove_admin_confirm_button)) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showRemoveAdminDialog = false }) {

@@ -38,7 +38,7 @@
     <string name="admin_permission_required">Adminrechte benötigt</string>
     <string name="device_admin_explanation">Admin rechte Erklärung</string>
     <string name="device_admin_remove_manual_hint">Bitte öffne die Geräteeinstellungen manuell und entferne dort den Geräteadministrator.</string>
-
+    <string name="remove_admin_confirm_button">sicher entferne?</string>
 
 
 </resources>
