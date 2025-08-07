@@ -1,6 +1,13 @@
 package com.tigonic.snoozely.ui.screens
 
 import android.app.Activity
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,21 +26,54 @@ import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.util.LocaleHelper
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
+import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 import kotlinx.coroutines.launch
-import android.os.Build
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val activity = context as? Activity
 
-    // Alle States kommen aus DataStore!
+    val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
+
+    // Status immer frisch lesen
+    var isAdmin by remember { mutableStateOf(devicePolicyManager.isAdminActive(adminComponent)) }
+
+    // Settings aus DataStore
     val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
     val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
     val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(context).collectAsState(initial = false)
     val timerVibrate by SettingsPreferenceHelper.getTimerVibrate(context).collectAsState(initial = false)
     val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
     val language by SettingsPreferenceHelper.getLanguage(context).collectAsState(initial = "de")
+
+    var showRemoveAdminDialog by remember { mutableStateOf(false) }
+
+    // Admin Launcher: wird benutzt zum Aktivieren
+    val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        // Nach Rückkehr: Status prüfen & setzen
+        val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
+        isAdmin = nowIsAdmin
+        scope.launch { SettingsPreferenceHelper.setScreenOff(context, nowIsAdmin) }
+        Toast.makeText(
+            context,
+            if (nowIsAdmin) context.getString(R.string.device_admin_enabled)
+            else context.getString(R.string.device_admin_failed),
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    // Nach jedem Composable-Start Status prüfen
+    LaunchedEffect(screenOff) {
+        val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
+        isAdmin = nowIsAdmin
+        if (!nowIsAdmin && screenOff) {
+            // Admin wurde außerhalb entzogen → Setting auf false
+            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -63,7 +103,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(8.dp))
 
-        // Bereich: Sleep Timer (blauer Titel-Link)
+        // Sleep Timer
         Text(
             stringResource(R.string.sleep_timer),
             color = Color(0xFF7F7FFF),
@@ -72,7 +112,6 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
         )
 
-        // Wiedergabe stoppen (mit Switch)
         SettingsRow(
             icon = Icons.Default.PlayCircleFilled,
             title = stringResource(R.string.playback),
@@ -82,7 +121,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             enabled = true
         )
 
-        // Fade-Out Dauer (Slider)
+        // Fade-Out
         Text(
             stringResource(R.string.fade_out_duration),
             color = Color.LightGray,
@@ -109,17 +148,73 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier.padding(horizontal = 8.dp)
         )
 
-        // Bildschirm ausschalten
+        // --- Bildschirm ausschalten mit Adminrechte ---
         SettingsRow(
             icon = Icons.Default.Brightness2,
             title = stringResource(R.string.screen),
-            subtitle = stringResource(R.string.turn_off_screen),
-            checked = screenOff,
-            onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setScreenOff(context, value) } },
+            subtitle = if (isAdmin)
+                stringResource(R.string.turn_off_screen)
+            else
+                stringResource(R.string.admin_permission_required),
+            checked = screenOff && isAdmin,
+            onCheckedChange = { value ->
+                if (value) {
+                    // Einschalten: Adminrechte holen!
+                    if (!isAdmin && activity != null) {
+                        val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                            putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                            putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, context.getString(R.string.device_admin_explanation))
+                        }
+                        adminLauncher.launch(intent)
+                    } else {
+                        // Schon Admin: einfach Setting setzen
+                        scope.launch { SettingsPreferenceHelper.setScreenOff(context, true) }
+                        Toast.makeText(context, context.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    // Ausschalten: Dialog für DeviceAdmin entfernen zeigen!
+                    if (isAdmin && activity != null) {
+                        showRemoveAdminDialog = true
+                    } else {
+                        scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
+                        Toast.makeText(context, context.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
             enabled = true
         )
 
-        // Bluetooth deaktiviert (Dummy, bleibt wie es ist)
+        // --- Remove Device Admin Dialog ---
+        if (showRemoveAdminDialog) {
+            AlertDialog(
+                onDismissRequest = { showRemoveAdminDialog = false },
+                title = { Text(stringResource(R.string.remove_admin_title)) },
+                text = { Text(stringResource(R.string.remove_admin_message)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showRemoveAdminDialog = false
+                        try {
+                            val intent = Intent("android.settings.ACTION_DEVICE_ADMIN_SETTINGS")
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.device_admin_remove_manual_hint),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }) { Text(stringResource(R.string.open_settings)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRemoveAdminDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
+
+        // Dummy Einstellungen ...
         SettingsRow(
             icon = Icons.Default.BluetoothDisabled,
             title = stringResource(R.string.bluetooth),
@@ -128,8 +223,6 @@ fun SettingsScreen(onBack: () -> Unit) {
             onCheckedChange = {},
             enabled = false
         )
-
-        // WLAN deaktiviert (Dummy, bleibt wie es ist)
         SettingsRow(
             icon = Icons.Default.WifiOff,
             title = stringResource(R.string.wifi),
@@ -141,7 +234,6 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        // Benachrichtigung (blauer Titel-Link)
         Text(
             stringResource(R.string.notification),
             color = Color(0xFF7F7FFF),
@@ -150,7 +242,6 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )
 
-        // Benachrichtigung aktivieren
         SettingsRow(
             icon = Icons.Default.Notifications,
             title = stringResource(R.string.enable_notification),
@@ -162,7 +253,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        // Haptisches Feedback (als blauer Link)
+        // Haptisches Feedback
         Text(
             stringResource(R.string.haptic_feedback),
             color = Color(0xFF7F7FFF),
@@ -188,7 +279,6 @@ fun SettingsScreen(onBack: () -> Unit) {
         LanguageDropdown(
             selectedLangCode = language,
             onSelect = { code ->
-                val activity = context as? Activity
                 if (activity != null) {
                     LocaleHelper.setAppLocaleAndRestart(activity, code)
                     scope.launch { SettingsPreferenceHelper.setLanguage(context, code) }
@@ -197,6 +287,8 @@ fun SettingsScreen(onBack: () -> Unit) {
         )
     }
 }
+
+// --- UNVERÄNDERT: SettingsRow und LanguageDropdown bleiben wie gehabt ---
 
 @Composable
 fun SettingsRow(
@@ -259,7 +351,6 @@ fun LanguageDropdown(
     onSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
     var expanded by remember { mutableStateOf(false) }
 
     val languageMap = mapOf(

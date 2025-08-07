@@ -29,6 +29,9 @@ import com.tigonic.snoozely.util.TimerPreferenceHelper
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 
 @Composable
 fun HomeScreen(
@@ -37,37 +40,36 @@ fun HomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // --- Settings (für Bildschirm ausschalten etc.) ---
+    // Einstellungen aus dem Datastore
     val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
     val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
-    val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f) // <-- Fade-Out-Wert
+    val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
 
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 0)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
-    // State für Initialwert beim Start speichern!
+    // Merke zuletzt gesetzten Startwert für Reset
     var initialTimerValue by remember { mutableStateOf(timerMinutes) }
+    var timerWasFinished by remember { mutableStateOf(false) }
+    var fadeOutStarted by remember { mutableStateOf(false) }
 
-    // Ladeanzeige oder Timer ungültig
-    when {
-        timerMinutes == null || timerMinutes < 1 -> {
-            Box(
-                Modifier.fillMaxSize().background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    stringResource(R.string.appLoading),
-                    color = Color.White,
-                )
-            }
-            return
+    // Ladeanzeige, solange Timer nicht geladen oder < 1 Minute
+    if (timerMinutes < 1) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                stringResource(R.string.appLoading),
+                color = Color.White,
+            )
         }
+        return
     }
 
-    // --- "Sekunden-Ticker" ---
+    // Sekundenticker für die Anzeige
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
-
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning && timerStartTime > 0L) {
             while (true) {
@@ -77,12 +79,10 @@ fun HomeScreen(
         }
     }
 
-    // Berechne vergangene Sekunden
     val startTimeValid = timerRunning && timerStartTime > 0L
     val elapsedMillis = if (startTimeValid) now - timerStartTime else 0L
     val elapsedSec = (elapsedMillis / 1000).toInt()
 
-    // verbleibende Sekunden
     val totalSeconds = when {
         !timerRunning -> timerMinutes * 60
         !startTimeValid -> timerMinutes * 60
@@ -104,38 +104,37 @@ fun HomeScreen(
         label = "wheelScale"
     )
 
-    // --- AKTIONEN nach Ablauf des Timers ---
-    var fadeOutStarted by remember { mutableStateOf(false) }
+    // **Nur EINE LaunchedEffect für alles, was nach Timer-Ende passieren muss**
+    LaunchedEffect(totalSeconds, timerRunning, screenOff, stopAudio, fadeOut) {
+        val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
 
-    // State zum Merken ob Timer abgelaufen war (um Reset zu verhindern bis neuer Start)
-    var timerWasFinished by remember { mutableStateOf(false) }
+        // FadeOut: Nur einmal pro Timerlauf
+        if (timerRunning && stopAudio && !fadeOutStarted && fadeOut > 0 && totalSeconds == fadeOut.toInt()) {
+            fadeOutStarted = true
+            scope.launch { fadeOutMusic(context, fadeOut.toInt()) }
+        }
+        // Musik stoppen und Timer zurücksetzen bei Ablauf
+        if (timerRunning && totalSeconds == 0 && !timerWasFinished) {
+            fadeOutStarted = false
+            timerWasFinished = true
 
-    LaunchedEffect(totalSeconds, timerRunning, stopAudio, fadeOut) {
-        if (timerRunning && stopAudio) {
-            // Fade-out starten, sobald die Zeit erreicht ist
-            if (!fadeOutStarted && fadeOut > 0 && totalSeconds == fadeOut.toInt()) {
-                fadeOutStarted = true
-                scope.launch {
-                    fadeOutMusic(context, fadeOut.toInt())
-                }
+            if (stopAudio) stopMusicPlayback(context)
+
+            // Bildschirm aus, aber nur wenn Adminrechte!
+            if (screenOff && devicePolicyManager.isAdminActive(adminComponent)) {
+                devicePolicyManager.lockNow()
             }
-            // Musik richtig stoppen, wenn Timer vorbei
-            if (totalSeconds == 0 && !timerWasFinished) {
-                fadeOutStarted = false
-                timerWasFinished = true
-                stopMusicPlayback(context)
-                // Nach kurzem Delay zurücksetzen (für Animation etc.)
-                scope.launch {
-                    delay(500L)
-                    TimerPreferenceHelper.stopTimer(context, initialTimerValue)
-                }
-            }
-            // Reset für fadeOutStarted wenn Timer gestoppt oder wieder hochgezählt wird
-            if (!timerRunning || totalSeconds > fadeOut.toInt()) {
-                fadeOutStarted = false
+            // Timer zurücksetzen (kurzes Delay für Animation)
+            scope.launch {
+                delay(500L)
+                TimerPreferenceHelper.stopTimer(context, initialTimerValue)
             }
         }
-        // Reset für timerWasFinished, wenn Timer wieder gestartet wird
+        // Reset-Flags falls Timer neu gestartet oder gestoppt wird
+        if (!timerRunning || totalSeconds > fadeOut.toInt()) {
+            fadeOutStarted = false
+        }
         if (!timerRunning && timerWasFinished) {
             timerWasFinished = false
         }
@@ -245,17 +244,14 @@ suspend fun fadeOutMusic(context: Context, fadeOutSec: Int) {
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     val stream = AudioManager.STREAM_MUSIC
     val originalVolume = audioManager.getStreamVolume(stream)
-    val steps = (fadeOutSec * 10).coerceAtLeast(1) // 10 Schritte pro Sekunde
+    val steps = (fadeOutSec * 10).coerceAtLeast(1)
 
     for (i in steps downTo 1) {
         val newVolume = (originalVolume * i) / steps
         audioManager.setStreamVolume(stream, newVolume, 0)
         delay(100L)
     }
-    // NICHT stopMusicPlayback(context) hier!
     // Die Musik wird nach Ablauf des Timers gestoppt!
-    // Optional: originalVolume wiederherstellen, wenn du willst
-    // audioManager.setStreamVolume(stream, originalVolume, 0)
 }
 
 /**

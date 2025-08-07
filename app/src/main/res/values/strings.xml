@@ -27,4 +27,18 @@
     <string name="back">Zurück</string>
     <string name="minutes">MINUTEN</string>
     <string name="appLoading">Lade...</string>
+    <string name="device_admin_enabled">Device Admin aktiviert</string>
+    <string name="device_admin_failed">Device Admin nicht aktiviert</string>
+    <string name="device_admin_disabled">Device Admin deaktiviert</string>
+    <string name="remove_admin_title">Adminrechte entfernen?</string>
+    <string name="remove_admin_message">Möchtest du die Berechtigung zum Bildschirm ausschalten entziehen? Gehe in die Geräteeinstellungen und entferne den Admin dort.</string>
+    <string name="open_settings">Geräteeinstellungen öffnen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="device_admin_remove_in_settings">Entferne die Adminrechte in den Einstellungen!</string>
+    <string name="admin_permission_required">Adminrechte benötigt</string>
+    <string name="device_admin_explanation">Admin rechte Erklärung</string>
+    <string name="device_admin_remove_manual_hint">Bitte öffne die Geräteeinstellungen manuell und entferne dort den Geräteadministrator.</string>
+
+
+
 </resources>
