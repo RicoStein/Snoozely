@@ -50,6 +50,11 @@ fun SettingsScreen(onBack: () -> Unit) {
     val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
     val language by SettingsPreferenceHelper.getLanguage(context).collectAsState(initial = "de")
 
+    // NEU: Weitere States für Benachrichtigungseinstellungen
+    var progressNotificationEnabled by remember { mutableStateOf(false) }
+    var reminderPopupEnabled by remember { mutableStateOf(false) }
+    var reminderMinutes by remember { mutableStateOf(2f) } // Slider float für Minuten, default 2
+
     var showRemoveAdminDialog by remember { mutableStateOf(false) }
 
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -72,7 +77,6 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    // HIER Scaffold mit TopBar und fixiertem BottomBar!
     Scaffold(
         topBar = {
             TopAppBar(
@@ -90,7 +94,6 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
         },
         bottomBar = {
-            // Fester Balken am unteren Rand: gleicher Farbton wie Hintergrund!
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -106,10 +109,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
-                .padding(top = 8.dp, bottom = 8.dp) // Abstand oben/unten
+                .padding(top = 8.dp, bottom = 8.dp)
         ) {
-            // Dein Inhalt wie gehabt...
-
             Spacer(Modifier.height(8.dp))
 
             // Sleep Timer
@@ -190,7 +191,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 enabled = true
             )
 
-            // Remove Device Admin Dialog
             if (showRemoveAdminDialog) {
                 AlertDialog(
                     onDismissRequest = { showRemoveAdminDialog = false },
@@ -245,6 +245,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
 
+            // --------- Benachrichtigungen ---------
             Text(
                 stringResource(R.string.notification),
                 color = Color(0xFF7F7FFF),
@@ -258,9 +259,66 @@ fun SettingsScreen(onBack: () -> Unit) {
                 title = stringResource(R.string.enable_notification),
                 subtitle = stringResource(R.string.show_remaining_time),
                 checked = notificationEnabled,
-                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, value) } },
+                onCheckedChange = { value ->
+                    scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, value) }
+                },
                 enabled = true
             )
+
+            // ---------- Dynamische Unteroptionen bei Benachrichtigungen ----------
+            if (notificationEnabled) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 28.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
+                        .background(Color(0x22111111), shape = MaterialTheme.shapes.small)
+                        .padding(8.dp)
+                ) {
+                    // Option A: Fortschrittsanzeige (Minuten/Sekunden)
+                    SettingsRow(
+                        icon = Icons.Default.Timeline,
+                        title = "Fortschritt in Benachrichtigung anzeigen",
+                        subtitle = "Zeigt die verbleibende Zeit in Minuten und Sekunden",
+                        checked = progressNotificationEnabled,
+                        onCheckedChange = { checked -> progressNotificationEnabled = checked }
+                    )
+
+                    // Option B: Reminder Interaktions-Popup (Slider für Minuten)
+                    SettingsRow(
+                        icon = Icons.Default.Alarm,
+                        title = "Reminder vor Ablauf anzeigen",
+                        subtitle = "Zeigt ein Popup/Heads-Up kurz vor Ablauf",
+                        checked = reminderPopupEnabled,
+                        onCheckedChange = { checked -> reminderPopupEnabled = checked }
+                    )
+
+                    if (reminderPopupEnabled) {
+                        // Slider für Minuten vor Ablauf
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Minuten vorher:", Modifier.padding(end = 8.dp))
+                            Slider(
+                                value = reminderMinutes,
+                                onValueChange = { reminderMinutes = it },
+                                valueRange = 1f..10f,
+                                steps = 8,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text("${reminderMinutes.toInt()} min")
+                        }
+                        Text(
+                            "Popup erscheint ${reminderMinutes.toInt()} Minuten vor Timer-Ende mit \"+5 Min\", \"Beenden\".",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(Modifier.height(12.dp))
 
@@ -299,6 +357,8 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 }
+
+// --- UNVERÄNDERT: SettingsRow und LanguageDropdown bleiben wie gehabt ---
 
 @Composable
 fun SettingsRow(
