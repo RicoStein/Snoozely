@@ -7,8 +7,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "settings_preferences")
+private val PROGRESS_EXTEND_MINUTES = intPreferencesKey("progress_extend_minutes")
 
 object SettingsPreferenceHelper {
+    // ... andere Keys ...
     private val STOP_AUDIO = booleanPreferencesKey("stop_audio")
     private val SCREEN_OFF = booleanPreferencesKey("screen_off")
     private val NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
@@ -19,39 +21,38 @@ object SettingsPreferenceHelper {
     private val SHOW_REMINDER_POPUP = booleanPreferencesKey("show_reminder_popup")
     private val REMINDER_MINUTES = intPreferencesKey("reminder_minutes")
     private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
+    // ...
 
-    // --- Getter ---
+    // --- Verlängerungsschritt ---
+    fun getProgressExtendMinutes(context: Context): Flow<Int> =
+        context.dataStore.data.map { it[PROGRESS_EXTEND_MINUTES] ?: 5 }
+
+    suspend fun setProgressExtendMinutes(context: Context, value: Int) {
+        context.dataStore.edit { it[PROGRESS_EXTEND_MINUTES] = value }
+    }
+
+    // --- Bestehende Getter/Setter wie gehabt ---
     fun getStopAudio(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[STOP_AUDIO] ?: true }
-
     fun getScreenOff(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[SCREEN_OFF] ?: false }
-
     fun getNotificationEnabled(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[NOTIFICATION_ENABLED] ?: false }
-
     fun getTimerVibrate(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[TIMER_VIBRATE] ?: false }
-
     fun getFadeOut(context: Context): Flow<Float> =
         context.dataStore.data.map { it[FADE_OUT] ?: 30f }
-
     fun getLanguage(context: Context): Flow<String> =
         context.dataStore.data.map { it[LANGUAGE] ?: "de" }
-
     fun getShowProgressNotification(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[SHOW_PROGRESS_NOTIFICATION] ?: false }
-
     fun getShowReminderPopup(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[SHOW_REMINDER_POPUP] ?: false }
-
     fun getReminderMinutes(context: Context): Flow<Int> =
         context.dataStore.data.map { it[REMINDER_MINUTES] ?: 2 }
-
     fun getIsFirstRun(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[IS_FIRST_RUN] ?: true }
 
-    // --- Setter ---
     suspend fun setStopAudio(context: Context, value: Boolean) {
         context.dataStore.edit { it[STOP_AUDIO] = value }
     }

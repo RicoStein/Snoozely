@@ -59,6 +59,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(context).collectAsState(initial = false)
     val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(context).collectAsState(initial = 2)
 
+    val progressExtendMinutes by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
+
+
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
         isAdmin = nowIsAdmin
@@ -372,15 +375,42 @@ fun SettingsScreen(onBack: () -> Unit) {
                         .padding(8.dp)
                 ) {
                     // Option A: Fortschrittsanzeige (Minuten/Sekunden)
-                    SettingsRow(
-                        icon = Icons.Default.Timeline,
-                        title = stringResource(R.string.show_progress_notification_title),
-                        subtitle = stringResource(R.string.show_progress_notification_subtitle),
-                        checked = showProgressNotification,
-                        onCheckedChange = { checked ->
-                            scope.launch { SettingsPreferenceHelper.setShowProgressNotification(context, checked) }
-                        }
+                    // Oben in der Funktion
+                    val progressExtendMinutes by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
+
+// Im UI-Bereich:
+                    Text(
+                        stringResource(R.string.extend_timer_label),
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 12.dp)
                     )
+                    Text(
+                        stringResource(R.string.timer_plus_5, progressExtendMinutes),
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Slider(
+                        value = progressExtendMinutes.toFloat(),
+                        onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(context, value.toInt()) } },
+                        valueRange = 1f..30f,
+                        steps = 29,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = Color(0xFF7F7FFF),
+                            inactiveTrackColor = Color(0x33444444),
+                            thumbColor = Color(0xFF7F7FFF),
+                            activeTickColor = Color.Transparent,
+                            inactiveTickColor = Color.Transparent
+                        ),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Text(
+                        stringResource(R.string.show_progress_notification_subtitle),
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+
 
                     // Option B: Reminder Interaktions-Popup (Slider für Minuten)
                     SettingsRow(

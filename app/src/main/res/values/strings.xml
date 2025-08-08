@@ -45,7 +45,7 @@
 
     <!-- Benachrichtigungs-Optionen -->
     <string name="show_progress_notification_title">Fortschritt in Benachrichtigung anzeigen</string>
-    <string name="show_progress_notification_subtitle">Zeigt die verbleibende Zeit in Minuten und Sekunden in der Statusleiste</string>
+    <string name="show_progress_notification_subtitle">Zeigt die verbleibende Zeit in der Statusleiste</string>
     <string name="show_reminder_popup_title">Reminder vor Ablauf anzeigen</string>
     <string name="show_reminder_popup_subtitle">Zeigt ein Popup/Heads-Up kurz vor Ablauf mit Interaktionsmöglichkeit</string>
     <string name="reminder_minutes_label">Minuten vorher:</string>
@@ -56,6 +56,9 @@
     <string name="ok">OK.</string>
     <string name="notification_disable_title">Benachrichtigung deaktivieren?</string>
     <string name="notification_disable_message">Benachrichtigung wurde deaktiviert</string>
-    <string name="timer_plus_5">+5 min</string>
+    <string name="timer_plus_5">+%1$d min</string>
+    <string name="extend_timer_label">Verlängerungsschritt Timer</string>
+
+    <string name="timer_plus_x">+ %1$d min</string>
 
 </resources>

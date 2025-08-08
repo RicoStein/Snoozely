@@ -18,11 +18,9 @@ class TimerNotificationService : Service() {
         const val CHANNEL_ID = "timer_notification_channel"
         const val NOTIFICATION_ID = 42
 
-        const val EXTRA_REMAINING_MS = "EXTRA_REMAINING_MS"
-        const val EXTRA_TOTAL_MS = "EXTRA_TOTAL_MS"
         const val ACTION_UPDATE = "ACTION_UPDATE"
         const val ACTION_STOP = "ACTION_STOP"
-        const val ACTION_PLUS_5_MIN = "ACTION_PLUS_5_MIN"
+        const val ACTION_EXTEND = "ACTION_EXTEND"
     }
 
     private var timerJob: Job? = null
@@ -48,11 +46,10 @@ class TimerNotificationService : Service() {
                     )
                 }
             }
-            ACTION_PLUS_5_MIN -> plusFiveMinutes()
+            ACTION_EXTEND -> extendTimerMinutes()
         }
         return START_STICKY
     }
-
 
     private fun showInitializingNotification() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -96,23 +93,22 @@ class TimerNotificationService : Service() {
                 }
             }
             stopTickerAndNotification()
-            // *** WICHTIG: HIER KEIN TimerPreferenceHelper.stopTimer() MEHR! ***
         }
     }
 
     private fun stopTickerAndNotification() {
         timerJob?.cancel()
-        // NICHT TimerPreferenceHelper.stopTimer() hier ausführen!
         stopForeground(true)
         stopSelf()
     }
 
-    private fun plusFiveMinutes() {
+    private fun extendTimerMinutes() {
         CoroutineScope(Dispatchers.Default).launch {
             val context = applicationContext
             val timerRunning = TimerPreferenceHelper.getTimerRunning(context).first()
             val timerMinutes = TimerPreferenceHelper.getTimer(context).first()
             val timerStartTime = TimerPreferenceHelper.getTimerStartTime(context).first()
+            val extendMinutes = SettingsPreferenceHelper.getProgressExtendMinutes(context).first()
 
             if (!timerRunning || timerStartTime == 0L) return@launch
 
@@ -121,12 +117,11 @@ class TimerNotificationService : Service() {
             val totalMs = timerMinutes * 60_000L
             val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
 
-            val newTotalMs = remainingMs + (5 * 60_000L)
+            val newTotalMs = remainingMs + (extendMinutes * 60_000L)
             val newMinutes = ((newTotalMs + elapsedMs) / 60_000L).toInt().coerceAtLeast(1)
 
             TimerPreferenceHelper.setTimer(applicationContext, newMinutes)
             // StartTime bleibt gleich!
-
             startOrUpdateTicker()
         }
     }
@@ -140,8 +135,14 @@ class TimerNotificationService : Service() {
         val stopIntent = Intent(this, TimerNotificationService::class.java).apply { action = ACTION_STOP }
         val stopPendingIntent = PendingIntent.getService(this, 1001, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable())
 
-        val plusFiveIntent = Intent(this, TimerNotificationService::class.java).apply { action = ACTION_PLUS_5_MIN }
-        val plusFivePendingIntent = PendingIntent.getService(this, 1002, plusFiveIntent, PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable())
+        // Dynamischer Minutenwert
+        val extendMinutes = runBlocking {
+            SettingsPreferenceHelper.getProgressExtendMinutes(this@TimerNotificationService).first()
+        }
+        val extendIntent = Intent(this, TimerNotificationService::class.java).apply { action = ACTION_EXTEND }
+        val extendPendingIntent = PendingIntent.getService(this, 1002, extendIntent, PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable())
+
+        val extendButtonText = getString(R.string.timer_plus_x, extendMinutes) // z.B. "+ 7 min"
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_timer_running))
@@ -149,7 +150,7 @@ class TimerNotificationService : Service() {
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .setProgress(100, progress, false)
-            .addAction(android.R.drawable.ic_input_add, getString(R.string.timer_plus_5), plusFivePendingIntent)
+            .addAction(android.R.drawable.ic_input_add, extendButtonText, extendPendingIntent)
             .addAction(android.R.drawable.ic_lock_idle_alarm, getString(R.string.timer_stop), stopPendingIntent)
             .build()
 
