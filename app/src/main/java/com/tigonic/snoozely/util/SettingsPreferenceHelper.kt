@@ -18,7 +18,7 @@ object SettingsPreferenceHelper {
     private val SHOW_PROGRESS_NOTIFICATION = booleanPreferencesKey("show_progress_notification")
     private val SHOW_REMINDER_POPUP = booleanPreferencesKey("show_reminder_popup")
     private val REMINDER_MINUTES = intPreferencesKey("reminder_minutes")
-    private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run") // <--- HINZUGEFÜGT
+    private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
 
     // --- Getter ---
     fun getStopAudio(context: Context): Flow<Boolean> =
@@ -48,7 +48,7 @@ object SettingsPreferenceHelper {
     fun getReminderMinutes(context: Context): Flow<Int> =
         context.dataStore.data.map { it[REMINDER_MINUTES] ?: 2 }
 
-    fun getIsFirstRun(context: Context): Flow<Boolean> = // <--- NEU
+    fun getIsFirstRun(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[IS_FIRST_RUN] ?: true }
 
     // --- Setter ---
@@ -79,7 +79,7 @@ object SettingsPreferenceHelper {
     suspend fun setReminderMinutes(context: Context, value: Int) {
         context.dataStore.edit { it[REMINDER_MINUTES] = value }
     }
-    suspend fun setIsFirstRun(context: Context, value: Boolean) { // <--- NEU
+    suspend fun setIsFirstRun(context: Context, value: Boolean) {
         context.dataStore.edit { it[IS_FIRST_RUN] = value }
     }
 }

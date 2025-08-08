@@ -17,6 +17,12 @@ import com.tigonic.snoozely.ui.screens.HomeScreen
 import com.tigonic.snoozely.ui.screens.SettingsScreen
 import com.tigonic.snoozely.ui.theme.SnoozelyTheme
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import com.tigonic.snoozely.util.TimerPreferenceHelper
+import com.tigonic.snoozely.util.SettingsPreferenceHelper
+import com.tigonic.snoozely.service.updateNotification
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +76,20 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
+        }
+        lifecycleScope.launch {
+            val context = applicationContext
+            val timerRunning = TimerPreferenceHelper.getTimerRunning(context).first()
+            val timerMinutes = TimerPreferenceHelper.getTimer(context).first()
+            val timerStartTime = TimerPreferenceHelper.getTimerStartTime(context).first()
+            val notificationEnabled = SettingsPreferenceHelper.getNotificationEnabled(context).first()
+            if (timerRunning && timerMinutes > 0 && timerStartTime > 0L && notificationEnabled) {
+                val now = System.currentTimeMillis()
+                val totalMs = timerMinutes * 60_000L
+                val elapsedMs = now - timerStartTime
+                val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+                updateNotification(context, remainingMs, totalMs)
             }
         }
     }

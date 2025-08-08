@@ -37,11 +37,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext  // *** Nur ApplicationContext ***
     val scope = rememberCoroutineScope()
-    val activity = context as? Activity
-
-
+    val activity = LocalContext.current as? Activity
 
     val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
@@ -56,7 +54,6 @@ fun SettingsScreen(onBack: () -> Unit) {
     val showProgressNotification by SettingsPreferenceHelper.getShowProgressNotification(context).collectAsState(initial = false)
     val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(context).collectAsState(initial = false)
     val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(context).collectAsState(initial = 2)
-    val isFirstRun by SettingsPreferenceHelper.getIsFirstRun(context).collectAsState(initial = true)
 
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
@@ -89,12 +86,12 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 
     // First run: set notifications to false!
-    LaunchedEffect(isFirstRun) {
-        if (isFirstRun) {
-            scope.launch {
-                SettingsPreferenceHelper.setNotificationEnabled(context, false)
-                SettingsPreferenceHelper.setIsFirstRun(context, false)
-            }
+    // Nur beim allerersten Start aufrufen, dann nie wieder (auch nach Recomposition nicht!)
+    LaunchedEffect(screenOff) {
+        val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
+        isAdmin = nowIsAdmin
+        if (!nowIsAdmin && screenOff) {
+            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
         }
     }
 
