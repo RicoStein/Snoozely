@@ -29,10 +29,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.service.stopNotification
+import com.tigonic.snoozely.service.updateNotification
 import com.tigonic.snoozely.util.LocaleHelper
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
+import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,6 +106,25 @@ fun SettingsScreen(onBack: () -> Unit) {
             scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
         }
     }
+
+    LaunchedEffect(Unit) {   // <--- Triggert IMMER beim Betreten des Screens!
+        scope.launch {
+            val timerRunning = TimerPreferenceHelper.getTimerRunning(context).first()
+            val timerMinutes = TimerPreferenceHelper.getTimer(context).first()
+            val timerStartTime = TimerPreferenceHelper.getTimerStartTime(context).first()
+            val notificationEnabledNow = SettingsPreferenceHelper.getNotificationEnabled(context).first()
+            if (notificationEnabledNow && timerRunning && timerStartTime > 0L && timerMinutes > 0) {
+                val now = System.currentTimeMillis()
+                val totalMs = timerMinutes * 60_000L
+                val elapsedMs = now - timerStartTime
+                val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+                updateNotification(context, remainingMs, totalMs)
+            } else {
+                stopNotification(context)
+            }
+        }
+    }
+
 
     Scaffold(
         topBar = {

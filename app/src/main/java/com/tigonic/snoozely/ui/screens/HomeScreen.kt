@@ -33,12 +33,11 @@ import kotlinx.coroutines.launch
 import com.tigonic.snoozely.service.updateNotification
 import com.tigonic.snoozely.service.stopNotification
 
-
 @Composable
 fun HomeScreen(
     onSettingsClick: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
     // Einstellungen aus DataStore
@@ -58,7 +57,6 @@ fun HomeScreen(
     var timerWasFinished by remember { mutableStateOf(false) }
     var fadeOutStarted by remember { mutableStateOf(false) }
 
-
     // Ladeanzeige solange Timer nicht geladen
     if (timerMinutes < 1) {
         Box(
@@ -73,7 +71,7 @@ fun HomeScreen(
         return
     }
 
-    // Sekundenticker für Anzeige
+    // Sekundenticker für Anzeige (nur UI, nicht für Notification)
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning && timerStartTime > 0L) {
@@ -109,35 +107,20 @@ fun HomeScreen(
         label = "wheelScale"
     )
 
-    // ==== TIMER NOTIFICATION LOGIK ====
-    // Notification-Update, solange Timer läuft (und aktiviert)
-    LaunchedEffect(timerRunning, totalSeconds, notificationEnabled, timerMinutes) {
-        if (notificationEnabled && timerRunning) {
-            // initial notification update & every second
-            updateNotification(
-                context = context,
-                remainingMs = totalSeconds * 1000L,
-                totalMs = timerMinutes * 60_000L
-            )
-        }
-        // Notification beenden wenn Stopp oder deaktiviert
-        if ((!timerRunning || !notificationEnabled) && totalSeconds > 0) {
-            stopNotification(context)
-        }
-        // Timer-Ende: ebenfalls Notification beenden
-        if (notificationEnabled && timerRunning && totalSeconds == 0) {
+    // **WICHTIG: Notification immer synchronisieren!**
+    LaunchedEffect(timerRunning, notificationEnabled, timerMinutes, timerStartTime) {
+        if (timerRunning && notificationEnabled && timerStartTime > 0L && timerMinutes > 0) {
+            val totalMs = timerMinutes * 60_000L
+            val now = System.currentTimeMillis()
+            val elapsedMs = now - timerStartTime
+            val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+            updateNotification(context, remainingMs, totalMs)
+        } else {
             stopNotification(context)
         }
     }
 
-    // Clean-up beim Verlassen
-    DisposableEffect(Unit) {
-        onDispose {
-            stopNotification(context)
-        }
-    }
-
-    // Nur EINE LaunchedEffect für alles am Ende des Timers
+    // Timer-Ende-Logik wie gehabt
     LaunchedEffect(totalSeconds, timerRunning, screenOff, stopAudio, fadeOut) {
         val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
@@ -169,7 +152,7 @@ fun HomeScreen(
         }
     }
 
-    // --- UI ---
+    // --- UI wie gehabt ---
     Box(
         modifier = Modifier
             .fillMaxSize()

@@ -7,6 +7,10 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.util.SettingsPreferenceHelper
+import com.tigonic.snoozely.util.TimerPreferenceHelper
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 class TimerNotificationService : Service() {
 
@@ -21,6 +25,8 @@ class TimerNotificationService : Service() {
         const val ACTION_PLUS_5_MIN = "ACTION_PLUS_5_MIN"
     }
 
+    private var timerJob: Job? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -29,32 +35,58 @@ class TimerNotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent == null) return START_NOT_STICKY
-
-        when (intent.action) {
-            ACTION_UPDATE -> {
-                val remainingMs = intent.getLongExtra(EXTRA_REMAINING_MS, 0)
-                val totalMs = intent.getLongExtra(EXTRA_TOTAL_MS, 0)
-                showNotification(remainingMs, totalMs)
-            }
-            ACTION_STOP -> {
-                stopForeground(true)
-                stopSelf()
-            }
-            // TODO: Handle ACTION_PLUS_5_MIN (Logik im Timer!)
+        when (intent?.action) {
+            ACTION_UPDATE -> startOrUpdateTicker()
+            ACTION_STOP -> stopTickerAndNotification()
+            // TODO: Handle ACTION_PLUS_5_MIN
         }
         return START_STICKY
+    }
+
+    private fun startOrUpdateTicker() {
+        timerJob?.cancel()
+        timerJob = CoroutineScope(Dispatchers.Default).launch {
+            val context = applicationContext
+            // Main-Loop: Solange Timer läuft und Notification aktiv ist, Notification updaten
+            while (true) {
+                val notificationEnabled = SettingsPreferenceHelper.getNotificationEnabled(context).first()
+                val timerRunning = TimerPreferenceHelper.getTimerRunning(context).first()
+                val timerMinutes = TimerPreferenceHelper.getTimer(context).first()
+                val timerStartTime = TimerPreferenceHelper.getTimerStartTime(context).first()
+
+                if (!notificationEnabled || !timerRunning || timerMinutes < 1 || timerStartTime == 0L) {
+                    break
+                }
+
+                val totalMs = timerMinutes * 60_000L
+                val now = System.currentTimeMillis()
+                val elapsedMs = now - timerStartTime
+                val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+
+                showNotification(remainingMs, totalMs)
+
+                if (remainingMs <= 0) {
+                    break
+                }
+                delay(1000)
+            }
+            stopTickerAndNotification()
+        }
+    }
+
+    private fun stopTickerAndNotification() {
+        timerJob?.cancel()
+        stopForeground(true)
+        stopSelf()
     }
 
     private fun showNotification(remainingMs: Long, totalMs: Long) {
         val minutes = (remainingMs / 1000) / 60
         val seconds = (remainingMs / 1000) % 60
         val timeText = String.format("%02d:%02d", minutes, seconds)
-
         val progress = if (totalMs > 0) (((totalMs - remainingMs) * 100 / totalMs).toInt()).coerceIn(0, 100) else 0
 
-
-        // Stopp-Action (optional)
+        // Stop-Action
         val stopIntent = Intent(this, TimerNotificationService::class.java).apply { action = ACTION_STOP }
         val stopPendingIntent = PendingIntent.getService(this, 1001, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable())
 
@@ -70,7 +102,7 @@ class TimerNotificationService : Service() {
         startForeground(NOTIFICATION_ID, notification)
     }
 
-    private fun createNotificationChannel() {0
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -84,4 +116,9 @@ class TimerNotificationService : Service() {
 
     private fun flagImmutable(): Int =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+
+    override fun onDestroy() {
+        timerJob?.cancel()
+        super.onDestroy()
+    }
 }
