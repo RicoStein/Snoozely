@@ -57,6 +57,8 @@ fun HomeScreen(
     var timerWasFinished by remember { mutableStateOf(false) }
     var fadeOutStarted by remember { mutableStateOf(false) }
 
+    var lastUserSetValue by remember { mutableStateOf(timerMinutes) }
+
     // Ladeanzeige solange Timer nicht geladen
     if (timerMinutes < 1) {
         Box(
@@ -107,6 +109,12 @@ fun HomeScreen(
         label = "wheelScale"
     )
 
+    LaunchedEffect(timerMinutes) {
+        if (!timerRunning) {
+            lastUserSetValue = timerMinutes
+        }
+    }
+
     // **WICHTIG: Notification immer synchronisieren!**
     LaunchedEffect(timerRunning, notificationEnabled, timerMinutes, timerStartTime) {
         if (timerRunning && notificationEnabled && timerStartTime > 0L && timerMinutes > 0) {
@@ -140,7 +148,7 @@ fun HomeScreen(
             // Timer zurücksetzen (kurzes Delay für Animation)
             scope.launch {
                 delay(500L)
-                TimerPreferenceHelper.stopTimer(context, initialTimerValue)
+                TimerPreferenceHelper.stopTimer(context, lastUserSetValue)
             }
         }
         // Reset-Flags falls Timer neu gestartet oder gestoppt wird
@@ -205,7 +213,7 @@ fun HomeScreen(
                     value = timerMinutes,
                     onValueChange = { value ->
                         if (!timerRunning && value >= 1) {
-                            initialTimerValue = value
+                            lastUserSetValue = value
                             scope.launch { TimerPreferenceHelper.setTimer(context, value) }
                         }
                     },
@@ -227,10 +235,11 @@ fun HomeScreen(
                 onClick = {
                     scope.launch {
                         if (!timerRunning && timerMinutes > 0) {
-                            initialTimerValue = timerMinutes
+                            // Timer starten
                             TimerPreferenceHelper.startTimer(context, timerMinutes)
                         } else if (timerRunning) {
-                            TimerPreferenceHelper.stopTimer(context, timerMinutes)
+                            // Timer stoppen
+                            TimerPreferenceHelper.stopTimer(context, lastUserSetValue)
                         }
                     }
                 },

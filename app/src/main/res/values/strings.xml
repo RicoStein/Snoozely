@@ -56,6 +56,6 @@
     <string name="ok">OK.</string>
     <string name="notification_disable_title">Benachrichtigung deaktivieren?</string>
     <string name="notification_disable_message">Benachrichtigung wurde deaktiviert</string>
-
+    <string name="timer_plus_5">+5 min</string>
 
 </resources>
