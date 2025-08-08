@@ -15,6 +15,10 @@ object SettingsPreferenceHelper {
     private val TIMER_VIBRATE = booleanPreferencesKey("timer_vibrate")
     private val FADE_OUT = floatPreferencesKey("fade_out")
     private val LANGUAGE = stringPreferencesKey("language")
+    private val SHOW_PROGRESS_NOTIFICATION = booleanPreferencesKey("show_progress_notification")
+    private val SHOW_REMINDER_POPUP = booleanPreferencesKey("show_reminder_popup")
+    private val REMINDER_MINUTES = intPreferencesKey("reminder_minutes")
+    private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run") // <--- HINZUGEFÜGT
 
     // --- Getter ---
     fun getStopAudio(context: Context): Flow<Boolean> =
@@ -35,6 +39,18 @@ object SettingsPreferenceHelper {
     fun getLanguage(context: Context): Flow<String> =
         context.dataStore.data.map { it[LANGUAGE] ?: "de" }
 
+    fun getShowProgressNotification(context: Context): Flow<Boolean> =
+        context.dataStore.data.map { it[SHOW_PROGRESS_NOTIFICATION] ?: false }
+
+    fun getShowReminderPopup(context: Context): Flow<Boolean> =
+        context.dataStore.data.map { it[SHOW_REMINDER_POPUP] ?: false }
+
+    fun getReminderMinutes(context: Context): Flow<Int> =
+        context.dataStore.data.map { it[REMINDER_MINUTES] ?: 2 }
+
+    fun getIsFirstRun(context: Context): Flow<Boolean> = // <--- NEU
+        context.dataStore.data.map { it[IS_FIRST_RUN] ?: true }
+
     // --- Setter ---
     suspend fun setStopAudio(context: Context, value: Boolean) {
         context.dataStore.edit { it[STOP_AUDIO] = value }
@@ -53,5 +69,17 @@ object SettingsPreferenceHelper {
     }
     suspend fun setLanguage(context: Context, value: String) {
         context.dataStore.edit { it[LANGUAGE] = value }
+    }
+    suspend fun setShowProgressNotification(context: Context, value: Boolean) {
+        context.dataStore.edit { it[SHOW_PROGRESS_NOTIFICATION] = value }
+    }
+    suspend fun setShowReminderPopup(context: Context, value: Boolean) {
+        context.dataStore.edit { it[SHOW_REMINDER_POPUP] = value }
+    }
+    suspend fun setReminderMinutes(context: Context, value: Int) {
+        context.dataStore.edit { it[REMINDER_MINUTES] = value }
+    }
+    suspend fun setIsFirstRun(context: Context, value: Boolean) { // <--- NEU
+        context.dataStore.edit { it[IS_FIRST_RUN] = value }
     }
 }

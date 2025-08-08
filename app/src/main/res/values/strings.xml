@@ -38,7 +38,24 @@
     <string name="admin_permission_required">Adminrechte benötigt</string>
     <string name="device_admin_explanation">Admin rechte Erklärung</string>
     <string name="device_admin_remove_manual_hint">Bitte öffne die Geräteeinstellungen manuell und entferne dort den Geräteadministrator.</string>
-    <string name="remove_admin_confirm_button">sicher entferne?</string>
+    <string name="remove_admin_confirm_button">sicher entfernen?</string>
+    <string name="notification_timer_running">Timer läuft</string>
+    <string name="notification_remaining_time">Noch %1$s</string>
+    <string name="timer_stop">Stoppen</string>
+
+    <!-- Benachrichtigungs-Optionen -->
+    <string name="show_progress_notification_title">Fortschritt in Benachrichtigung anzeigen</string>
+    <string name="show_progress_notification_subtitle">Zeigt die verbleibende Zeit in Minuten und Sekunden in der Statusleiste</string>
+    <string name="show_reminder_popup_title">Reminder vor Ablauf anzeigen</string>
+    <string name="show_reminder_popup_subtitle">Zeigt ein Popup/Heads-Up kurz vor Ablauf mit Interaktionsmöglichkeit</string>
+    <string name="reminder_minutes_label">Minuten vorher:</string>
+    <string name="reminder_popup_hint">Popup erscheint %1$d Minuten vor Timer-Ende mit "+5 Min" und "Beenden"</string>
+    <string name="notification_permission_title">Benachrichtigung aktivierne</string>
+    <string name="notification_permission_rationale">rationale</string>
+    <string name="notification_permission_denied">abgelehnt</string>
+    <string name="ok">OK.</string>
+    <string name="notification_disable_title">Benachrichtigung deaktivieren?</string>
+    <string name="notification_disable_message">Benachrichtigung wurde deaktiviert</string>
 
 
 </resources>

@@ -1,12 +1,13 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 package com.tigonic.snoozely.ui.screens
 
+import android.Manifest
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,11 +34,14 @@ import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val activity = context as? Activity
+
+
 
     val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
@@ -49,13 +53,10 @@ fun SettingsScreen(onBack: () -> Unit) {
     val timerVibrate by SettingsPreferenceHelper.getTimerVibrate(context).collectAsState(initial = false)
     val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
     val language by SettingsPreferenceHelper.getLanguage(context).collectAsState(initial = "de")
-
-    // NEU: Weitere States für Benachrichtigungseinstellungen
-    var progressNotificationEnabled by remember { mutableStateOf(false) }
-    var reminderPopupEnabled by remember { mutableStateOf(false) }
-    var reminderMinutes by remember { mutableStateOf(2f) } // Slider float für Minuten, default 2
-
-    var showRemoveAdminDialog by remember { mutableStateOf(false) }
+    val showProgressNotification by SettingsPreferenceHelper.getShowProgressNotification(context).collectAsState(initial = false)
+    val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(context).collectAsState(initial = false)
+    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(context).collectAsState(initial = 2)
+    val isFirstRun by SettingsPreferenceHelper.getIsFirstRun(context).collectAsState(initial = true)
 
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
@@ -67,6 +68,34 @@ fun SettingsScreen(onBack: () -> Unit) {
             else context.getString(R.string.device_admin_failed),
             Toast.LENGTH_SHORT
         ).show()
+    }
+
+    var showRemoveAdminDialog by remember { mutableStateOf(false) }
+    var showNotificationPermissionDialog by remember { mutableStateOf(false) }
+    var showDisableNotificationDialog by remember { mutableStateOf(false) }
+
+    // Notification Permission Launcher (Android 13+)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        scope.launch {
+            if (isGranted) {
+                SettingsPreferenceHelper.setNotificationEnabled(context, true)
+            } else {
+                SettingsPreferenceHelper.setNotificationEnabled(context, false)
+                Toast.makeText(context, context.getString(R.string.notification_permission_denied), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    // First run: set notifications to false!
+    LaunchedEffect(isFirstRun) {
+        if (isFirstRun) {
+            scope.launch {
+                SettingsPreferenceHelper.setNotificationEnabled(context, false)
+                SettingsPreferenceHelper.setIsFirstRun(context, false)
+            }
+        }
     }
 
     LaunchedEffect(screenOff) {
@@ -260,12 +289,60 @@ fun SettingsScreen(onBack: () -> Unit) {
                 subtitle = stringResource(R.string.show_remaining_time),
                 checked = notificationEnabled,
                 onCheckedChange = { value ->
-                    scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, value) }
+                    if (value) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val permissionCheck = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                            if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+                                showNotificationPermissionDialog = true
+                                return@SettingsRow
+                            }
+                        }
+                        scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, true) }
+                    } else {
+                        showDisableNotificationDialog = true
+                    }
                 },
                 enabled = true
             )
 
-            // ---------- Dynamische Unteroptionen bei Benachrichtigungen ----------
+            if (showNotificationPermissionDialog) {
+                AlertDialog(
+                    onDismissRequest = { showNotificationPermissionDialog = false },
+                    title = { Text(stringResource(R.string.notification_permission_title)) },
+                    text = { Text(stringResource(R.string.notification_permission_rationale)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showNotificationPermissionDialog = false
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }) { Text(stringResource(R.string.ok)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showNotificationPermissionDialog = false }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
+                )
+            }
+
+            if (showDisableNotificationDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDisableNotificationDialog = false },
+                    title = { Text(stringResource(R.string.notification_disable_title)) },
+                    text = { Text(stringResource(R.string.notification_disable_message)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showDisableNotificationDialog = false
+                            scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, false) }
+                        }) { Text(stringResource(R.string.ok)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDisableNotificationDialog = false }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
+                )
+            }
+
             if (notificationEnabled) {
                 Column(
                     modifier = Modifier
@@ -277,41 +354,44 @@ fun SettingsScreen(onBack: () -> Unit) {
                     // Option A: Fortschrittsanzeige (Minuten/Sekunden)
                     SettingsRow(
                         icon = Icons.Default.Timeline,
-                        title = "Fortschritt in Benachrichtigung anzeigen",
-                        subtitle = "Zeigt die verbleibende Zeit in Minuten und Sekunden",
-                        checked = progressNotificationEnabled,
-                        onCheckedChange = { checked -> progressNotificationEnabled = checked }
+                        title = stringResource(R.string.show_progress_notification_title),
+                        subtitle = stringResource(R.string.show_progress_notification_subtitle),
+                        checked = showProgressNotification,
+                        onCheckedChange = { checked ->
+                            scope.launch { SettingsPreferenceHelper.setShowProgressNotification(context, checked) }
+                        }
                     )
 
                     // Option B: Reminder Interaktions-Popup (Slider für Minuten)
                     SettingsRow(
                         icon = Icons.Default.Alarm,
-                        title = "Reminder vor Ablauf anzeigen",
-                        subtitle = "Zeigt ein Popup/Heads-Up kurz vor Ablauf",
-                        checked = reminderPopupEnabled,
-                        onCheckedChange = { checked -> reminderPopupEnabled = checked }
+                        title = stringResource(R.string.show_reminder_popup_title),
+                        subtitle = stringResource(R.string.show_reminder_popup_subtitle),
+                        checked = showReminderPopup,
+                        onCheckedChange = { checked ->
+                            scope.launch { SettingsPreferenceHelper.setShowReminderPopup(context, checked) }
+                        }
                     )
 
-                    if (reminderPopupEnabled) {
-                        // Slider für Minuten vor Ablauf
+                    if (showReminderPopup) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Minuten vorher:", Modifier.padding(end = 8.dp))
+                            Text(stringResource(R.string.reminder_minutes_label), Modifier.padding(end = 8.dp))
                             Slider(
-                                value = reminderMinutes,
-                                onValueChange = { reminderMinutes = it },
+                                value = reminderMinutes.toFloat(),
+                                onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setReminderMinutes(context, value.toInt()) } },
                                 valueRange = 1f..10f,
                                 steps = 8,
                                 modifier = Modifier.weight(1f)
                             )
-                            Text("${reminderMinutes.toInt()} min")
+                            Text("${reminderMinutes} min")
                         }
                         Text(
-                            "Popup erscheint ${reminderMinutes.toInt()} Minuten vor Timer-Ende mit \"+5 Min\", \"Beenden\".",
+                            stringResource(R.string.reminder_popup_hint, reminderMinutes),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray,
                             modifier = Modifier.padding(start = 8.dp)
@@ -357,8 +437,6 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 }
-
-// --- UNVERÄNDERT: SettingsRow und LanguageDropdown bleiben wie gehabt ---
 
 @Composable
 fun SettingsRow(

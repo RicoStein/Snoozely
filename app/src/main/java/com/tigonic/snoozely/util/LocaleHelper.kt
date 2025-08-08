@@ -1,7 +1,6 @@
 package com.tigonic.snoozely.util
 
 import android.app.Activity
-import android.content.Context
 import android.os.Build
 import android.os.LocaleList
 import android.app.LocaleManager

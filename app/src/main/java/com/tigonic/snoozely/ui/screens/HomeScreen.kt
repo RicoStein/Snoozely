@@ -1,5 +1,7 @@
 package com.tigonic.snoozely.ui.screens
 
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.media.AudioManager
 import androidx.compose.animation.core.animateFloatAsState
@@ -10,10 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,13 +24,15 @@ import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
-import com.tigonic.snoozely.util.TimerPreferenceHelper
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
+import com.tigonic.snoozely.util.TimerPreferenceHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
+
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.tigonic.snoozely.service.updateNotification
+import com.tigonic.snoozely.service.stopNotification
+
 
 @Composable
 fun HomeScreen(
@@ -40,21 +41,25 @@ fun HomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Einstellungen aus dem Datastore
+    // Einstellungen aus DataStore
     val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
     val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
     val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
+    val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(context).collectAsState(initial = false)
 
+    // Timer-States
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 0)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
-    // Merke zuletzt gesetzten Startwert für Reset
+    val showProgressNotification by SettingsPreferenceHelper.getShowProgressNotification(context).collectAsState(initial = false)
+
     var initialTimerValue by remember { mutableStateOf(timerMinutes) }
     var timerWasFinished by remember { mutableStateOf(false) }
     var fadeOutStarted by remember { mutableStateOf(false) }
 
-    // Ladeanzeige, solange Timer nicht geladen oder < 1 Minute
+
+    // Ladeanzeige solange Timer nicht geladen
     if (timerMinutes < 1) {
         Box(
             Modifier.fillMaxSize().background(Color.Black),
@@ -68,7 +73,7 @@ fun HomeScreen(
         return
     }
 
-    // Sekundenticker für die Anzeige
+    // Sekundenticker für Anzeige
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning && timerStartTime > 0L) {
@@ -104,24 +109,48 @@ fun HomeScreen(
         label = "wheelScale"
     )
 
-    // **Nur EINE LaunchedEffect für alles, was nach Timer-Ende passieren muss**
+    // ==== TIMER NOTIFICATION LOGIK ====
+    // Notification-Update, solange Timer läuft (und aktiviert)
+    LaunchedEffect(timerRunning, totalSeconds, notificationEnabled, timerMinutes) {
+        if (notificationEnabled && timerRunning) {
+            // initial notification update & every second
+            updateNotification(
+                context = context,
+                remainingMs = totalSeconds * 1000L,
+                totalMs = timerMinutes * 60_000L
+            )
+        }
+        // Notification beenden wenn Stopp oder deaktiviert
+        if ((!timerRunning || !notificationEnabled) && totalSeconds > 0) {
+            stopNotification(context)
+        }
+        // Timer-Ende: ebenfalls Notification beenden
+        if (notificationEnabled && timerRunning && totalSeconds == 0) {
+            stopNotification(context)
+        }
+    }
+
+    // Clean-up beim Verlassen
+    DisposableEffect(Unit) {
+        onDispose {
+            stopNotification(context)
+        }
+    }
+
+    // Nur EINE LaunchedEffect für alles am Ende des Timers
     LaunchedEffect(totalSeconds, timerRunning, screenOff, stopAudio, fadeOut) {
         val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
 
-        // FadeOut: Nur einmal pro Timerlauf
         if (timerRunning && stopAudio && !fadeOutStarted && fadeOut > 0 && totalSeconds == fadeOut.toInt()) {
             fadeOutStarted = true
             scope.launch { fadeOutMusic(context, fadeOut.toInt()) }
         }
-        // Musik stoppen und Timer zurücksetzen bei Ablauf
         if (timerRunning && totalSeconds == 0 && !timerWasFinished) {
             fadeOutStarted = false
             timerWasFinished = true
 
             if (stopAudio) stopMusicPlayback(context)
-
-            // Bildschirm aus, aber nur wenn Adminrechte!
             if (screenOff && devicePolicyManager.isAdminActive(adminComponent)) {
                 devicePolicyManager.lockNow()
             }
@@ -193,7 +222,7 @@ fun HomeScreen(
                     value = timerMinutes,
                     onValueChange = { value ->
                         if (!timerRunning && value >= 1) {
-                            initialTimerValue = value // Merke Startwert!
+                            initialTimerValue = value
                             scope.launch { TimerPreferenceHelper.setTimer(context, value) }
                         }
                     },
@@ -215,7 +244,7 @@ fun HomeScreen(
                 onClick = {
                     scope.launch {
                         if (!timerRunning && timerMinutes > 0) {
-                            initialTimerValue = timerMinutes // Startwert merken!
+                            initialTimerValue = timerMinutes
                             TimerPreferenceHelper.startTimer(context, timerMinutes)
                         } else if (timerRunning) {
                             TimerPreferenceHelper.stopTimer(context, timerMinutes)
