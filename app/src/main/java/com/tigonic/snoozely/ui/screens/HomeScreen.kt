@@ -3,7 +3,9 @@ package com.tigonic.snoozely.ui.screens
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -32,11 +34,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.tigonic.snoozely.service.updateNotification
 import com.tigonic.snoozely.service.stopNotification
+import kotlinx.coroutines.flow.first
+import android.Manifest
+import android.util.Log
+
+private const val TAG = "HomeScreenDebug"
 
 @Composable
 fun HomeScreen(
     onSettingsClick: () -> Unit,
 ) {
+
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
@@ -76,10 +84,12 @@ fun HomeScreen(
     // Sekundenticker für Anzeige (nur UI, nicht für Notification)
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
+        Log.d(TAG, "LaunchedEffect Sekundenticker: timerRunning=$timerRunning, timerStartTime=$timerStartTime")
         if (timerRunning && timerStartTime > 0L) {
             while (true) {
                 now = System.currentTimeMillis()
                 delay(1000)
+                Log.d(TAG, "Sekunde getickt: now=$now")
             }
         }
     }
@@ -117,19 +127,22 @@ fun HomeScreen(
 
     // **WICHTIG: Notification immer synchronisieren!**
     LaunchedEffect(timerRunning, notificationEnabled, timerMinutes, timerStartTime) {
+        Log.d(TAG, "LaunchedEffect Notification: timerRunning=$timerRunning, notificationEnabled=$notificationEnabled, timerMinutes=$timerMinutes, timerStartTime=$timerStartTime")
         if (timerRunning && notificationEnabled && timerStartTime > 0L && timerMinutes > 0) {
             val totalMs = timerMinutes * 60_000L
             val now = System.currentTimeMillis()
             val elapsedMs = now - timerStartTime
             val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+            Log.d(TAG, "updateNotification wird aufgerufen mit remainingMs=$remainingMs, totalMs=$totalMs")
             updateNotification(context, remainingMs, totalMs)
         } else {
-            stopNotification(context)
+            Log.d(TAG, "stopNotification wird aufgerufen")
         }
     }
 
     // Timer-Ende-Logik wie gehabt
     LaunchedEffect(totalSeconds, timerRunning, screenOff, stopAudio, fadeOut) {
+        Log.d(TAG, "LaunchedEffect Timer-Ende: totalSeconds=$totalSeconds, timerRunning=$timerRunning")
         val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
 
@@ -235,11 +248,24 @@ fun HomeScreen(
                 onClick = {
                     scope.launch {
                         if (!timerRunning && timerMinutes > 0) {
-                            // Timer starten
+                            Log.d(TAG, "Play pressed: startTimer mit Minuten = $timerMinutes")
                             TimerPreferenceHelper.startTimer(context, timerMinutes)
+                            while (TimerPreferenceHelper.getTimerStartTime(context).first() == 0L) {
+                                delay(10)
+                            }
+                            Log.d(TAG, "timerStartTime jetzt: ${TimerPreferenceHelper.getTimerStartTime(context).first()}")
+                            if (notificationEnabled && hasNotificationPermission(context)) {
+                                val totalMs = timerMinutes * 60_000L
+                                val timerStart = TimerPreferenceHelper.getTimerStartTime(context).first()
+                                val elapsedMs = System.currentTimeMillis() - timerStart
+                                val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+                                Log.d(TAG, "updateNotification wird getriggert")
+                                updateNotification(context, remainingMs, totalMs)
+                            }
                         } else if (timerRunning) {
-                            // Timer stoppen
+                            Log.d(TAG, "Stop pressed: stopTimer, Wert = $lastUserSetValue")
                             TimerPreferenceHelper.stopTimer(context, lastUserSetValue)
+                            stopNotification(context)
                         }
                     }
                 },
@@ -275,6 +301,8 @@ suspend fun fadeOutMusic(context: Context, fadeOutSec: Int) {
     // Die Musik wird nach Ablauf des Timers gestoppt!
 }
 
+
+
 /**
  * Holt den Audio-Fokus transient und unterbricht damit Spotify, YouTube usw.
  */
@@ -285,4 +313,12 @@ fun stopMusicPlayback(context: Context) {
         AudioManager.STREAM_MUSIC,
         AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
     )
+}
+
+fun hasNotificationPermission(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    } else {
+        true
+    }
 }
