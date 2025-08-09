@@ -103,8 +103,15 @@ class TimerNotificationService : Service() {
                 showNotification(remainingMs, totalMs)
 
                 if (remainingMs <= 0) {
-                    Log.d("TimerService", "Timer abgelaufen.")
-                    break
+                    Log.d("TimerService", "Timer abgelaufen (Service übernimmt Ende-Logik).")
+                    withContext(Dispatchers.Main.immediate) {
+                        // optional: Heads-up wegräumen
+                        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                            .cancel(REMINDER_NOTIFICATION_ID)
+                    }
+                    // Ende-Logik im Hintergrund ausführen
+                    handleTimerFinished()
+                    return@launch // Service stoppt sich in handleTimerFinished()
                 }
                 delay(1000)
             }
@@ -278,4 +285,69 @@ class TimerNotificationService : Service() {
         timerJob?.cancel()
         super.onDestroy()
     }
+
+    private fun stopMusicPlayback() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        // Holt kurz den Audiofokus → pausiert Spotify/YouTube etc.
+        am.requestAudioFocus(
+            { _ -> }, android.media.AudioManager.STREAM_MUSIC,
+            android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+        )
+    }
+
+    private fun lockScreenIfAllowed() {
+        val screenOff = runBlocking {
+            com.tigonic.snoozely.util.SettingsPreferenceHelper.getScreenOff(applicationContext).first()
+        }
+        if (!screenOff) return
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+        val admin = android.content.ComponentName(applicationContext, com.tigonic.snoozely.util.ScreenOffAdminReceiver::class.java)
+        if (dpm.isAdminActive(admin)) {
+            dpm.lockNow()
+        }
+    }
+
+    private suspend fun handleTimerFinished() {
+        // optional Vibration, wenn gewünscht
+        val vibrate = SettingsPreferenceHelper.getTimerVibrate(applicationContext).first()
+        if (vibrate) vibrateOnce(200)
+
+        // Audio stoppen (transient focus)
+        val stopAudio = com.tigonic.snoozely.util.SettingsPreferenceHelper
+            .getStopAudio(applicationContext).first()
+        if (stopAudio) stopMusicPlayback()
+
+        // Display sperren (wenn erlaubt)
+        lockScreenIfAllowed()
+
+        // Timer sauber zurücksetzen (bleibt auch ohne UI bestehen)
+        val lastUserMinutes = com.tigonic.snoozely.util.TimerPreferenceHelper
+            .getTimer(applicationContext).first()
+        com.tigonic.snoozely.util.TimerPreferenceHelper.stopTimer(applicationContext, lastUserMinutes)
+
+        // Service-Notification beenden
+        stopTickerAndNotification()
+    }
+
+    private fun vibrateOnce(ms: Long = 200L) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // API 31+: VibratorManager
+            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
+            if (vm.defaultVibrator.hasVibrator()) {
+                vm.defaultVibrator.vibrate(
+                    android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE)
+                )
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val vib = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+            if (vib.hasVibrator()) {
+                vib.vibrate(
+                    android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE)
+                )
+            }
+        }
+    }
+
+
 }
