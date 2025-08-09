@@ -211,7 +211,7 @@ class TimerNotificationService : Service() {
         }
 
         // kurzer, dynamischer Text: "Timer läuft in X Min ab – +Y Min oder beenden."
-        val body = getString(R.string.reminder_popup_hint_short, remainingMin, extendMinutes)
+        val body = getString(R.string.reminder_popup_message, remainingMin, extendMinutes)
         // Falls du lieber den längeren Text möchtest:
         // val body = getString(R.string.reminder_popup_hint, remainingMin, extendMinutes)
 

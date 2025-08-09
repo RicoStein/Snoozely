@@ -63,6 +63,6 @@
     <string name="reminder_popup_title">Popup</string>
     <string name="reminder_popup_message">Timer läuft gleich ab.</string>
     <string name="stop">Stoppen</string>
-    <string name="reminder_popup_hint_short">Zeigt ein Heads-up-Popup kurz vor ablauf</string>
+    <string name="reminder_popup_hint_short">Zeigt ein Heads-Up-Popup kurz vor Ablauf</string>
 
 </resources>
