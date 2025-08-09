@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
+import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -29,14 +30,11 @@ import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
-
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.tigonic.snoozely.service.updateNotification
 import com.tigonic.snoozely.service.stopNotification
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import android.Manifest
-import android.util.Log
+import kotlinx.coroutines.launch
 
 private const val TAG = "HomeScreenDebug"
 
@@ -44,28 +42,29 @@ private const val TAG = "HomeScreenDebug"
 fun HomeScreen(
     onSettingsClick: () -> Unit,
 ) {
-
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
-    // Einstellungen aus DataStore
+    // Einstellungen
     val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
     val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
     val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
     val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(context).collectAsState(initial = false)
+
+    // Reminder/Verlängerung
+    val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(context).collectAsState(initial = false)
+    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(context).collectAsState(initial = 5)
+    val progressExtendMinutes by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
 
     // Timer-States
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 0)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
-    val showProgressNotification by SettingsPreferenceHelper.getShowProgressNotification(context).collectAsState(initial = false)
-
-    var initialTimerValue by remember { mutableStateOf(timerMinutes) }
-    var timerWasFinished by remember { mutableStateOf(false) }
-    var fadeOutStarted by remember { mutableStateOf(false) }
-
+    // UI States
     var lastUserSetValue by remember { mutableStateOf(timerMinutes) }
+    var fadeOutStarted by remember { mutableStateOf(false) }
+    var timerWasFinished by remember { mutableStateOf(false) }
 
     // Ladeanzeige solange Timer nicht geladen
     if (timerMinutes < 1) {
@@ -81,7 +80,7 @@ fun HomeScreen(
         return
     }
 
-    // Sekundenticker für Anzeige (nur UI, nicht für Notification)
+    // Sekundenticker für UI (notifikationsunabhängig)
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         Log.d(TAG, "LaunchedEffect Sekundenticker: timerRunning=$timerRunning, timerStartTime=$timerStartTime")
@@ -125,7 +124,7 @@ fun HomeScreen(
         }
     }
 
-    // **WICHTIG: Notification immer synchronisieren!**
+    // --- Notification immer synchronisieren ---
     LaunchedEffect(timerRunning, notificationEnabled, timerMinutes, timerStartTime) {
         Log.d(TAG, "LaunchedEffect Notification: timerRunning=$timerRunning, notificationEnabled=$notificationEnabled, timerMinutes=$timerMinutes, timerStartTime=$timerStartTime")
         if (timerRunning && notificationEnabled && timerStartTime > 0L && timerMinutes > 0) {
@@ -133,14 +132,11 @@ fun HomeScreen(
             val now = System.currentTimeMillis()
             val elapsedMs = now - timerStartTime
             val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
-            Log.d(TAG, "updateNotification wird aufgerufen mit remainingMs=$remainingMs, totalMs=$totalMs")
             updateNotification(context, remainingMs, totalMs)
-        } else {
-            Log.d(TAG, "stopNotification wird aufgerufen")
         }
     }
 
-    // Timer-Ende-Logik wie gehabt
+    // --- Timer-Ende-Logik ---
     LaunchedEffect(totalSeconds, timerRunning, screenOff, stopAudio, fadeOut) {
         Log.d(TAG, "LaunchedEffect Timer-Ende: totalSeconds=$totalSeconds, timerRunning=$timerRunning")
         val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
@@ -164,7 +160,6 @@ fun HomeScreen(
                 TimerPreferenceHelper.stopTimer(context, lastUserSetValue)
             }
         }
-        // Reset-Flags falls Timer neu gestartet oder gestoppt wird
         if (!timerRunning || totalSeconds > fadeOut.toInt()) {
             fadeOutStarted = false
         }
@@ -259,7 +254,6 @@ fun HomeScreen(
                                 val timerStart = TimerPreferenceHelper.getTimerStartTime(context).first()
                                 val elapsedMs = System.currentTimeMillis() - timerStart
                                 val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
-                                Log.d(TAG, "updateNotification wird getriggert")
                                 updateNotification(context, remainingMs, totalMs)
                             }
                         } else if (timerRunning) {
@@ -301,8 +295,6 @@ suspend fun fadeOutMusic(context: Context, fadeOutSec: Int) {
     // Die Musik wird nach Ablauf des Timers gestoppt!
 }
 
-
-
 /**
  * Holt den Audio-Fokus transient und unterbricht damit Spotify, YouTube usw.
  */
@@ -317,7 +309,7 @@ fun stopMusicPlayback(context: Context) {
 
 fun hasNotificationPermission(context: Context): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     } else {
         true
     }

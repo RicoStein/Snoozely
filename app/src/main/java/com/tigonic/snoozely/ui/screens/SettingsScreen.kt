@@ -57,7 +57,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     val language by SettingsPreferenceHelper.getLanguage(context).collectAsState(initial = "de")
     val showProgressNotification by SettingsPreferenceHelper.getShowProgressNotification(context).collectAsState(initial = false)
     val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(context).collectAsState(initial = false)
-    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(context).collectAsState(initial = 2)
+    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(context).collectAsState(initial = 5)
+    val extendStep by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
+
 
     val progressExtendMinutes by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
 
@@ -297,7 +299,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
 
-            // --------- Benachrichtigungen ---------
+// --------- Benachrichtigungen ---------
             Text(
                 stringResource(R.string.notification),
                 color = Color(0xFF7F7FFF),
@@ -374,25 +376,21 @@ fun SettingsScreen(onBack: () -> Unit) {
                         .background(Color(0x22111111), shape = MaterialTheme.shapes.small)
                         .padding(8.dp)
                 ) {
-                    // Option A: Fortschrittsanzeige (Minuten/Sekunden)
-                    // Oben in der Funktion
-                    val progressExtendMinutes by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
-
-// Im UI-Bereich:
+                    // ---------- Verlängerungsschritt ----------
                     Text(
-                        stringResource(R.string.extend_timer_label),
+                        text = stringResource(R.string.extend_timer_label), // z.B. "Verlängerungsschritt"
                         color = Color.LightGray,
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = 12.dp)
                     )
                     Text(
-                        stringResource(R.string.timer_plus_5, progressExtendMinutes),
+                        text = stringResource(R.string.timer_plus_x, extendStep), // nur EINMAL „+x min“
                         color = Color.Gray,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Slider(
-                        value = progressExtendMinutes.toFloat(),
-                        onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(context, value.toInt()) } },
+                        value = extendStep.toFloat(),
+                        onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(context, v.toInt()) } },
                         valueRange = 1f..30f,
                         steps = 29,
                         colors = SliderDefaults.colors(
@@ -411,12 +409,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                         modifier = Modifier.padding(start = 8.dp)
                     )
 
-
-                    // Option B: Reminder Interaktions-Popup (Slider für Minuten)
+                    // ---------- Reminder (Heads-Up) ----------
+                    // kurzer Subtitle im Toggle -> kein Überlappen mit Switch
                     SettingsRow(
                         icon = Icons.Default.Alarm,
                         title = stringResource(R.string.show_reminder_popup_title),
-                        subtitle = stringResource(R.string.show_reminder_popup_subtitle),
+                        subtitle = stringResource(R.string.reminder_popup_hint_short, extendStep), // kurz, dynamisch
                         checked = showReminderPopup,
                         onCheckedChange = { checked ->
                             scope.launch { SettingsPreferenceHelper.setShowReminderPopup(context, checked) }
@@ -424,33 +422,48 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
 
                     if (showReminderPopup) {
-                        Row(
-                            Modifier
+                        // eigener Block wie beim Verlängerungsschritt, gleicher Slider-Look
+                        Column(
+                            modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)
+                                .background(Color(0x11111111), shape = MaterialTheme.shapes.small)
+                                .padding(8.dp)
                         ) {
-                            Text(stringResource(R.string.reminder_minutes_label), Modifier.padding(end = 8.dp))
+                            Text(
+                                text = stringResource(R.string.reminder_minutes_label),
+                                color = Color.LightGray,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+
                             Slider(
                                 value = reminderMinutes.toFloat(),
-                                onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setReminderMinutes(context, value.toInt()) } },
+                                onValueChange = { value ->
+                                    scope.launch { SettingsPreferenceHelper.setReminderMinutes(context, value.toInt()) }
+                                },
                                 valueRange = 1f..10f,
-                                steps = 8,
-                                modifier = Modifier.weight(1f)
+                                steps = 9, // identisch „gefühlt“ wie oben: feiner Raster
+                                colors = SliderDefaults.colors(
+                                    activeTrackColor = Color(0xFF7F7FFF),
+                                    inactiveTrackColor = Color(0x33444444),
+                                    thumbColor = Color(0xFF7F7FFF),
+                                    activeTickColor = Color.Transparent,
+                                    inactiveTickColor = Color.Transparent
+                                ),
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             )
-                            Text("${reminderMinutes} min")
+                            Text(
+                                text = stringResource(R.string.reminder_popup_hint, reminderMinutes),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+                            )
                         }
-                        Text(
-                            stringResource(R.string.reminder_popup_hint, reminderMinutes),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
 
             Text(
                 stringResource(R.string.haptic_feedback),
