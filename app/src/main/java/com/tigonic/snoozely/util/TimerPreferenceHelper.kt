@@ -1,27 +1,25 @@
 package com.tigonic.snoozely.util
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.math.max
 
 private val Context.dataStore by preferencesDataStore(name = "timer_preferences")
 
 object TimerPreferenceHelper {
     private val TIMER_KEY = intPreferencesKey("timer_minutes")
-    private val TIMER_START_TIME = longPreferencesKey("timer_start_time") // in Millis
+    private val TIMER_START_TIME = longPreferencesKey("timer_start_time") // ms
     private val TIMER_RUNNING = booleanPreferencesKey("timer_running")
 
     fun getTimer(context: Context): Flow<Int> =
         context.dataStore.data.map { it[TIMER_KEY] ?: 0 }
 
     suspend fun setTimer(context: Context, minutes: Int) {
-        if (minutes < 1) return // Niemals 0 oder negativ speichern!
-        context.dataStore.edit { it[TIMER_KEY] = minutes }
+        val safe = max(1, minutes)
+        context.dataStore.edit { it[TIMER_KEY] = safe }
     }
 
     fun getTimerStartTime(context: Context): Flow<Long> =
@@ -38,15 +36,24 @@ object TimerPreferenceHelper {
         context.dataStore.edit { it[TIMER_RUNNING] = running }
     }
 
+    /** Startet den Timer atomar: Minuten setzen, Startzeit setzen, Running=true */
     suspend fun startTimer(context: Context, minutes: Int) {
-        setTimer(context, minutes)
-        setTimerStartTime(context, System.currentTimeMillis())
-        setTimerRunning(context, true)
+        val safe = max(1, minutes)
+        val now = System.currentTimeMillis()
+        context.dataStore.edit { prefs ->
+            prefs[TIMER_KEY] = safe
+            prefs[TIMER_START_TIME] = now
+            prefs[TIMER_RUNNING] = true
+        }
     }
 
+    /** Stoppt den Timer atomar: Minuten merken (z. B. letzte User-Auswahl), Startzeit löschen, Running=false */
     suspend fun stopTimer(context: Context, minutes: Int) {
-        setTimer(context, minutes)
-        setTimerStartTime(context, 0L)
-        setTimerRunning(context, false)
+        val safe = max(1, minutes)
+        context.dataStore.edit { prefs ->
+            prefs[TIMER_KEY] = safe
+            prefs[TIMER_START_TIME] = 0L
+            prefs[TIMER_RUNNING] = false
+        }
     }
 }

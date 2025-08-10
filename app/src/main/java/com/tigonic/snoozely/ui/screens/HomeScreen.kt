@@ -1,6 +1,7 @@
 package com.tigonic.snoozely.ui.screens
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -17,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,14 +27,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
-import com.tigonic.snoozely.service.stopNotification
-import com.tigonic.snoozely.service.updateNotification
+import com.tigonic.snoozely.service.TimerContracts
+import com.tigonic.snoozely.service.TimerEngineService
+import com.tigonic.snoozely.service.TimerNotificationService
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
-import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.TimerPreferenceHelper
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private const val TAG = "HomeScreenDebug"
@@ -44,40 +48,28 @@ fun HomeScreen(
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
-    // Nur noch das, was der HomeScreen wirklich braucht:
-    val notificationEnabled by SettingsPreferenceHelper
-        .getNotificationEnabled(context).collectAsState(initial = false)
-
-    // Timer-States (Anzeige + Start/Stop):
-    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 0)
+    // Live-States aus DataStore
+    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 5)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
-    // UI State: letzter vom User gesetzter Wert
-    var lastUserSetValue by remember { mutableStateOf(timerMinutes) }
+    // Eigener UI-State für Slider + Debounce-Job
+    var sliderMinutes by rememberSaveable { mutableStateOf(timerMinutes.coerceAtLeast(1)) }
+    var persistJob by remember { mutableStateOf<Job?>(null) }
 
-    // Ladeanzeige solange Timer nicht geladen
-    if (timerMinutes < 1) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                stringResource(R.string.appLoading),
-                color = Color.White,
-            )
+    // Slider nur synchronisieren, wenn kein Timer läuft (kein Drag-End-Callback vorhanden)
+    LaunchedEffect(timerMinutes, timerRunning) {
+        if (!timerRunning) {
+            sliderMinutes = timerMinutes.coerceAtLeast(1)
         }
-        return
     }
 
-    // Sekundenticker nur für die UI-Anzeige (keine Logik!)
+    // Sekundenticker nur für die UI-Anzeige
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
-        Log.d(TAG, "LaunchedEffect Sekundenticker: timerRunning=$timerRunning, timerStartTime=$timerStartTime")
+        Log.d(TAG, "UI tick start: running=$timerRunning, startTime=$timerStartTime")
         if (timerRunning && timerStartTime > 0L) {
-            while (true) {
+            while (isActive) {
                 now = System.currentTimeMillis()
                 delay(1000)
             }
@@ -85,18 +77,19 @@ fun HomeScreen(
     }
 
     val startTimeValid = timerRunning && timerStartTime > 0L
-    val elapsedMillis = if (startTimeValid) now - timerStartTime else 0L
-    val elapsedSec = (elapsedMillis / 1000).toInt()
+    val elapsedMillis: Long = if (startTimeValid) now - timerStartTime else 0L
+    val elapsedSec: Int = (elapsedMillis / 1000L).toInt()
 
-    val totalSeconds = when {
-        !timerRunning -> timerMinutes * 60
-        !startTimeValid -> timerMinutes * 60
-        elapsedSec < 0 -> timerMinutes * 60
-        else -> (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
+    // Alles strikt Int, damit keine BigDecimal-Overloads greifen
+    val totalSeconds: Int = when {
+        !timerRunning     -> sliderMinutes * 60
+        !startTimeValid   -> timerMinutes * 60
+        elapsedSec < 0    -> timerMinutes * 60
+        else              -> (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
     }
 
-    val remainingMinutes = totalSeconds / 60
-    val remainingSeconds = totalSeconds % 60
+    val remainingMinutes: Int = totalSeconds / 60
+    val remainingSeconds: Int = totalSeconds % 60
 
     val wheelAlpha by animateFloatAsState(
         targetValue = if (timerRunning) 0f else 1f,
@@ -108,23 +101,6 @@ fun HomeScreen(
         animationSpec = tween(durationMillis = 0),
         label = "wheelScale"
     )
-
-    LaunchedEffect(timerMinutes) {
-        if (!timerRunning) {
-            lastUserSetValue = timerMinutes
-        }
-    }
-
-    // Foreground-Notification (Fortschrittsanzeige) synchron halten – reine UI Sync, keine Logik
-    LaunchedEffect(timerRunning, notificationEnabled, timerMinutes, timerStartTime) {
-        Log.d(TAG, "LaunchedEffect Notification: running=$timerRunning, notif=$notificationEnabled, minutes=$timerMinutes, start=$timerStartTime")
-        if (timerRunning && notificationEnabled && timerStartTime > 0L && timerMinutes > 0) {
-            val totalMs = timerMinutes * 60_000L
-            val elapsedMs = System.currentTimeMillis() - timerStartTime
-            val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
-            updateNotification(context, remainingMs, totalMs)
-        }
-    }
 
     // --- UI ---
     Box(
@@ -176,11 +152,17 @@ fun HomeScreen(
                 modifier = Modifier.height(320.dp)
             ) {
                 WheelSlider(
-                    value = timerMinutes,
+                    value = sliderMinutes,
                     onValueChange = { value ->
-                        if (!timerRunning && value >= 1) {
-                            lastUserSetValue = value
-                            scope.launch { TimerPreferenceHelper.setTimer(context, value) }
+                        if (!timerRunning) {
+                            val coerced = value.coerceAtLeast(1)
+                            sliderMinutes = coerced
+                            // Debounce: schreibe erst 250 ms nach der letzten Änderung
+                            persistJob?.cancel()
+                            persistJob = scope.launch {
+                                delay(250)
+                                TimerPreferenceHelper.setTimer(context, coerced)
+                            }
                         }
                     },
                     minValue = 1,
@@ -200,27 +182,31 @@ fun HomeScreen(
             IconButton(
                 onClick = {
                     scope.launch {
-                        if (!timerRunning && timerMinutes > 0) {
-                            Log.d(TAG, "Play pressed: startTimer = $timerMinutes min")
-                            // Start im Datenspeicher markieren
-                            TimerPreferenceHelper.startTimer(context, timerMinutes)
-                            // warten bis StartTime gesetzt
-                            while (TimerPreferenceHelper.getTimerStartTime(context).first() == 0L) {
-                                delay(10)
+
+                        if (!timerRunning && sliderMinutes > 0) {
+                            // User-Auswahl persistent halten (optional – schadet nicht)
+                            if (timerMinutes != sliderMinutes) {
+                                TimerPreferenceHelper.setTimer(context, sliderMinutes)
                             }
-                            // Fortschritts-Notification starten (Service übernimmt Ticker & Ende)
-                            if (notificationEnabled && hasNotificationPermission(context)) {
-                                val totalMs = timerMinutes * 60_000L
-                                val start = TimerPreferenceHelper.getTimerStartTime(context).first()
-                                val elapsedMs = System.currentTimeMillis() - start
-                                val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
-                                updateNotification(context, remainingMs, totalMs)
-                            }
+
+                            // Engine direkt starten und MINUTEN ALS EXTRA mitsenden
+                            val startIntent = Intent(
+                                context,
+                                com.tigonic.snoozely.service.TimerEngineService::class.java
+                            ).setAction(com.tigonic.snoozely.service.TimerContracts.ACTION_START)
+                                .putExtra(com.tigonic.snoozely.service.TimerContracts.EXTRA_MINUTES, sliderMinutes)
+
+                            context.startForegroundServiceCompat(startIntent)
+
+                            // DataStore „Start“ direkt auch setzen (doppelt hält besser, aber Service verlässt sich NICHT mehr drauf)
+                            TimerPreferenceHelper.startTimer(context, sliderMinutes)
+
                         } else if (timerRunning) {
-                            Log.d(TAG, "Pause pressed: stopTimer, restore = $lastUserSetValue")
-                            TimerPreferenceHelper.stopTimer(context, lastUserSetValue)
-                            stopNotification(context)
+                            val stopIntent = Intent(context, com.tigonic.snoozely.service.TimerEngineService::class.java)
+                                .setAction(com.tigonic.snoozely.service.TimerContracts.ACTION_STOP)
+                            context.startForegroundServiceCompat(stopIntent)
                         }
+
                     }
                 },
                 modifier = Modifier
@@ -238,6 +224,39 @@ fun HomeScreen(
     }
 }
 
+
+/** Startet nur für ACTION_START als Foreground-Service (O+), sonst normal. */
+/** Startet nur als Foreground-Service, wenn Progress-Notifications erlaubt sind. */
+fun Context.startForegroundServiceCompat(intent: Intent) {
+    val action = intent.action
+    val baseShould =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                (action == TimerContracts.ACTION_START ||
+                        action == TimerContracts.ACTION_STOP  ||
+                        action == TimerContracts.ACTION_EXTEND)
+
+    if (!baseShould) {
+        startService(intent)
+        return
+    }
+
+    // Settings synchron (kurz) lesen
+    val notificationsEnabled = kotlinx.coroutines.runBlocking {
+        com.tigonic.snoozely.util.SettingsPreferenceHelper.getNotificationEnabled(this@startForegroundServiceCompat).first()
+    }
+    val showProgress = kotlinx.coroutines.runBlocking {
+        com.tigonic.snoozely.util.SettingsPreferenceHelper.getShowProgressNotification(this@startForegroundServiceCompat).first()
+    }
+
+    if (notificationsEnabled && showProgress) {
+        startForegroundService(intent)  // zeigt laufende Statusbar-Notification
+    } else {
+        startService(intent)            // KEIN Foreground → keine Statusbar-Notification
+    }
+}
+
+
+
 fun hasNotificationPermission(context: Context): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
@@ -246,3 +265,5 @@ fun hasNotificationPermission(context: Context): Boolean {
         true
     }
 }
+
+

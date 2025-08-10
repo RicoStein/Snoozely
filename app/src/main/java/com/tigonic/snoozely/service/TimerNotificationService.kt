@@ -1,353 +1,290 @@
 package com.tigonic.snoozely.service
 
-import android.app.*
-import android.content.Context
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.tigonic.snoozely.R
-import com.tigonic.snoozely.ui.dialog.ReminderDialogActivity
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.TimerPreferenceHelper
-import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
+/**
+ * Reagiert auf Events der TimerEngine:
+ * - ACTION_NOTIFY_UPDATE    → laufende Statusbar-Notification mit Fortschritt
+ * - ACTION_NOTIFY_REMINDER  → Heads-up Reminder kurz vor Ablauf
+ * - ACTION_EXTEND / ACTION_STOP (Buttons) → leitet an Engine weiter
+ */
 class TimerNotificationService : Service() {
-
-    companion object {
-        const val CHANNEL_ID = "timer_notification_channel"           // FG (LOW)
-        const val NOTIFICATION_ID = 42
-
-        const val REMINDER_CHANNEL_ID = "timer_reminder_channel"      // HUN (HIGH)
-        const val REMINDER_NOTIFICATION_ID = 43
-
-        const val ACTION_UPDATE = "ACTION_UPDATE"
-        const val ACTION_STOP = "ACTION_STOP"
-        const val ACTION_EXTEND = "ACTION_EXTEND"
-    }
-
-    private var reminderShownForTimerStart: Long = -1
-    private var timerJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        createForegroundChannel()
-        createReminderChannelIfNeeded()
+        createChannelsIfNeeded()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        showInitializingNotification()
-        when (intent?.action) {
-            ACTION_UPDATE -> startOrUpdateTicker()
-            ACTION_STOP -> {
-                stopTickerAndNotification()
-                CoroutineScope(Dispatchers.Default).launch {
-                    TimerPreferenceHelper.stopTimer(
-                        applicationContext,
-                        TimerPreferenceHelper.getTimer(applicationContext).first()
-                    )
+        // Channels sicherstellen (auch wenn onCreate schon lief – doppelt schadet nicht)
+        createChannelsIfNeeded()
+
+        val action = intent?.action
+
+        when (action) {
+            // Fortschrittsanzeige – an "Benachrichtigung AN" gekoppelt
+            TimerContracts.ACTION_NOTIFY_UPDATE -> {
+                val notificationsEnabled = runBlocking {
+                    SettingsPreferenceHelper.getNotificationEnabled(applicationContext).first()
                 }
-            }
-            ACTION_EXTEND -> extendTimerMinutes()
-        }
-        return START_STICKY
-    }
-
-    private fun showInitializingNotification() {
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.notification_timer_running))
-            .setContentText("Timer wird gestartet...")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setOngoing(true)
-            .build()
-        startForeground(NOTIFICATION_ID, notification)
-    }
-
-    private fun startOrUpdateTicker() {
-        timerJob?.cancel()
-        timerJob = CoroutineScope(Dispatchers.Default).launch {
-            val context = applicationContext
-
-            while (true) {
-                val notificationEnabled = SettingsPreferenceHelper.getNotificationEnabled(context).first()
-                val timerRunning = TimerPreferenceHelper.getTimerRunning(context).first()
-                val timerMinutes = TimerPreferenceHelper.getTimer(context).first()
-                val timerStartTime = TimerPreferenceHelper.getTimerStartTime(context).first()
-                val showReminderPopup = SettingsPreferenceHelper.getShowReminderPopup(context).first()
-                val reminderMinutes = SettingsPreferenceHelper.getReminderMinutes(context).first()
-
-                if (!notificationEnabled || !timerRunning || timerMinutes < 1 || timerStartTime == 0L) {
-                    Log.d("TimerService", "Abbruch: notif=$notificationEnabled, running=$timerRunning, minutes=$timerMinutes, start=$timerStartTime")
-                    break
+                val showProgress = notificationsEnabled && runBlocking {
+                    SettingsPreferenceHelper.getShowProgressNotification(applicationContext).first()
+                }
+                if (!showProgress) {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    runCatching { nm.cancel(NOTIFICATION_ID_RUNNING) }
+                    stopSelf()
+                    return START_NOT_STICKY
                 }
 
-                val totalMs = timerMinutes * 60_000L
-                val now = System.currentTimeMillis()
-                val elapsedMs = now - timerStartTime
-                val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
-                val remainingSec = (remainingMs / 1000).toInt()
+                var remainingMs = intent.getLongExtra(TimerContracts.EXTRA_REMAINING_MS, -1L)
+                var totalMs     = intent.getLongExtra(TimerContracts.EXTRA_TOTAL_MS, -1L)
 
-                if (showReminderPopup &&
-                    remainingSec == reminderMinutes * 60 &&
-                    reminderShownForTimerStart != timerStartTime
-                ) {
-                    reminderShownForTimerStart = timerStartTime
-                    Log.d("TimerService", "Heads-Up Reminder ausgelöst (t−$reminderMinutes min)")
-                    showHeadsUpReminder(reminderMinutes)
-                }
-
-                showNotification(remainingMs, totalMs)
-
-                if (remainingMs <= 0) {
-                    Log.d("TimerService", "Timer abgelaufen (Service übernimmt Ende-Logik).")
-                    withContext(Dispatchers.Main.immediate) {
-                        // optional: Heads-up wegräumen
-                        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                            .cancel(REMINDER_NOTIFICATION_ID)
+                if (remainingMs < 0 || totalMs < 0) {
+                    runBlocking {
+                        val minutes = SettingsPreferenceHelper
+                            .getProgressExtendMinutes(applicationContext).first() // nicht zwingend, nur Beispiel
+                        val m = TimerPreferenceHelper.getTimer(applicationContext).first()
+                        val s = TimerPreferenceHelper.getTimerStartTime(applicationContext).first()
+                        if (m > 0 && s > 0L) {
+                            totalMs = m * 60_000L
+                            remainingMs = (totalMs - (System.currentTimeMillis() - s)).coerceAtLeast(0)
+                        }
                     }
-                    // Ende-Logik im Hintergrund ausführen
-                    handleTimerFinished()
-                    return@launch // Service stoppt sich in handleTimerFinished()
                 }
-                delay(1000)
+
+                if (totalMs > 0) showRunningNotification(remainingMs.coerceAtLeast(0), totalMs)
             }
-            stopTickerAndNotification()
+
+            // Reminder – an "Benachrichtigung AN" UND "Reminder vor Ablauf AN" gekoppelt
+            TimerContracts.ACTION_NOTIFY_REMINDER -> {
+                val notificationsEnabled = runBlocking {
+                    SettingsPreferenceHelper.getNotificationEnabled(applicationContext).first()
+                }
+                val allowReminder = notificationsEnabled && runBlocking {
+                    SettingsPreferenceHelper.getShowReminderPopup(applicationContext).first()
+                }
+                if (!allowReminder) {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    runCatching { nm.cancel(NOTIFICATION_ID_REMINDER) }
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+
+                // Reminder-Minuten aus Extra oder Settings
+                val fromExtra = intent?.getIntExtra("reminderMinutes", -1) ?: -1
+                val minutes = if (fromExtra > 0) fromExtra else runBlocking {
+                    SettingsPreferenceHelper.getReminderMinutes(applicationContext).first()
+                }
+
+                showHeadsUpReminder(minutes)
+            }
+
+            TimerContracts.ACTION_EXTEND -> {
+                startService(Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_EXTEND))
+            }
+
+            TimerContracts.ACTION_STOP -> {
+                startService(Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_STOP))
+                val nm = getSystemService(NotificationManager::class.java)
+                runCatching { nm.cancel(NOTIFICATION_ID_RUNNING) }
+                runCatching { nm.cancel(NOTIFICATION_ID_REMINDER) }
+                stopSelf()
+            }
+
+            else -> Unit
         }
+
+        return START_NOT_STICKY
     }
 
-    private fun stopTickerAndNotification() {
-        timerJob?.cancel()
-        stopForeground(true)
-        stopSelf()
-    }
 
-    private fun extendTimerMinutes() {
-        CoroutineScope(Dispatchers.Default).launch {
-            val context = applicationContext
-            val timerRunning = TimerPreferenceHelper.getTimerRunning(context).first()
-            val timerMinutes = TimerPreferenceHelper.getTimer(context).first()
-            val timerStartTime = TimerPreferenceHelper.getTimerStartTime(context).first()
-            val extendMinutes = SettingsPreferenceHelper.getProgressExtendMinutes(context).first()
 
-            if (!timerRunning || timerStartTime == 0L) return@launch
 
-            val now = System.currentTimeMillis()
-            val elapsedMs = now - timerStartTime
-            val totalMs = timerMinutes * 60_000L
-            val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+    // --- Laufende Timer-Notification (Statusleiste) ---
 
-            val newTotalMs = remainingMs + (extendMinutes * 60_000L)
-            val newMinutes = ((newTotalMs + elapsedMs) / 60_000L).toInt().coerceAtLeast(1)
-
-            TimerPreferenceHelper.setTimer(applicationContext, newMinutes)
-            startOrUpdateTicker()
-        }
-    }
-
-    private fun showNotification(remainingMs: Long, totalMs: Long) {
+    private fun showRunningNotification(remainingMs: Long, totalMs: Long) {
+        android.util.Log.d("TimerNotif", "showRunningNotification: remaining=$remainingMs total=$totalMs")
         val minutes = (remainingMs / 1000) / 60
         val seconds = (remainingMs / 1000) % 60
         val timeText = String.format("%02d:%02d", minutes, seconds)
-        val progress = if (totalMs > 0) (((totalMs - remainingMs) * 100 / totalMs).toInt()).coerceIn(0, 100) else 0
+        val progress = if (totalMs > 0)
+            (((totalMs - remainingMs) * 100 / totalMs).toInt()).coerceIn(0, 100)
+        else 0
 
-        val stopIntent = Intent(this, TimerNotificationService::class.java).apply { action = ACTION_STOP }
-        val stopPendingIntent = PendingIntent.getService(this, 1001, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable())
-
-        val extendMinutes = runBlocking { SettingsPreferenceHelper.getProgressExtendMinutes(this@TimerNotificationService).first() }
-        val extendIntent = Intent(this, TimerNotificationService::class.java).apply { action = ACTION_EXTEND }
-        val extendPendingIntent = PendingIntent.getService(this, 1002, extendIntent, PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable())
-
-        val extendButtonText = getString(R.string.timer_plus_x, extendMinutes)
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.notification_timer_running))
-            .setContentText(getString(R.string.notification_remaining_time, timeText))
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setOngoing(true)
-            .setProgress(100, progress, false)
-            .addAction(android.R.drawable.ic_input_add, extendButtonText, extendPendingIntent)
-            .addAction(android.R.drawable.ic_lock_idle_alarm, getString(R.string.timer_stop), stopPendingIntent)
-            .build()
-
-        startForeground(NOTIFICATION_ID, notification)
-    }
-
-    // ---------- Channels & Heads-Up ----------
-
-    private fun createForegroundChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-                val ch = NotificationChannel(
-                    CHANNEL_ID,
-                    "Timer",
-                    NotificationManager.IMPORTANCE_LOW   // Foreground → LOW
-                )
-                nm.createNotificationChannel(ch)
-            }
-        }
-    }
-
-    private fun createReminderChannelIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (nm.getNotificationChannel(REMINDER_CHANNEL_ID) == null) {
-                val ch = NotificationChannel(
-                    REMINDER_CHANNEL_ID,
-                    "Timer-Reminder",
-                    NotificationManager.IMPORTANCE_HIGH  // Heads-Up
-                ).apply {
-                    description = "Hinweis kurz vor Timerende"
-                    enableVibration(true)
-                    setShowBadge(false)
-                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                }
-                nm.createNotificationChannel(ch)
-            }
-        }
-    }
-
-    private fun showHeadsUpReminder(remainingMin: Int) {
-        // Verlängerungsschritt aus Settings holen
-        val extendMinutes = runBlocking {
+        val extendStep = runBlocking {
             SettingsPreferenceHelper.getProgressExtendMinutes(this@TimerNotificationService).first()
         }
 
-        // kurzer, dynamischer Text: "Timer läuft in X Min ab – +Y Min oder beenden."
-        val body = getString(R.string.reminder_popup_message, remainingMin, extendMinutes)
-        // Falls du lieber den längeren Text möchtest:
-        // val body = getString(R.string.reminder_popup_hint, remainingMin, extendMinutes)
-
-        // Tippen auf Banner -> optionaler Dialog
-        val dialogIntent = Intent(this, ReminderDialogActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val dialogPi = PendingIntent.getActivity(
-            this, 2001, dialogIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable()
-        )
-
-        // Action: +x min
-        val extendIntent = Intent(this, TimerNotificationService::class.java).apply {
-            action = ACTION_EXTEND
-        }
-        val extendPi = PendingIntent.getService(
-            this, 2002, extendIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable()
-        )
-
-        // Action: Stoppen
-        val stopIntent = Intent(this, TimerNotificationService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val stopPi = PendingIntent.getService(
-            this, 2003, stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable()
-        )
-
-        val builder = NotificationCompat.Builder(this, REMINDER_CHANNEL_ID)
+        val notif = NotificationCompat.Builder(this, TimerContracts.CHANNEL_RUNNING)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(getString(R.string.reminder_popup_title))
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body)) // mehr Text im HUN sichtbar
-            .setCategory(NotificationCompat.CATEGORY_ALARM)            // aggressiver als REMINDER
-            .setPriority(NotificationCompat.PRIORITY_HIGH)             // < API 26
-            .setDefaults(Notification.DEFAULT_ALL)                     // Ton/Vibration für Heads-Up
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
-            .setContentIntent(dialogPi)
+            .setContentTitle(getString(R.string.notification_timer_running))
+            .setContentText(getString(R.string.notification_remaining_time, timeText))
+            .setOngoing(true)
+            .setProgress(100, progress, false)
+            .setContentIntent(pendingOpenApp())           // <— NEU
             .addAction(
                 android.R.drawable.ic_input_add,
-                getString(R.string.timer_plus_x, extendMinutes),
-                extendPi
+                getString(R.string.timer_plus_x, extendStep),
+                pendingExtend()                           // <— NEU (statt inline)
             )
             .addAction(
                 android.R.drawable.ic_lock_idle_alarm,
                 getString(R.string.timer_stop),
-                stopPi
+                pendingStop()                             // <— NEU (statt inline)
             )
-            .setTimeoutAfter(10_000)
+            .build()
 
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(REMINDER_NOTIFICATION_ID, builder.build())
+        notify(NOTIFICATION_ID_RUNNING, notif)
     }
 
 
+    // --- Heads-up Reminder kurz vor Ablauf ---
+
+    private fun showHeadsUpReminder(remainingMin: Int) {
+        val extendMinutes = runBlocking {
+            SettingsPreferenceHelper.getProgressExtendMinutes(this@TimerNotificationService).first()
+        }
+
+        val body = getString(R.string.reminder_popup_message)
+
+        val notif = NotificationCompat.Builder(this, TimerContracts.CHANNEL_REMINDER)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle(getString(R.string.reminder_popup_title))
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(Notification.DEFAULT_ALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(pendingOpenApp())           // <— NEU
+            .addAction(
+                android.R.drawable.ic_input_add,
+                getString(R.string.timer_plus_x, extendMinutes),
+                pendingExtend()                           // <— NEU (statt inline)
+            )
+            .addAction(
+                android.R.drawable.ic_lock_idle_alarm,
+                getString(R.string.timer_stop),
+                pendingStop()                             // <— NEU (statt inline)
+            )
+            .setTimeoutAfter(10_000)
+            .build()
+
+        notify(NOTIFICATION_ID_REMINDER, notif)
+    }
+
+
+    // --- Channels / Utils ---
+
+    private fun createChannelsIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val nm = getSystemService(NotificationManager::class.java)
+
+        fun upsert(id: String, name: String, imp: Int, apply: NotificationChannel.() -> Unit = {}) {
+            val existing = nm.getNotificationChannel(id)
+            if (existing == null) {
+                nm.createNotificationChannel(NotificationChannel(id, name, imp).apply(apply))
+                return
+            }
+            val blocked = existing.importance == NotificationManager.IMPORTANCE_NONE
+            val tooLow = existing.importance < imp &&
+                    existing.importance != NotificationManager.IMPORTANCE_UNSPECIFIED
+            val renamed = existing.name?.toString() != name
+            if (blocked || tooLow || renamed) {
+                runCatching { nm.deleteNotificationChannel(id) }
+                nm.createNotificationChannel(NotificationChannel(id, name, imp).apply(apply))
+            }
+        }
+
+        upsert(
+            TimerContracts.CHANNEL_RUNNING,
+            "Timer läuft",
+            NotificationManager.IMPORTANCE_LOW
+        ) {
+            description = "Fortschritt und verbleibende Zeit in der Statusleiste"
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+        }
+
+        upsert(
+            TimerContracts.CHANNEL_REMINDER,
+            "Timer-Reminder",
+            NotificationManager.IMPORTANCE_HIGH
+        ) {
+            description = "Heads-up Hinweis kurz vor Ablauf"
+            enableVibration(true)
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
+    }
+
+
+
+    private fun notify(id: Int, notification: Notification) {
+        android.util.Log.d("TimerNotif", "notify: id=$id")
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.notify(id, notification)
+    }
 
     private fun flagImmutable(): Int =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
 
-    override fun onDestroy() {
-        timerJob?.cancel()
-        super.onDestroy()
+    companion object {
+        private const val REQ_EXTEND = 2002
+        private const val REQ_STOP = 2003
+
+        const val NOTIFICATION_ID_RUNNING = 42
+        const val NOTIFICATION_ID_REMINDER = 43
     }
 
-    private fun stopMusicPlayback() {
-        val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-        // Holt kurz den Audiofokus → pausiert Spotify/YouTube etc.
-        am.requestAudioFocus(
-            { _ -> }, android.media.AudioManager.STREAM_MUSIC,
-            android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
-        )
+    private fun pendingStop(): PendingIntent {
+        val i = Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_STOP)
+        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+                PendingIntent.FLAG_CANCEL_CURRENT
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            PendingIntent.getForegroundService(this, 2003, i, flags)
+        else
+            PendingIntent.getService(this, 2003, i, flags)
     }
 
-    private fun lockScreenIfAllowed() {
-        val screenOff = runBlocking {
-            com.tigonic.snoozely.util.SettingsPreferenceHelper.getScreenOff(applicationContext).first()
-        }
-        if (!screenOff) return
-        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
-        val admin = android.content.ComponentName(applicationContext, com.tigonic.snoozely.util.ScreenOffAdminReceiver::class.java)
-        if (dpm.isAdminActive(admin)) {
-            dpm.lockNow()
-        }
+    private fun pendingExtend(): PendingIntent {
+        val i = Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_EXTEND)
+        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+                PendingIntent.FLAG_CANCEL_CURRENT
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            PendingIntent.getForegroundService(this, 2002, i, flags)
+        else
+            PendingIntent.getService(this, 2002, i, flags)
     }
 
-    private suspend fun handleTimerFinished() {
-        // optional Vibration, wenn gewünscht
-        val vibrate = SettingsPreferenceHelper.getTimerVibrate(applicationContext).first()
-        if (vibrate) vibrateOnce(200)
+    private fun pendingOpenApp(): PendingIntent {
+        val i = Intent(this, com.tigonic.snoozely.MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
-        // Audio stoppen (transient focus)
-        val stopAudio = com.tigonic.snoozely.util.SettingsPreferenceHelper
-            .getStopAudio(applicationContext).first()
-        if (stopAudio) stopMusicPlayback()
+        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+                PendingIntent.FLAG_CANCEL_CURRENT
 
-        // Display sperren (wenn erlaubt)
-        lockScreenIfAllowed()
-
-        // Timer sauber zurücksetzen (bleibt auch ohne UI bestehen)
-        val lastUserMinutes = com.tigonic.snoozely.util.TimerPreferenceHelper
-            .getTimer(applicationContext).first()
-        com.tigonic.snoozely.util.TimerPreferenceHelper.stopTimer(applicationContext, lastUserMinutes)
-
-        // Service-Notification beenden
-        stopTickerAndNotification()
+        return PendingIntent.getActivity(this, /*REQ*/ 1001, i, flags)
     }
-
-    private fun vibrateOnce(ms: Long = 200L) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // API 31+: VibratorManager
-            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
-            if (vm.defaultVibrator.hasVibrator()) {
-                vm.defaultVibrator.vibrate(
-                    android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE)
-                )
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            val vib = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-            if (vib.hasVibrator()) {
-                vib.vibrate(
-                    android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE)
-                )
-            }
-        }
-    }
-
 
 }

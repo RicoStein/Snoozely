@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -29,49 +30,48 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
-import com.tigonic.snoozely.service.stopNotification
-import com.tigonic.snoozely.service.updateNotification
 import com.tigonic.snoozely.util.LocaleHelper
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
-import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first
+
+// Helper: Context → Activity (vermeidet direkten Cast von LocalContext)
+private tailrec fun Context.asActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.asActivity()
+    else -> null
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    val context = LocalContext.current.applicationContext  // *** Nur ApplicationContext ***
+    val appContext = LocalContext.current.applicationContext // nur ApplicationContext
+    val activity = LocalContext.current.asActivity()
     val scope = rememberCoroutineScope()
-    val activity = LocalContext.current as? Activity
 
-    val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-    val adminComponent = ComponentName(context, ScreenOffAdminReceiver::class.java)
+    val devicePolicyManager =
+        appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    val adminComponent = ComponentName(appContext, ScreenOffAdminReceiver::class.java)
 
     var isAdmin by remember { mutableStateOf(devicePolicyManager.isAdminActive(adminComponent)) }
-    val stopAudio by SettingsPreferenceHelper.getStopAudio(context).collectAsState(initial = true)
-    val screenOff by SettingsPreferenceHelper.getScreenOff(context).collectAsState(initial = false)
-    val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(context).collectAsState(initial = false)
-    val timerVibrate by SettingsPreferenceHelper.getTimerVibrate(context).collectAsState(initial = false)
-    val fadeOut by SettingsPreferenceHelper.getFadeOut(context).collectAsState(initial = 30f)
-    val language by SettingsPreferenceHelper.getLanguage(context).collectAsState(initial = "de")
-    val showProgressNotification by SettingsPreferenceHelper.getShowProgressNotification(context).collectAsState(initial = false)
-    val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(context).collectAsState(initial = false)
-    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(context).collectAsState(initial = 5)
-    val extendStep by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
-
-
-    val progressExtendMinutes by SettingsPreferenceHelper.getProgressExtendMinutes(context).collectAsState(initial = 5)
-
+    val stopAudio by SettingsPreferenceHelper.getStopAudio(appContext).collectAsState(initial = true)
+    val screenOff by SettingsPreferenceHelper.getScreenOff(appContext).collectAsState(initial = false)
+    val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(appContext).collectAsState(initial = false)
+    val timerVibrate by SettingsPreferenceHelper.getTimerVibrate(appContext).collectAsState(initial = false)
+    val fadeOut by SettingsPreferenceHelper.getFadeOut(appContext).collectAsState(initial = 30f)
+    val language by SettingsPreferenceHelper.getLanguage(appContext).collectAsState(initial = "de")
+    val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(appContext).collectAsState(initial = false)
+    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(appContext).collectAsState(initial = 5)
+    val extendStep by SettingsPreferenceHelper.getProgressExtendMinutes(appContext).collectAsState(initial = 5)
 
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
         isAdmin = nowIsAdmin
-        scope.launch { SettingsPreferenceHelper.setScreenOff(context, nowIsAdmin) }
+        scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, nowIsAdmin) }
         Toast.makeText(
-            context,
-            if (nowIsAdmin) context.getString(R.string.device_admin_enabled)
-            else context.getString(R.string.device_admin_failed),
+            appContext,
+            if (nowIsAdmin) appContext.getString(R.string.device_admin_enabled)
+            else appContext.getString(R.string.device_admin_failed),
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -80,56 +80,30 @@ fun SettingsScreen(onBack: () -> Unit) {
     var showNotificationPermissionDialog by remember { mutableStateOf(false) }
     var showDisableNotificationDialog by remember { mutableStateOf(false) }
 
-    // Notification Permission Launcher (Android 13+)
+    // Notification Permission (Android 13+)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         scope.launch {
-            if (isGranted) {
-                SettingsPreferenceHelper.setNotificationEnabled(context, true)
-            } else {
-                SettingsPreferenceHelper.setNotificationEnabled(context, false)
-                Toast.makeText(context, context.getString(R.string.notification_permission_denied), Toast.LENGTH_LONG).show()
+            SettingsPreferenceHelper.setNotificationEnabled(appContext, isGranted)
+            if (!isGranted) {
+                Toast.makeText(
+                    appContext,
+                    appContext.getString(R.string.notification_permission_denied),
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
 
-    // First run: set notifications to false!
-    // Nur beim allerersten Start aufrufen, dann nie wieder (auch nach Recomposition nicht!)
+    // Admin-Status mit Switch synchron halten
     LaunchedEffect(screenOff) {
         val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
         isAdmin = nowIsAdmin
         if (!nowIsAdmin && screenOff) {
-            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
+            scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, false) }
         }
     }
-
-    LaunchedEffect(screenOff) {
-        val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
-        isAdmin = nowIsAdmin
-        if (!nowIsAdmin && screenOff) {
-            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
-        }
-    }
-
-    LaunchedEffect(Unit) {   // <--- Triggert IMMER beim Betreten des Screens!
-        scope.launch {
-            val timerRunning = TimerPreferenceHelper.getTimerRunning(context).first()
-            val timerMinutes = TimerPreferenceHelper.getTimer(context).first()
-            val timerStartTime = TimerPreferenceHelper.getTimerStartTime(context).first()
-            val notificationEnabledNow = SettingsPreferenceHelper.getNotificationEnabled(context).first()
-            if (notificationEnabledNow && timerRunning && timerStartTime > 0L && timerMinutes > 0) {
-                val now = System.currentTimeMillis()
-                val totalMs = timerMinutes * 60_000L
-                val elapsedMs = now - timerStartTime
-                val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
-                updateNotification(context, remainingMs, totalMs)
-            } else {
-                stopNotification(context)
-            }
-        }
-    }
-
 
     Scaffold(
         topBar = {
@@ -181,7 +155,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 title = stringResource(R.string.playback),
                 subtitle = stringResource(R.string.stop_audio_video),
                 checked = stopAudio,
-                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setStopAudio(context, value) } },
+                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setStopAudio(appContext, value) } },
                 enabled = true
             )
 
@@ -199,7 +173,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
             Slider(
                 value = fadeOut,
-                onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setFadeOut(context, value) } },
+                onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setFadeOut(appContext, value) } },
                 valueRange = 0f..120f,
                 steps = 11,
                 colors = SliderDefaults.colors(
@@ -212,7 +186,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
 
-            // Bildschirm ausschalten mit Adminrechte
+            // Bildschirm ausschalten (Device Admin)
             SettingsRow(
                 icon = Icons.Default.Brightness2,
                 title = stringResource(R.string.screen),
@@ -226,19 +200,22 @@ fun SettingsScreen(onBack: () -> Unit) {
                         if (!isAdmin && activity != null) {
                             val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
                                 putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
-                                putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, context.getString(R.string.device_admin_explanation))
+                                putExtra(
+                                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                    appContext.getString(R.string.device_admin_explanation)
+                                )
                             }
                             adminLauncher.launch(intent)
                         } else {
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(context, true) }
-                            Toast.makeText(context, context.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, true) }
+                            Toast.makeText(appContext, appContext.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         if (isAdmin && activity != null) {
                             showRemoveAdminDialog = true
                         } else {
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
-                            Toast.makeText(context, context.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, false) }
+                            Toast.makeText(appContext, appContext.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -256,16 +233,16 @@ fun SettingsScreen(onBack: () -> Unit) {
                             try {
                                 devicePolicyManager.removeActiveAdmin(adminComponent)
                                 isAdmin = false
-                                scope.launch { SettingsPreferenceHelper.setScreenOff(context, false) }
+                                scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, false) }
                                 Toast.makeText(
-                                    context,
-                                    context.getString(R.string.device_admin_disabled),
+                                    appContext,
+                                    appContext.getString(R.string.device_admin_disabled),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } catch (e: Exception) {
                                 Toast.makeText(
-                                    context,
-                                    context.getString(R.string.device_admin_remove_manual_hint),
+                                    appContext,
+                                    appContext.getString(R.string.device_admin_remove_manual_hint),
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
@@ -299,7 +276,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
 
-// --------- Benachrichtigungen ---------
+            // --------- Benachrichtigungen ---------
             Text(
                 stringResource(R.string.notification),
                 color = Color(0xFF7F7FFF),
@@ -316,13 +293,14 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onCheckedChange = { value ->
                     if (value) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            val permissionCheck = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                            val permissionCheck =
+                                appContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                             if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
                                 showNotificationPermissionDialog = true
                                 return@SettingsRow
                             }
                         }
-                        scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, true) }
+                        scope.launch { SettingsPreferenceHelper.setNotificationEnabled(appContext, true) }
                     } else {
                         showDisableNotificationDialog = true
                     }
@@ -357,7 +335,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                     confirmButton = {
                         TextButton(onClick = {
                             showDisableNotificationDialog = false
-                            scope.launch { SettingsPreferenceHelper.setNotificationEnabled(context, false) }
+                            scope.launch {
+                                SettingsPreferenceHelper.setNotificationEnabled(appContext, false)
+                                // Best effort: aktuelle Notifs schließen
+                                val nm = appContext.getSystemService(android.app.NotificationManager::class.java)
+                                try { nm.cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_RUNNING) } catch (_: Throwable) {}
+                                try { nm.cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_REMINDER) } catch (_: Throwable) {}
+                            }
                         }) { Text(stringResource(R.string.ok)) }
                     },
                     dismissButton = {
@@ -378,19 +362,21 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ) {
                     // ---------- Verlängerungsschritt ----------
                     Text(
-                        text = stringResource(R.string.extend_timer_label), // z.B. "Verlängerungsschritt"
+                        text = stringResource(R.string.extend_timer_label),
                         color = Color.LightGray,
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = 12.dp)
                     )
                     Text(
-                        text = stringResource(R.string.timer_plus_x, extendStep), // nur EINMAL „+x min“
+                        text = stringResource(R.string.timer_plus_x, extendStep),
                         color = Color.Gray,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Slider(
                         value = extendStep.toFloat(),
-                        onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(context, v.toInt()) } },
+                        onValueChange = { v ->
+                            scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(appContext, v.toInt()) }
+                        },
                         valueRange = 1f..30f,
                         steps = 29,
                         colors = SliderDefaults.colors(
@@ -410,19 +396,17 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
 
                     // ---------- Reminder (Heads-Up) ----------
-                    // kurzer Subtitle im Toggle -> kein Überlappen mit Switch
                     SettingsRow(
                         icon = Icons.Default.Alarm,
                         title = stringResource(R.string.show_reminder_popup_title),
-                        subtitle = stringResource(R.string.reminder_popup_hint_short, extendStep), // kurz, dynamisch
+                        subtitle = stringResource(R.string.reminder_popup_hint_short, extendStep),
                         checked = showReminderPopup,
                         onCheckedChange = { checked ->
-                            scope.launch { SettingsPreferenceHelper.setShowReminderPopup(context, checked) }
+                            scope.launch { SettingsPreferenceHelper.setShowReminderPopup(appContext, checked) }
                         }
                     )
 
                     if (showReminderPopup) {
-                        // eigener Block wie beim Verlängerungsschritt, gleicher Slider-Look
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -440,10 +424,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                             Slider(
                                 value = reminderMinutes.toFloat(),
                                 onValueChange = { value ->
-                                    scope.launch { SettingsPreferenceHelper.setReminderMinutes(context, value.toInt()) }
+                                    scope.launch { SettingsPreferenceHelper.setReminderMinutes(appContext, value.toInt()) }
                                 },
                                 valueRange = 1f..10f,
-                                steps = 9, // identisch „gefühlt“ wie oben: feiner Raster
+                                steps = 8, // 1..10 → 10-2 = 8
                                 colors = SliderDefaults.colors(
                                     activeTrackColor = Color(0xFF7F7FFF),
                                     inactiveTrackColor = Color(0x33444444),
@@ -464,7 +448,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-
+            // Haptik
             Text(
                 stringResource(R.string.haptic_feedback),
                 color = Color(0xFF7F7FFF),
@@ -476,11 +460,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                 title = stringResource(R.string.timer),
                 subtitle = stringResource(R.string.device_vibrate_on_timer),
                 checked = timerVibrate,
-                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setTimerVibrate(context, value) } },
+                onCheckedChange = { value ->
+                    scope.launch { SettingsPreferenceHelper.setTimerVibrate(appContext, value) }
+                },
                 enabled = true
             )
 
-            // Sprache wählen (Dropdown)
+            // Sprache
             Text(
                 stringResource(R.string.language),
                 color = Color(0xFF7F7FFF),
@@ -490,12 +476,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             LanguageDropdown(
                 selectedLangCode = language,
                 onSelect = { code ->
-                    if (activity != null) {
-                        LocaleHelper.setAppLocaleAndRestart(activity, code)
-                        scope.launch { SettingsPreferenceHelper.setLanguage(context, code) }
+                    activity?.let {
+                        LocaleHelper.setAppLocaleAndRestart(it, code)
+                        scope.launch { SettingsPreferenceHelper.setLanguage(appContext, code) }
                     }
                 }
             )
+
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -519,13 +506,13 @@ fun SettingsRow(
         Icon(
             icon,
             contentDescription = null,
-            tint = if (enabled && checked) Color(0xFF7F7FFF) else if (enabled) Color.LightGray else Color(0xFF222222),
+            tint = if (enabled && checked) Color(0xFF7F7FFF)
+            else if (enabled) Color.LightGray
+            else Color(0xFF222222),
             modifier = Modifier.size(22.dp)
         )
         Spacer(Modifier.width(12.dp))
-        Column(
-            Modifier.weight(1f)
-        ) {
+        Column(Modifier.weight(1f)) {
             Text(
                 text = title,
                 color = if (enabled) Color.White else Color.Gray,

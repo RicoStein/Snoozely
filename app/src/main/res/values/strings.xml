@@ -64,5 +64,8 @@
     <string name="reminder_popup_message">Timer läuft gleich ab.</string>
     <string name="stop">Stoppen</string>
     <string name="reminder_popup_hint_short">Zeigt ein Heads-Up-Popup kurz vor Ablauf</string>
+    <string name="fade_out_running">Audio wird ausgefaded</string>
+    <string name="notification_channel_running">Test</string>
+    <string name="notification_channel_reminder">Test2</string>
 
 </resources>
