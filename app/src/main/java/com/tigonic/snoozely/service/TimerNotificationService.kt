@@ -178,12 +178,12 @@ class TimerNotificationService : Service() {
             .addAction(
                 android.R.drawable.ic_input_add,
                 getString(R.string.timer_plus_x, extendMinutes),
-                pendingExtend()                           // <— NEU (statt inline)
+                pendingExtendReminder()
             )
             .addAction(
                 android.R.drawable.ic_lock_idle_alarm,
                 getString(R.string.timer_stop),
-                pendingStop()                             // <— NEU (statt inline)
+                pendingStopReminder()
             )
             .setTimeoutAfter(10_000)
             .build()
@@ -249,10 +249,13 @@ class TimerNotificationService : Service() {
 
     companion object {
         private const val REQ_EXTEND = 2002
-        private const val REQ_STOP = 2003
-
+        private const val REQ_STOP   = 2003
         const val NOTIFICATION_ID_RUNNING = 42
         const val NOTIFICATION_ID_REMINDER = 43
+
+        // NEU: eigene RequestCodes für das Reminder-Popup
+        private const val REQ_EXTEND_REMINDER = 2102
+        private const val REQ_STOP_REMINDER   = 2103
     }
 
     private fun pendingStop(): PendingIntent {
@@ -286,5 +289,34 @@ class TimerNotificationService : Service() {
 
         return PendingIntent.getActivity(this, /*REQ*/ 1001, i, flags)
     }
+
+    private fun pendingExtendReminder(): PendingIntent {
+        val i = Intent(this, TimerEngineService::class.java)
+            .setAction(TimerContracts.ACTION_EXTEND)
+            .setPackage(packageName) // <— wichtig auf einigen OEMs
+
+        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+                PendingIntent.FLAG_UPDATE_CURRENT  // <— statt CANCEL_CURRENT
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            PendingIntent.getForegroundService(this, REQ_EXTEND_REMINDER, i, flags)
+        else
+            PendingIntent.getService(this, REQ_EXTEND_REMINDER, i, flags)
+    }
+
+    private fun pendingStopReminder(): PendingIntent {
+        val i = Intent(this, TimerEngineService::class.java)
+            .setAction(TimerContracts.ACTION_STOP)
+            .setPackage(packageName)
+
+        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+                PendingIntent.FLAG_UPDATE_CURRENT
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            PendingIntent.getForegroundService(this, REQ_STOP_REMINDER, i, flags)
+        else
+            PendingIntent.getService(this, REQ_STOP_REMINDER, i, flags)
+    }
+
 
 }
