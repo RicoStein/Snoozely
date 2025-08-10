@@ -44,10 +44,11 @@ class AudioFadeService : Service() {
 
     companion object {
         private const val TAG = "AudioFadeService"
-
-        // Optionaler Foreground während der aktiven Fade-Phase:
         private const val FADE_CHANNEL_ID = "audio_fade"
         private const val FADE_NOTIFICATION_ID = 1007
+
+        // NEU: Finalisierungs-Action (bitte String identisch in der Engine verwenden)
+        const val ACTION_FADE_FINALIZE = "com.tigonic.snoozely.action.FADE_FINALIZE"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -61,6 +62,7 @@ class AudioFadeService : Service() {
     // Settings-Cache (wird bei jedem Tick aktualisiert)
     @Volatile private var stopAudioEnabled: Boolean = true
     @Volatile private var fadeOutSec: Int = 30 // Default, wird aus Settings gelesen
+    @Volatile private var finalizing: Boolean = false
 
     // Receiver für Ticks aus dem Engine-Service
     private val tickReceiver = object : BroadcastReceiver() {
@@ -81,13 +83,31 @@ class AudioFadeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Service lebt im Hintergrund und reagiert auf Ticks.
+        val action = intent?.action
+        if (action == ACTION_FADE_FINALIZE) {
+            // Wir sind am Timerende: kurz warten, bis Player pausiert / Screen off ist,
+            // dann erst auf Original-Lautstärke zurück.
+            finalizing = true
+            scope.launch {
+                try {
+                    kotlinx.coroutines.delay(1200) // 1.2s Puffer – je nach Gerät ggf. anpassen
+                } catch (_: Throwable) { /* ignore */ }
+                restoreVolumeIfNeeded()
+                stopSelf()
+            }
+            return START_NOT_STICKY
+        }
+        // Normalfall: Service lebt im Hintergrund und reagiert auf Ticks.
         return START_STICKY
     }
 
+
     override fun onDestroy() {
-        // Sicherheitshalber Lautstärke zurücksetzen, falls wir mitten im Fade sind.
-        restoreVolumeIfNeeded()
+        // Nur dann SOFORT restaurieren, wenn wir NICHT im Finalisieren-Flow sind.
+        // Beim Finalisieren übernehmen wir das nach kurzer Verzögerung in onStartCommand().
+        if (!finalizing) {
+            restoreVolumeIfNeeded()
+        }
         unregisterReceivers()
         scope.cancel()
         super.onDestroy()

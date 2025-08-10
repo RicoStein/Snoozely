@@ -29,6 +29,7 @@ class TimerEngineService : Service() {
         private const val NOTIF_ID_REMINDER = 43
         private const val REQ_EXTEND = 2002
         private const val REQ_STOP = 2003
+        private const val ACTION_FADE_FINALIZE = "com.tigonic.snoozely.action.FADE_FINALIZE"
 
         @Volatile var isForeground: Boolean = false
     }
@@ -114,7 +115,7 @@ class TimerEngineService : Service() {
             }
 
             TimerContracts.ACTION_STOP -> {
-                stopEverything()
+                stopEverything(timerFinished = false) // manueller Stop: AudioFade wird hart beendet (sofortige Restore)
                 return START_NOT_STICKY
             }
 
@@ -425,36 +426,43 @@ class TimerEngineService : Service() {
     private fun onTimerFinished() {
         serviceScope.launch {
             val ctx = applicationContext
-            // optionales Feedback, aber nicht crashen wenn verboten
+            // haptisches Feedback + Screen-Off anstoßen
             startServiceSafe(Intent(ctx, HapticsService::class.java).setAction("END"))
             startServiceSafe(Intent(ctx, ScreenLockService::class.java))
 
-            stopEverything()
+            // NEU: Fade sauber finalisieren lassen (wartet intern ~1.2s und restauriert dann)
+            startServiceSafe(Intent(ctx, AudioFadeService::class.java).setAction(ACTION_FADE_FINALIZE))
+
+            // Engine & Notifs beenden – aber den Fade-Service jetzt NICHT hart stoppen
+            stopEverything(timerFinished = true)
         }
     }
 
-    private fun stopEverything() {
+    private fun stopEverything(timerFinished: Boolean) {
         // Ticker beenden
         tickerJob?.cancel()
         tickerJob = null
 
-        // DataStore-Stop SYNCHRON (vor stopSelf/Scope-Cancel!)
         val ctx = applicationContext
         val fallback = (lastStartMinutesCache
             ?: runCatching { kotlinx.coroutines.runBlocking { com.tigonic.snoozely.util.TimerPreferenceHelper.getTimer(ctx).first() } }
                 .getOrDefault(5))
             .coerceAtLeast(1)
 
-        // <— wichtig: blockierend, damit running=false garantiert gesetzt ist
+        // running=false garantieren
         kotlinx.coroutines.runBlocking {
             com.tigonic.snoozely.util.TimerPreferenceHelper.stopTimer(ctx, fallback)
         }
 
-        // Reminder-Guards zurücksetzen
         reminderSentForStartTime = -1L
 
-        // AudioFade beenden (restauriert Lautstärke in onDestroy)
-        try { stopService(Intent(applicationContext, AudioFadeService::class.java)) } catch (_: Throwable) {}
+        // AudioFade:
+        if (timerFinished) {
+            // NICHT hart stoppen – AudioFade kümmert sich um verzögerte Restore & stopSelf()
+        } else {
+            // Manueller Stop: direkt beenden -> onDestroy() im Fade-Service restauriert sofort
+            try { stopService(Intent(applicationContext, AudioFadeService::class.java)) } catch (_: Throwable) {}
+        }
 
         // Notifications aufräumen + Foreground verlassen
         try {
@@ -467,6 +475,7 @@ class TimerEngineService : Service() {
         stopForegroundCompat()
         stopSelf()
     }
+
 
 
     private fun startServiceSafe(intent: Intent) {
