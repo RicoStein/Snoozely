@@ -28,6 +28,8 @@ import com.tigonic.snoozely.service.TimerEngineService
 import com.tigonic.snoozely.service.TimerContracts
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.tigonic.snoozely.ui.screens.ShakeExtendSettingsScreen
+import com.tigonic.snoozely.ui.screens.ShakeStrengthScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -88,12 +90,23 @@ class MainActivity : ComponentActivity() {
                         }
                     ) {
                         composable("home") {
-                            HomeScreen(
-                                onSettingsClick = { navController.navigate("settings") }
-                            )
+                            HomeScreen(onSettingsClick = { navController.navigate("settings") })
                         }
                         composable("settings") {
-                            SettingsScreen(onBack = { navController.popBackStack() })
+                            SettingsScreen(
+                                onBack = { navController.popBackStack() },
+                                onNavigateShakeSettings = { navController.navigate("settings/shake") }
+                            )
+                        }
+                        composable("settings/shake") {
+                            ShakeExtendSettingsScreen(
+                                onBack = { navController.popBackStack() },
+                                onNavigateShakeStrength = { navController.navigate("settings/shake/strength") },
+                                onPickSound = { /* handled inside screen via launcher */ }
+                            )
+                        }
+                        composable("settings/shake/strength") {
+                            ShakeStrengthScreen(onBack = { navController.popBackStack() })
                         }
                     }
                 }

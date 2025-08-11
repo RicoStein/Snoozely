@@ -44,7 +44,7 @@ private tailrec fun Context.asActivity(): Activity? = when (this) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onNavigateShakeSettings: () -> Unit) {
     val appContext = LocalContext.current.applicationContext // nur ApplicationContext
     val activity = LocalContext.current.asActivity()
     val scope = rememberCoroutineScope()
@@ -447,6 +447,62 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
             }
+
+            // --- Shake to Extend ---------------------------------------------------------
+            val shakeEnabled by SettingsPreferenceHelper
+                .getShakeEnabled(appContext)
+                .collectAsState(initial = false)
+            val shakeExtend by SettingsPreferenceHelper
+                .getShakeExtendMinutes(appContext)
+                .collectAsState(initial = 10)
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.shake_to_extend),
+                color = Color(0xFF7F7FFF),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+
+// Ganze Zeile als Button → immer zur Detailseite navigieren
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateShakeSettings() }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Vibration,
+                    contentDescription = null,
+                    tint = if (shakeEnabled) Color(0xFF7F7FFF) else Color.LightGray,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.shake_to_extend),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = if (shakeEnabled)
+                            stringResource(R.string.shake_to_extend_enabled_sub, shakeExtend)
+                        else
+                            stringResource(R.string.disabled),
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                // Statt Switch: Chevron als visuelles „weiter“-Signal
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = Color.Gray
+                )
+            }
+
 
             // Haptik
             Text(

@@ -68,4 +68,28 @@
     <string name="notification_channel_running">Test</string>
     <string name="notification_channel_reminder">Test2</string>
 
+
+    <!-- Shake to Extend -->
+    <string name="shake_to_extend_enabled_sub">Aktiv · +%1$d Min.</string>
+    <string name="disabled">Deaktiviert</string>
+
+
+    <!-- Shake to Extend Settings -->
+    <string name="shake_to_extend">Schütteln zum Verlängern</string>
+    <string name="enabled">Aktiviert</string>
+
+    <string name="shake_strength">Schüttelkraft</string>
+    <string name="shake_strength_sub">Empfindlichkeit der Erkennung anpassen</string>
+
+    <string name="extend_by_minutes">Verlängerungszeit (Minuten)</string>
+
+    <string name="notification_sound">Benachrichtigungston</string>
+    <string name="pick_tone">Ton auswählen</string>
+    <string name="vibrate">Vibration</string>
+    <string name="current_tone_uri">Aktueller Ton: %1$s</string>
+
+    <string name="notification_volume">Benachrichtigungslautstärke</string>
+    <string name="volume_relative_hint">Relativ zur aktuellen Medienlautstärke</string>
+
+
 </resources>
