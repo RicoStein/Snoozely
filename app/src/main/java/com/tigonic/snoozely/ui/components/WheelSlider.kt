@@ -221,18 +221,20 @@ fun WheelSlider(
 
             // Fortschrittsbogen
             if (drawSteps > 0) {
-                val darkBlue = Color(0xFF001F3F) // Tiefes, dunkles Blau
-                val mediumBlue = Color(0xFF003366) // Ein mittlerer Blauton
-                val lightBlue = Color(0xFFC0D6E4) // Ein helles, verblichenes Blau
+                val sweepColors = listOf(
+                    Color(0xFFFF2222), Color(0xFFFF531B), Color(0xFFFF851E),
+                    Color(0xFFFFB719), Color(0xFFFFEA16), Color(0xFFFFFF15),
+                    Color(0xFFFFEA16), Color(0xFFFFB719), Color(0xFFFF851E),
+                    Color(0xFFFF531B), Color(0xFFFF2222)
+                )
+                val steps = sweepColors.size - 1
+                val rotateCount =
+                    ((steps * sweep / 360f).roundToInt() + steps) % steps
+                val rotatedColors =
+                    sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
 
-                // Erzeuge einen SweepGradient, der mit dem dunklen Blau am Ende des Bogens beginnt
-                // und nach hinten hin zu helleren Farben verblasst.
                 drawArc(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(darkBlue, mediumBlue, lightBlue),
-                        center = center,
-                        startAngle = -90f + sweep
-                    ),
+                    brush = Brush.sweepGradient(colors = rotatedColors, center = center),
                     startAngle = -90f,
                     sweepAngle = sweep,
                     useCenter = false,
