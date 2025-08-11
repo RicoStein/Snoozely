@@ -79,6 +79,7 @@
     <string name="enabled">Aktiviert</string>
 
     <string name="shake_strength">Schüttelkraft</string>
+    <string name="shake_strength_hint">Handy schütteln, um die Schüttelkraft zu testen</string>
     <string name="shake_strength_sub">Empfindlichkeit der Erkennung anpassen</string>
 
     <string name="extend_by_minutes">Verlängerungszeit (Minuten)</string>
@@ -90,6 +91,21 @@
 
     <string name="notification_volume">Benachrichtigungslautstärke</string>
     <string name="volume_relative_hint">Relativ zur aktuellen Medienlautstärke</string>
+
+    <string name="notif_perm_needed">Benachrichtigungs-Berechtigung erforderlich, um den Ton abzuspielen.</string>
+    <string name="none">Kein Ton</string>
+    <string name="unknown_tone">Unbekannter Ton</string>
+
+    <!-- Shake-Detail -->
+    <string name="runtime">Laufzeit</string>
+    <string name="last_minute">Letzte Minute</string>
+    <string name="extend_type">Verlängerungsart</string>
+    <string name="extend">Verlängern</string>
+
+
+    <!-- Sound/Vibration -->
+    <string name="silent">Stumm</string>
+    <string name="shake_vibration_hint">Wenn Vibration aktiviert ist, bleibt der Ton stumm.</string>
 
 
 </resources>
