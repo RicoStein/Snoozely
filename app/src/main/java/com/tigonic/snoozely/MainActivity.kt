@@ -31,6 +31,10 @@ import kotlinx.coroutines.launch
 import com.tigonic.snoozely.ui.screens.ShakeExtendSettingsScreen
 import com.tigonic.snoozely.ui.screens.ShakeStrengthScreen
 import com.tigonic.snoozely.ui.NotificationSettingsScreen
+import com.tigonic.snoozely.ui.theme.registerDefaultThemes
+import com.tigonic.snoozely.util.SettingsPreferenceHelper
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 class MainActivity : ComponentActivity() {
 
@@ -38,12 +42,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Falls ein Timer bereits läuft (App wurde im Hintergrund beendet/relaunched),
-        // den Engine-Service sicherstellen:
-        lifecycleScope.launch {
-            maybeStartEngineIfTimerRunning()
-        }
+        // Engine ggf. wieder starten (wenn Timer schon lief)
+        lifecycleScope.launch { maybeStartEngineIfTimerRunning() }
 
+        // POST_NOTIFICATIONS anfragen (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
@@ -52,13 +54,19 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Theme-Presets registrieren (einmalig)
+        registerDefaultThemes()
 
         setContent {
-            SnoozelyTheme {
+            // Theme-Settings REAKTIV lesen → UI wechselt sofort beim Umschalten
+            val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
+            val dynamic by SettingsPreferenceHelper.getThemeDynamic(this).collectAsState(initial = true)
+
+            SnoozelyTheme(themeId = themeId, dynamicColor = dynamic) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black) // stabiler Hintergrund
+                        .background(Color.Black)
                 ) {
                     val navController = rememberNavController()
 
@@ -97,10 +105,9 @@ class MainActivity : ComponentActivity() {
                             SettingsScreen(
                                 onBack = { navController.popBackStack() },
                                 onNavigateShakeSettings = { navController.navigate("settings/shake") },
-                                onNavigateNotificationSettings = { navController.navigate("settings/notifications") } // <- NEU
+                                onNavigateNotificationSettings = { navController.navigate("settings/notifications") }
                             )
                         }
-
                         composable("settings/notifications") {
                             NotificationSettingsScreen(onBack = { navController.popBackStack() })
                         }
@@ -108,7 +115,7 @@ class MainActivity : ComponentActivity() {
                             ShakeExtendSettingsScreen(
                                 onBack = { navController.popBackStack() },
                                 onNavigateShakeStrength = { navController.navigate("settings/shake/strength") },
-                                onPickSound = { /* handled inside screen via launcher */ }
+                                onPickSound = { /* handled inside screen */ }
                             )
                         }
                         composable("settings/shake/strength") {
@@ -127,7 +134,6 @@ class MainActivity : ComponentActivity() {
         val minutes = TimerPreferenceHelper.getTimer(ctx).first()
 
         if (running && start > 0L && minutes > 0) {
-            // Engine-Service starten/weiterlaufen lassen
             val intent = Intent(ctx, TimerEngineService::class.java).apply {
                 action = TimerContracts.ACTION_START
             }
@@ -135,7 +141,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Startet nur für ACTION_START als Foreground-Service (O+), sonst normal. */
+    /** Startet nur für ACTION_START/STOP/EXTEND als Foreground-Service (O+), sonst normal. */
     /** Startet nur als Foreground-Service, wenn Progress-Notifications erlaubt sind. */
     fun Context.startForegroundServiceCompat(intent: Intent) {
         val action = intent.action
@@ -146,22 +152,16 @@ class MainActivity : ComponentActivity() {
                             action == TimerContracts.ACTION_EXTEND)
 
         if (!baseShould) {
-            startService(intent)
-            return
+            startService(intent); return
         }
 
         val notificationsEnabled = kotlinx.coroutines.runBlocking {
-            com.tigonic.snoozely.util.SettingsPreferenceHelper.getNotificationEnabled(this@startForegroundServiceCompat).first()
+            SettingsPreferenceHelper.getNotificationEnabled(this@startForegroundServiceCompat).first()
         }
         val showProgress = kotlinx.coroutines.runBlocking {
-            com.tigonic.snoozely.util.SettingsPreferenceHelper.getShowProgressNotification(this@startForegroundServiceCompat).first()
+            SettingsPreferenceHelper.getShowProgressNotification(this@startForegroundServiceCompat).first()
         }
 
-        if (notificationsEnabled && showProgress) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+        if (notificationsEnabled && showProgress) startForegroundService(intent) else startService(intent)
     }
-
 }

@@ -34,6 +34,10 @@ object SettingsPreferenceHelper {
     private val REMINDER_EXTEND_ENABLED = booleanPreferencesKey("reminder_extend_enabled")
     private val REMINDER_EXTEND_MINUTES = intPreferencesKey("reminder_extend_minutes")
 
+    // --- THEME ---
+    private val THEME_MODE = stringPreferencesKey("theme_mode")            // z.B. "system"|"light"|"dark"|...
+    private val THEME_DYNAMIC = booleanPreferencesKey("theme_dynamic")     // true/false
+
     // -------- Getter --------
     fun getProgressExtendMinutes(context: Context): Flow<Int> =
         context.dataStore.data.map { it[PROGRESS_EXTEND_MINUTES] ?: 5 }
@@ -160,4 +164,23 @@ object SettingsPreferenceHelper {
 
     suspend fun setReminderExtendMinutes(ctx: Context, m: Int) =
         ctx.dataStore.edit { it[REMINDER_EXTEND_MINUTES] = m.coerceIn(1, 30) }
+
+
+    fun getThemeMode(ctx: Context) = ctx.dataStore.data.map { prefs ->
+        // Default: "system"
+        prefs[THEME_MODE] ?: "system"
+    }
+
+    suspend fun setThemeMode(ctx: Context, id: String) {
+        // Optional absichern: nur erlaubte IDs – hier akzeptieren wir alles (Registry prüft bei Verwendung)
+        ctx.dataStore.edit { it[THEME_MODE] = id }
+    }
+
+    fun getThemeDynamic(ctx: Context) = ctx.dataStore.data.map { prefs ->
+        prefs[THEME_DYNAMIC] ?: true
+    }
+
+    suspend fun setThemeDynamic(ctx: Context, enabled: Boolean) {
+        ctx.dataStore.edit { it[THEME_DYNAMIC] = enabled }
+    }
 }

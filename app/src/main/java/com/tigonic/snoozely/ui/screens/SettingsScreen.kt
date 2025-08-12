@@ -534,5 +534,59 @@ fun LanguageDropdown(
                 )
             }
         }
+
+
+    }
+    ThemeSection()
+}
+
+
+// ===== Theme (Dropdown + Dynamic Colors) =====
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThemeSection() {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val themeId by SettingsPreferenceHelper.getThemeMode(ctx).collectAsState(initial = "system")
+    val dynamic by SettingsPreferenceHelper.getThemeDynamic(ctx).collectAsState(initial = true)
+
+    var expanded by remember { mutableStateOf(false) }
+    val themes = remember { com.tigonic.snoozely.ui.theme.ThemeRegistry.themes }
+    val selectedLabel = themes.firstOrNull { it.id == themeId }?.label ?: "System"
+
+    Spacer(Modifier.height(16.dp))
+    Text("Theme", color = Color(0xFF7F7FFF), style = MaterialTheme.typography.titleMedium)
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Theme") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            themes.forEach { spec ->
+                DropdownMenuItem(
+                    text = { Text(spec.label) },
+                    onClick = {
+                        expanded = false
+                        scope.launch { SettingsPreferenceHelper.setThemeMode(ctx, spec.id) }
+                    }
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Dynamische Farben", modifier = Modifier.weight(1f))
+        Switch(
+            checked = dynamic,
+            onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setThemeDynamic(ctx, v) } }
+        )
     }
 }
