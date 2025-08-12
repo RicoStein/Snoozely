@@ -114,20 +114,13 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 ctx.getSystemService(VibratorManager::class.java)
                     ?.defaultVibrator
-                    ?.vibrate(VibrationEffect.createOneShot(80L, VibrationEffect.DEFAULT_AMPLITUDE))
+                    ?.vibrate(VibrationEffect.createOneShot(600L, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
                 @Suppress("DEPRECATION")
-                ctx.getSystemService(Vibrator::class.java)?.vibrate(80L)
+                ctx.getSystemService(Vibrator::class.java)?.vibrate(600L)
             }
         } catch (_: Throwable) {}
     }
-
-    // Nur EIN Triggerpfad: Detector -> Feedback
-    val onShakeFeedbackState = rememberUpdatedState({
-        scope.launch {
-            if (modeState == "vibrate") pulseVibrate() else playTestTone()
-        }
-    })
 
     val detector = remember {
         ShakeDetector(
@@ -147,10 +140,6 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
         label = "uiMagnitude"
     )
 
-    // Physikalische Schwelle -> Position der Linie (0..1)
-    val thrAbs = mapPercentToThreshold(strength)
-    val thrNorm = (thrAbs / MAX_MAG).coerceIn(0f, 1f)
-
     // Strength live in den Detector
     LaunchedEffect(strength) { detector.updateStrength(strength) }
 
@@ -162,21 +151,34 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
         }
     }
 
+
+    // Hysterese: erst wieder „scharf“, wenn wir deutlich unter die Linie zurückgehen
     var armed by remember { mutableStateOf(true) }
-    var lastMag by remember { mutableStateOf(0f) }
+
+// Optional: Minimalabstand zwischen zwei Auslösungen (ms), schützt vor Rattern
+    var lastFiredAt by remember { mutableStateOf(0L) }
+    val minIntervalMs = 500L
 
     LaunchedEffect(uiMagnitude, strength) {
-        val thrUi = strength / 100f
-        // Rising edge: vorher unterhalb, jetzt >= Linie
-        if (armed && lastMag < thrUi && uiMagnitude >= thrUi) {
-            if (mode == "vibrate") pulseVibrate() else playTestTone()
-            armed = false
-            // Re-Arm nach kurzem Cooldown passend zur Preview
-            kotlinx.coroutines.delay(800)
+        val thr = strength / 100f
+        val rearmBelow = (thr - 0.08f).coerceAtLeast(0f) // 8%-Punkte unter der Linie re-armen
+
+        val now = System.currentTimeMillis()
+
+        // Re-Arm: erst wenn wir deutlich unter die Linie zurückgehen
+        if (!armed && uiMagnitude < rearmBelow) {
             armed = true
         }
-        lastMag = uiMagnitude
+
+        // Fire: exakt beim Erreichen/Überschreiten der Linie (und nicht zu schnell hintereinander)
+        if (armed && uiMagnitude >= thr && (now - lastFiredAt) >= minIntervalMs) {
+            if (mode == "vibrate") pulseVibrate() else playTestTone()
+            lastFiredAt = now
+            armed = false
+        }
     }
+
+
 
     Scaffold(
         topBar = {
