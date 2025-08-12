@@ -41,7 +41,8 @@ object TimerPreferenceHelper {
         val safe = max(1, minutes)
         val now = System.currentTimeMillis()
         context.dataStore.edit { prefs ->
-            prefs[TIMER_KEY] = safe
+            prefs[TIMER_KEY] = safe               // laufender Zielwert (kann später steigen)
+            prefs[TIMER_USER_BASE] = safe         // <- NEU: User-Startwert
             prefs[TIMER_START_TIME] = now
             prefs[TIMER_RUNNING] = true
         }
@@ -55,5 +56,15 @@ object TimerPreferenceHelper {
             prefs[TIMER_START_TIME] = 0L
             prefs[TIMER_RUNNING] = false
         }
+    }
+
+    private val TIMER_USER_BASE = intPreferencesKey("timer_user_base_minutes")
+
+    fun getTimerUserBase(context: Context): Flow<Int> =
+        context.dataStore.data.map { it[TIMER_USER_BASE] ?: 0 }
+
+    suspend fun setTimerUserBase(context: Context, minutes: Int) {
+        val safe = max(1, minutes)
+        context.dataStore.edit { it[TIMER_USER_BASE] = safe }
     }
 }

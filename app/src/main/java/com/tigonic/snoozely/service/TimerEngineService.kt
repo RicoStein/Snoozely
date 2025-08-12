@@ -113,6 +113,12 @@ class TimerEngineService : Service() {
                     val minutes = if (minutesFromIntent > 0) minutesFromIntent
                     else runCatching { TimerPreferenceHelper.getTimer(ctx).first() }.getOrDefault(5)
 
+                    // User-Basis für diesen Run cachen (für den Rücksetzer beim Stop)
+                    lastStartMinutesCache = minutes
+
+                    // ATOMAR starten (schreibt jetzt auch den User-Base-Key mit, s. Helper)
+                    TimerPreferenceHelper.startTimer(ctx, minutes)
+
                     // ATOMAR starten
                     TimerPreferenceHelper.startTimer(ctx, minutes)
 
@@ -589,12 +595,24 @@ class TimerEngineService : Service() {
         tickerJob = null
 
         val ctx = applicationContext
-        val fallback = (lastStartMinutesCache
-            ?: runCatching { kotlinx.coroutines.runBlocking { com.tigonic.snoozely.util.TimerPreferenceHelper.getTimer(ctx).first() } }
-                .getOrDefault(5))
-            .coerceAtLeast(1)
 
-        // running=false garantieren
+        // 1) bevorzugt: persistierter User-Startwert dieses Runs
+        val base = runCatching { kotlinx.coroutines.runBlocking {
+            com.tigonic.snoozely.util.TimerPreferenceHelper.getTimerUserBase(ctx).first()
+        } }.getOrDefault(0)
+
+        // 2) Fallback: Cache aus diesem Service-Lebenszyklus
+        val cached = lastStartMinutesCache
+
+        // 3) Notfall: aktueller Minutenwert (sollte selten sein)
+        val current = runCatching { kotlinx.coroutines.runBlocking {
+            com.tigonic.snoozely.util.TimerPreferenceHelper.getTimer(ctx).first()
+        } }.getOrDefault(5)
+
+
+        val fallback = (if (base > 0) base else (cached ?: current)).coerceAtLeast(1)
+
+        // running=false garantieren & sichtbaren Wert zurücksetzen
         kotlinx.coroutines.runBlocking {
             com.tigonic.snoozely.util.TimerPreferenceHelper.stopTimer(ctx, fallback)
         }
