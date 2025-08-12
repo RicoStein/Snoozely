@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState           // <- NEU
+import androidx.compose.foundation.verticalScroll              // <- NEU
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -66,8 +68,11 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
             )
         }
     ) { inner ->
+        // WICHTIG: Scrollfähig wie im SettingsScreen
         Column(
-            Modifier
+            modifier = Modifier
+                .fillMaxSize()                               // <- NEU
+                .verticalScroll(rememberScrollState())       // <- NEU
                 .padding(inner)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -165,6 +170,9 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     }
                 )
             }
+
+            // Optional: kleiner Bottom-Spacer, falls System-Nav überlappt
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
