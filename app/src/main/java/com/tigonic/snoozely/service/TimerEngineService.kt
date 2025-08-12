@@ -21,6 +21,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import android.media.AudioAttributes
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.net.Uri
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.provider.Settings
+import com.tigonic.snoozely.shake.ShakeDetector
+
 
 class TimerEngineService : Service() {
 
@@ -30,9 +40,17 @@ class TimerEngineService : Service() {
         private const val REQ_EXTEND = 2002
         private const val REQ_STOP = 2003
         private const val ACTION_FADE_FINALIZE = "com.tigonic.snoozely.action.FADE_FINALIZE"
+        private const val SHAKE_COOLDOWN_MS = 3000L
 
         @Volatile var isForeground: Boolean = false
     }
+
+    // --- Shake-Integration ---
+    private var shakeDetector: ShakeDetector? = null
+    @Volatile private var shakeCooldownUntil: Long = 0L
+    private var shakeRingtone: Ringtone? = null
+
+
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var tickerJob: Job? = null
@@ -68,6 +86,7 @@ class TimerEngineService : Service() {
         tickerJob = null
         serviceScope.cancel()
         isForeground = false
+        stopShakeDetectorAndSound() // <--- NEU
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -228,9 +247,10 @@ class TimerEngineService : Service() {
                 val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
 
                 if (!running || startTime <= 0L || minutes < 1) {
-                    // Falls Timer gestoppt wurde: Progress-Notif wegräumen und Foreground verlassen
+                    // Aufräumen, wenn Timer gestoppt/ungültig
                     runCatching { nm.cancel(NOTIF_ID_RUNNING) }
                     stopForegroundCompat()
+                    stopShakeDetectorAndSound() // <--- NEU
                     delay(300)
                     continue
                 }
@@ -258,6 +278,15 @@ class TimerEngineService : Service() {
                 val showReminder = notificationsEnabled && runCatching {
                     SettingsPreferenceHelper.getShowReminderPopup(ctx).first()
                 }.getOrDefault(true)
+
+                // --- NEU: Shake-Settings lesen & Sensor an-/abschalten
+                val shakeEnabled = runCatching {
+                    SettingsPreferenceHelper.getShakeEnabled(ctx).first()
+                }.getOrDefault(false)
+                val shakeStrength = runCatching {
+                    SettingsPreferenceHelper.getShakeStrength(ctx).first()
+                }.getOrDefault(50)
+                ensureShakeDetector(shakeEnabled, shakeStrength) // <--- NEU
 
                 // --- Laufende Notification + Foreground steuern ---
                 if (showProgress) {
@@ -287,10 +316,8 @@ class TimerEngineService : Service() {
                     }.getOrDefault(2).coerceAtLeast(1)
 
                     val thresholdMs = reminderMin * 60_000L
-                    // Nur einmal pro Startzeit senden
                     if (remaining <= thresholdMs && reminderSentForStartTime != startTime) {
                         reminderSentForStartTime = startTime
-                        // Heads-up Reminder posten
                         startServiceSafe(
                             Intent(ctx, TimerNotificationService::class.java)
                                 .setAction(TimerContracts.ACTION_NOTIFY_REMINDER)
@@ -311,6 +338,111 @@ class TimerEngineService : Service() {
             }
         }
     }
+
+    // Startet/aktualisiert bzw. stoppt den Sensor-Listener je nach Setting
+    private fun ensureShakeDetector(enabled: Boolean, strength: Int) {
+        if (enabled) {
+            if (shakeDetector == null) {
+                shakeDetector = ShakeDetector(
+                    context = applicationContext,
+                    strengthPercent = strength,
+                    onShake = { serviceScope.launch { onShakeTriggered() } },
+                    cooldownMs = SHAKE_COOLDOWN_MS,
+                    hitsToTrigger = 2          // <— explizit (Default), für Klarheit
+                ).also { it.start() }
+            } else {
+                shakeDetector?.updateStrength(strength)
+            }
+        } else {
+            stopShakeDetectorAndSound()
+        }
+    }
+
+
+    // Wird genau dann aufgerufen, wenn der ShakeDetector eine valide "Shake"-Geste erkannt hat
+    private suspend fun onShakeTriggered() {
+        val ctx = applicationContext
+        val now = System.currentTimeMillis()
+        if (now < shakeCooldownUntil) return  // Service-Sperrzeit
+
+        val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
+        val enabled = SettingsPreferenceHelper.getShakeEnabled(ctx).first()
+        if (!running || !enabled) return
+
+        val extendBy = SettingsPreferenceHelper.getShakeExtendMinutes(ctx).first().coerceAtLeast(1)
+        extendTimerBy(extendBy)
+
+        val mode = SettingsPreferenceHelper.getShakeSoundMode(ctx).first() // "tone" | "vibrate"
+        val uri  = SettingsPreferenceHelper.getShakeRingtone(ctx).first()  // leer => Default
+        playShakeFeedback(mode, uri)
+
+        shakeCooldownUntil = now + SHAKE_COOLDOWN_MS   // <— 3 s
+    }
+
+
+    // Wie extendTimer(), aber für die per Shake gewünschten Minuten
+    private suspend fun extendTimerBy(extendMin: Int) {
+        val ctx = applicationContext
+        val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
+        val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
+        if (!running || start == 0L) return
+
+        val minutes = TimerPreferenceHelper.getTimer(ctx).first()
+        val now       = System.currentTimeMillis()
+        val elapsed   = now - start
+        val totalMs   = minutes * 60_000L
+        val remaining = (totalMs - elapsed).coerceAtLeast(0)
+
+        val newTotal   = remaining + extendMin * 60_000L
+        val newMinutes = (((newTotal) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
+        TimerPreferenceHelper.setTimer(ctx, newMinutes)
+    }
+
+    // Einmaliges akustisches oder haptisches Feedback
+    private fun playShakeFeedback(mode: String, ringtoneUri: String) {
+        if (mode == "vibrate") {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = getSystemService(VibratorManager::class.java)
+                    vm?.defaultVibrator?.vibrate(
+                        VibrationEffect.createOneShot(80L, VibrationEffect.DEFAULT_AMPLITUDE)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    getSystemService(Vibrator::class.java)?.vibrate(80L)
+                }
+            } catch (_: Throwable) { /* ignore */ }
+            return
+        }
+
+        // Ton
+        try {
+            shakeRingtone?.stop()
+            val uri = if (ringtoneUri.isEmpty())
+                Settings.System.DEFAULT_NOTIFICATION_URI
+            else
+                Uri.parse(ringtoneUri)
+
+            val r = RingtoneManager.getRingtone(this, uri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                r.audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            }
+            shakeRingtone = r
+            r.play()
+        } catch (_: Throwable) { /* best-effort */ }
+    }
+
+    // Aufräumen
+    private fun stopShakeDetectorAndSound() {
+        try { shakeDetector?.stop() } catch (_: Throwable) {}
+        shakeDetector = null
+        runCatching { shakeRingtone?.stop() }
+        shakeRingtone = null
+    }
+
 
 
     private fun buildRunningNotification(
@@ -471,7 +603,7 @@ class TimerEngineService : Service() {
                 cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_REMINDER)
             }
         } catch (_: Throwable) {}
-
+        stopShakeDetectorAndSound()
         stopForegroundCompat()
         stopSelf()
     }
