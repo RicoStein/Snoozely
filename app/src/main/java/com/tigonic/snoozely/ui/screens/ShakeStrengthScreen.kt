@@ -11,6 +11,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -229,6 +230,7 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                                     val pct = (norm * 100f).roundToInt().coerceIn(0, 100)
                                     strength = pct
                                     scope.launch { SettingsPreferenceHelper.setShakeStrength(appCtx, pct) }
+                                    Log.d("ShakeStrength", "Saved shake strength: $pct%")
                                 }
                             }
                         }

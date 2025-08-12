@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +27,17 @@ class ShakeDetector(
     private val onShake: () -> Unit,
     private val cooldownMs: Long = 3000L,
     private val hitsToTrigger: Int = 2,   // Preview: 1, Service: 2
+    private val overFactor: Float = 1.0f
+
+
 ) : SensorEventListener {
+
+    private val TAG = "ShakeDetector"
+
+    // Peak-Logik
+    private val peakWindowMs = 200L     // Zeitfenster für zusammengehörige Peaks (enger als 250)
+    private val rearmRatio   = 0.70f    // erst unter 70% der Effektiv-Schwelle wieder „scharf“
+    private var canCountPeak = true     // Rising-Edge-Arming
 
     private val scope = CoroutineScope(Dispatchers.Default + Job())
     private val sm: SensorManager = context.getSystemService(SensorManager::class.java)
@@ -64,6 +75,7 @@ class ShakeDetector(
 
     fun updateStrength(percent: Int) {
         threshold = mapPercentToThreshold(percent.coerceIn(0, 100))
+        Log.d(TAG, "updateStrength -> $percent%  (threshold=${"%.2f".format(threshold)} m/s²)")
     }
 
     fun start() {
@@ -95,14 +107,10 @@ class ShakeDetector(
         event ?: return
         val usingLinear = accel?.type == Sensor.TYPE_LINEAR_ACCELERATION
 
-        val ax: Float
-        val ay: Float
-        val az: Float
-
+        val ax: Float; val ay: Float; val az: Float
         if (usingLinear) {
             ax = event.values[0]; ay = event.values[1]; az = event.values[2]
         } else {
-            // Fallback: Gravitation grob herausfiltern
             gX = lpAlpha * gX + (1 - lpAlpha) * event.values[0]
             gY = lpAlpha * gY + (1 - lpAlpha) * event.values[1]
             gZ = lpAlpha * gZ + (1 - lpAlpha) * event.values[2]
@@ -113,30 +121,41 @@ class ShakeDetector(
 
         val magnitude = sqrt((ax * ax + ay * ay + az * az).toDouble()).toFloat()
 
-        // NEU: absolute Magnitude (0..1)
+        // absolute Magnitude (0..1)
         _magnitudeNorm.value = (magnitude / maxMag).coerceIn(0f, 1f)
 
-        // Bisheriges über-Schwelle-Level (für UI-Dynamik)
+        // über-Schwelle-Level (für UI)
         val norm = ((magnitude - threshold) / (maxMag - threshold)).coerceIn(0f, 1f)
         val smooth = max(norm, _level.value * 0.85f + norm * 0.15f)
         _level.value = smooth
 
-        if (magnitude > threshold) {
-            val now = System.currentTimeMillis()
+        // Effektive Auslöseschwelle (Over-Factor)
+        val effective = threshold * overFactor
+        val rearm     = effective * rearmRatio
+        val now       = System.currentTimeMillis()
+
+        if (canCountPeak && magnitude >= effective) {
             if (now >= coolUntil) {
-                // 1) Peak zählen (<= 350 ms = gleiche Geste)
-                hitCount = if (now - lastShakeTs <= 350) hitCount + 1 else 1
+                hitCount = if (now - lastShakeTs <= peakWindowMs) hitCount + 1 else 1
                 lastShakeTs = now
 
-                // 2) Auslösen
+                Log.d(TAG, "PEAK  mag=${"%.2f".format(magnitude)} thr=${"%.2f".format(threshold)} of=$overFactor eff=${"%.2f".format(effective)} hits=$hitCount/$hitsToTrigger")
+
                 if (hitCount >= hitsToTrigger) {
                     hitCount = 0
                     coolUntil = now + cooldownMs
+                    Log.w(TAG, "TRIGGER  mag=${"%.2f".format(magnitude)} thr=${"%.2f".format(threshold)} eff=${"%.2f".format(effective)} cooldown=${cooldownMs}ms")
                     scope.launch { onShake() }
                 }
             }
+            // Bis unter rearm gefallen: keine weiteren Peaks zählen
+            canCountPeak = false
+        } else if (magnitude < rearm) {
+            // Re-Arm unterhalb der Hysterese
+            canCountPeak = true
         }
     }
+
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 

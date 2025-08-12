@@ -29,6 +29,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
+import android.util.Log
 import com.tigonic.snoozely.shake.ShakeDetector
 
 
@@ -337,26 +338,38 @@ class TimerEngineService : Service() {
                 delay(1000)
             }
         }
+        serviceScope.launch {
+            val ctx = applicationContext
+            SettingsPreferenceHelper.getShakeStrength(ctx).collect { v ->
+                Log.d("TimerService", "Observed strength from settings: $v%")
+                shakeDetector?.updateStrength(v)
+            }
+        }
     }
 
     // Startet/aktualisiert bzw. stoppt den Sensor-Listener je nach Setting
     private fun ensureShakeDetector(enabled: Boolean, strength: Int) {
+        Log.d("TimerService", "ensureShakeDetector(enabled=$enabled, strength=$strength%)")
         if (enabled) {
             if (shakeDetector == null) {
+                Log.d("TimerService", "Creating ShakeDetector with strength=$strength%, hitsToTrigger=2/3, overFactor=1.35")
                 shakeDetector = ShakeDetector(
                     context = applicationContext,
                     strengthPercent = strength,
                     onShake = { serviceScope.launch { onShakeTriggered() } },
                     cooldownMs = SHAKE_COOLDOWN_MS,
-                    hitsToTrigger = 2          // <— explizit (Default), für Klarheit
+                    hitsToTrigger = 1,
+                    overFactor = 5.8f
                 ).also { it.start() }
             } else {
+                Log.d("TimerService", "Updating ShakeDetector strength -> $strength%")
                 shakeDetector?.updateStrength(strength)
             }
         } else {
             stopShakeDetectorAndSound()
         }
     }
+
 
 
     // Wird genau dann aufgerufen, wenn der ShakeDetector eine valide "Shake"-Geste erkannt hat
@@ -405,11 +418,11 @@ class TimerEngineService : Service() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val vm = getSystemService(VibratorManager::class.java)
                     vm?.defaultVibrator?.vibrate(
-                        VibrationEffect.createOneShot(80L, VibrationEffect.DEFAULT_AMPLITUDE)
+                        VibrationEffect.createOneShot(600L, VibrationEffect.DEFAULT_AMPLITUDE)
                     )
                 } else {
                     @Suppress("DEPRECATION")
-                    getSystemService(Vibrator::class.java)?.vibrate(80L)
+                    getSystemService(Vibrator::class.java)?.vibrate(600L)
                 }
             } catch (_: Throwable) { /* ignore */ }
             return
