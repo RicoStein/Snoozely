@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.tigonic.snoozely.ui.screens.ShakeExtendSettingsScreen
 import com.tigonic.snoozely.ui.screens.ShakeStrengthScreen
+import com.tigonic.snoozely.ui.NotificationSettingsScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -95,8 +96,13 @@ class MainActivity : ComponentActivity() {
                         composable("settings") {
                             SettingsScreen(
                                 onBack = { navController.popBackStack() },
-                                onNavigateShakeSettings = { navController.navigate("settings/shake") }
+                                onNavigateShakeSettings = { navController.navigate("settings/shake") },
+                                onNavigateNotificationSettings = { navController.navigate("settings/notifications") } // <- NEU
                             )
+                        }
+
+                        composable("settings/notifications") {
+                            NotificationSettingsScreen(onBack = { navController.popBackStack() })
                         }
                         composable("settings/shake") {
                             ShakeExtendSettingsScreen(

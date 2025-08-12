@@ -1,111 +1,125 @@
 <resources>
+    <!-- App -->
     <string name="app_name">Snoozely</string>
+    <string name="appLoading">Lade...</string>
+
+    <!-- Navigation -->
     <string name="settings">Einstellungen</string>
+    <string name="back">Zurück</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Abbrechen</string>
+
+    <!-- Timer -->
     <string name="sleep_timer">Sleep Timer</string>
+    <string name="timer">Timer</string>
+    <string name="minutes">MINUTEN</string>
+    <string name="pause">Pause</string>
+    <string name="play">Play</string>
+    <string name="stop">Stoppen</string>
+    <string name="timer_stop">Stoppen</string>
+    <string name="timer_plus_x">+ %1$d min</string>
+    <string name="extend">Verlängern</string>
+    <string name="extend_by_minutes">Verlängerungszeit (Minuten)</string>
+    <string name="fade_out_duration">Fade-out-Dauer</string>
+    <string name="fade_out_running">Audio wird ausgefaded</string>
+    <string name="seconds">%1$d Sekunden</string>
+
+    <!-- Playback -->
     <string name="playback">Wiedergabe</string>
     <string name="stop_audio_video">Audio und Video stoppen</string>
-    <string name="fade_out_duration">Fade-out-Dauer</string>
-    <string name="seconds">%1$d Sekunden</string>
+
+    <!-- Screen -->
     <string name="screen">Bildschirm</string>
     <string name="turn_off_screen">Bildschirm ausschalten</string>
+
+    <!-- Bluetooth / WiFi -->
     <string name="bluetooth">Bluetooth</string>
     <string name="bluetooth_android_13_removed">Diese Funktion wurde in Android 13 entfernt</string>
     <string name="wifi">WLAN</string>
     <string name="wifi_android_10_removed">Diese Funktion wurde von Google ab Android 10 entfernt</string>
-    <string name="notification">Benachrichtigung</string>
-    <string name="enable_notification">Benachrichtigung aktivieren</string>
-    <string name="show_remaining_time">Zeigt die verbleibende Zeit und ermöglicht Anpassungen.</string>
-    <string name="haptic_feedback">Haptisches Feedback</string>
-    <string name="timer">Timer</string>
-    <string name="device_vibrate_on_timer">Das Gerät vibriert beim Anpassen des Timers</string>
-    <string name="language">Sprache</string>
-    <string name="german">Deutsch</string>
-    <string name="english">Englisch</string>
-    <string name="french">Französisch</string>
-    <string name="pause">Pause</string>
-    <string name="play">Play</string>
-    <string name="back">Zurück</string>
-    <string name="minutes">MINUTEN</string>
-    <string name="appLoading">Lade...</string>
+
+    <!-- Device Admin -->
     <string name="device_admin_enabled">Device Admin aktiviert</string>
     <string name="device_admin_failed">Device Admin nicht aktiviert</string>
     <string name="device_admin_disabled">Device Admin deaktiviert</string>
     <string name="remove_admin_title">Adminrechte entfernen?</string>
     <string name="remove_admin_message">Möchtest du die Berechtigung zum Bildschirm ausschalten entziehen? Gehe in die Geräteeinstellungen und entferne den Admin dort.</string>
     <string name="open_settings">Geräteeinstellungen öffnen</string>
-    <string name="cancel">Abbrechen</string>
     <string name="device_admin_remove_in_settings">Entferne die Adminrechte in den Einstellungen!</string>
     <string name="admin_permission_required">Adminrechte benötigt</string>
     <string name="device_admin_explanation">Admin rechte Erklärung</string>
     <string name="device_admin_remove_manual_hint">Bitte öffne die Geräteeinstellungen manuell und entferne dort den Geräteadministrator.</string>
-    <string name="remove_admin_confirm_button">sicher entfernen?</string>
-    <string name="notification_timer_running">Timer läuft</string>
-    <string name="notification_remaining_time">Noch %1$s</string>
-    <string name="timer_stop">Stoppen</string>
+    <string name="remove_admin_confirm_button">Sicher entfernen?</string>
 
-    <!-- Benachrichtigungs-Optionen -->
-    <string name="show_progress_notification_title">Fortschritt in Benachrichtigung anzeigen</string>
-    <string name="show_progress_notification_subtitle">Zeigt die verbleibende Zeit in der Statusleiste</string>
-    <string name="show_reminder_popup_title">Reminder vor Ablauf anzeigen</string>
-    <string name="show_reminder_popup_subtitle">Zeigt ein Popup/Heads-Up kurz vor Ablauf mit Interaktionsmöglichkeit</string>
-    <string name="reminder_minutes_label">Minuten vorher:</string>
-    <string name="reminder_popup_hint">Popup erscheint %1$d Minuten vor Timer-Ende"</string>
-    <string name="notification_permission_title">Benachrichtigung aktivierne</string>
-    <string name="notification_permission_rationale">rationale</string>
-    <string name="notification_permission_denied">abgelehnt</string>
-    <string name="ok">OK.</string>
+    <!-- Language -->
+    <string name="language">Sprache</string>
+    <string name="german">Deutsch</string>
+    <string name="english">Englisch</string>
+    <string name="french">Französisch</string>
+
+    <!-- Haptics -->
+    <string name="haptic_feedback">Haptisches Feedback</string>
+    <string name="device_vibrate_on_timer">Das Gerät vibriert beim Anpassen des Timers</string>
+    <string name="silent">Stumm</string>
+    <string name="shake_vibration_hint">Wenn Vibration aktiviert ist, bleibt der Ton stumm.</string>
+
+    <!-- Notification -->
+    <string name="notification">Benachrichtigung</string>
+    <string name="enable_notification">Benachrichtigung aktivieren</string>
+    <string name="notification_permission_title">Benachrichtigung aktivieren</string>
+    <string name="notification_permission_rationale">Zum Anzeigen und Interagieren mit Timer-Benachrichtigungen benötigt</string>
+    <string name="notification_permission_denied">Berechtigung verweigert</string>
     <string name="notification_disable_title">Benachrichtigung deaktivieren?</string>
     <string name="notification_disable_message">Benachrichtigung wurde deaktiviert</string>
-    <string name="timer_plus_5">+%1$d min</string>
-    <string name="extend_timer_label">Verlängerungsschritt Timer</string>
+    <string name="notification_timer_running">Timer läuft</string>
+    <string name="notification_remaining_time">Noch %1$s</string>
+    <string name="notification_channel_running">Timer läuft</string>
+    <string name="notification_channel_reminder">Timer Erinnerung</string>
+    <string name="show_remaining_time">Keine Ahnung</string>
 
-    <string name="timer_plus_x">+ %1$d min</string>
-    <string name="reminder_popup_title">Popup</string>
+
+    <!-- Notification Settings -->
+    <string name="settings_notifications">Benachrichtigungen</string>
+    <string name="settings_notifications_desc">Statusleistenanzeige, Reminder &amp; Verlängerung einstellen</string>
+    <string name="notifications_master">Benachrichtigungen aktivieren</string>
+
+    <string name="notifications_section_progress">Statusleistenanzeige</string>
+    <string name="notifications_progress_show">Fortschritt anzeigen</string>
+    <string name="notifications_progress_extend_btn">Verlängerungsschaltfläche anzeigen</string>
+
+    <string name="notifications_section_reminder">Erinnerung</string>
+    <string name="notifications_reminder_show">Reminder vor Ablauf</string>
+    <string name="notifications_reminder_minutes">Minuten vorher: %1$d</string>
+    <string name="notifications_reminder_extend_btn">Verlängerung im Reminder anzeigen</string>
+
+    <string name="notifications_extend_minutes">Verlängerungsschritt: %1$d Minuten</string>
+
+    <!-- Reminder Popup -->
+    <string name="reminder_popup_title">Erinnerung</string>
     <string name="reminder_popup_message">Timer läuft gleich ab.</string>
-    <string name="stop">Stoppen</string>
+    <string name="reminder_popup_hint">Popup erscheint %1$d Minuten vor Timer-Ende</string>
     <string name="reminder_popup_hint_short">Zeigt ein Heads-Up-Popup kurz vor Ablauf</string>
-    <string name="fade_out_running">Audio wird ausgefaded</string>
-    <string name="notification_channel_running">Test</string>
-    <string name="notification_channel_reminder">Test2</string>
-
 
     <!-- Shake to Extend -->
-    <string name="shake_to_extend_enabled_sub">Aktiv · +%1$d Min.</string>
-    <string name="disabled">Deaktiviert</string>
-
-
-    <!-- Shake to Extend Settings -->
     <string name="shake_to_extend">Schütteln zum Verlängern</string>
+    <string name="shake_to_extend_enabled_sub">Aktiv · +%1$d Min.</string>
     <string name="enabled">Aktiviert</string>
-
+    <string name="disabled">Deaktiviert</string>
     <string name="shake_strength">Schüttelkraft</string>
     <string name="shake_strength_hint">Handy schütteln, um die Schüttelkraft zu testen</string>
     <string name="shake_strength_sub">Empfindlichkeit der Erkennung anpassen</string>
-
-    <string name="extend_by_minutes">Verlängerungszeit (Minuten)</string>
-
     <string name="notification_sound">Benachrichtigungston</string>
     <string name="pick_tone">Ton auswählen</string>
     <string name="vibrate">Vibration</string>
     <string name="current_tone_uri">Aktueller Ton: %1$s</string>
-
     <string name="notification_volume">Benachrichtigungslautstärke</string>
     <string name="volume_relative_hint">Relativ zur aktuellen Medienlautstärke</string>
-
     <string name="notif_perm_needed">Benachrichtigungs-Berechtigung erforderlich, um den Ton abzuspielen.</string>
     <string name="none">Kein Ton</string>
     <string name="unknown_tone">Unbekannter Ton</string>
 
-    <!-- Shake-Detail -->
+    <!-- Shake Detail -->
     <string name="runtime">Laufzeit</string>
     <string name="last_minute">Letzte Minute</string>
     <string name="extend_type">Verlängerungsart</string>
-    <string name="extend">Verlängern</string>
-
-
-    <!-- Sound/Vibration -->
-    <string name="silent">Stumm</string>
-    <string name="shake_vibration_hint">Wenn Vibration aktiviert ist, bleibt der Ton stumm.</string>
-
-
 </resources>

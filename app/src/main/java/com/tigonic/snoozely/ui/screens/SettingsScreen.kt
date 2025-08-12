@@ -44,7 +44,11 @@ private tailrec fun Context.asActivity(): Activity? = when (this) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onNavigateShakeSettings: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onNavigateShakeSettings: () -> Unit,
+    onNavigateNotificationSettings: () -> Unit, // <- NEU
+) {
     val appContext = LocalContext.current.applicationContext // nur ApplicationContext
     val activity = LocalContext.current.asActivity()
     val scope = rememberCoroutineScope()
@@ -285,167 +289,38 @@ fun SettingsScreen(onBack: () -> Unit, onNavigateShakeSettings: () -> Unit) {
                 modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
             )
 
-            SettingsRow(
-                icon = Icons.Default.Notifications,
-                title = stringResource(R.string.enable_notification),
-                subtitle = stringResource(R.string.show_remaining_time),
-                checked = notificationEnabled,
-                onCheckedChange = { value ->
-                    if (value) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            val permissionCheck =
-                                appContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                            if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-                                showNotificationPermissionDialog = true
-                                return@SettingsRow
-                            }
-                        }
-                        scope.launch { SettingsPreferenceHelper.setNotificationEnabled(appContext, true) }
-                    } else {
-                        showDisableNotificationDialog = true
-                    }
-                },
-                enabled = true
-            )
-
-            if (showNotificationPermissionDialog) {
-                AlertDialog(
-                    onDismissRequest = { showNotificationPermissionDialog = false },
-                    title = { Text(stringResource(R.string.notification_permission_title)) },
-                    text = { Text(stringResource(R.string.notification_permission_rationale)) },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showNotificationPermissionDialog = false
-                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }) { Text(stringResource(R.string.ok)) }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showNotificationPermissionDialog = false }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                    }
+            // NEU: Ein Eintrag, der zur separaten Seite navigiert
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateNotificationSettings() }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = null,
+                    tint = Color(0xFF7F7FFF),
+                    modifier = Modifier.size(22.dp)
                 )
-            }
-
-            if (showDisableNotificationDialog) {
-                AlertDialog(
-                    onDismissRequest = { showDisableNotificationDialog = false },
-                    title = { Text(stringResource(R.string.notification_disable_title)) },
-                    text = { Text(stringResource(R.string.notification_disable_message)) },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showDisableNotificationDialog = false
-                            scope.launch {
-                                SettingsPreferenceHelper.setNotificationEnabled(appContext, false)
-                                // Best effort: aktuelle Notifs schließen
-                                val nm = appContext.getSystemService(android.app.NotificationManager::class.java)
-                                try { nm.cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_RUNNING) } catch (_: Throwable) {}
-                                try { nm.cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_REMINDER) } catch (_: Throwable) {}
-                            }
-                        }) { Text(stringResource(R.string.ok)) }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDisableNotificationDialog = false }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                    }
-                )
-            }
-
-            if (notificationEnabled) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 28.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
-                        .background(Color(0x22111111), shape = MaterialTheme.shapes.small)
-                        .padding(8.dp)
-                ) {
-                    // ---------- Verlängerungsschritt ----------
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.extend_timer_label),
-                        color = Color.LightGray,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 12.dp)
+                        text = stringResource(R.string.notification), // falls vorhanden; sonst „Benachrichtigungen“
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = stringResource(R.string.timer_plus_x, extendStep),
+                        text = stringResource(R.string.show_remaining_time), // vorhandener Subtext
                         color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodySmall
                     )
-                    Slider(
-                        value = extendStep.toFloat(),
-                        onValueChange = { v ->
-                            scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(appContext, v.toInt()) }
-                        },
-                        valueRange = 1f..30f,
-                        steps = 29,
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = Color(0xFF7F7FFF),
-                            inactiveTrackColor = Color(0x33444444),
-                            thumbColor = Color(0xFF7F7FFF),
-                            activeTickColor = Color.Transparent,
-                            inactiveTickColor = Color.Transparent
-                        ),
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-                    Text(
-                        stringResource(R.string.show_progress_notification_subtitle),
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-
-                    // ---------- Reminder (Heads-Up) ----------
-                    SettingsRow(
-                        icon = Icons.Default.Alarm,
-                        title = stringResource(R.string.show_reminder_popup_title),
-                        subtitle = stringResource(R.string.reminder_popup_hint_short, extendStep),
-                        checked = showReminderPopup,
-                        onCheckedChange = { checked ->
-                            scope.launch { SettingsPreferenceHelper.setShowReminderPopup(appContext, checked) }
-                        }
-                    )
-
-                    if (showReminderPopup) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)
-                                .background(Color(0x11111111), shape = MaterialTheme.shapes.small)
-                                .padding(8.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.reminder_minutes_label),
-                                color = Color.LightGray,
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 2.dp)
-                            )
-
-                            Slider(
-                                value = reminderMinutes.toFloat(),
-                                onValueChange = { value ->
-                                    scope.launch { SettingsPreferenceHelper.setReminderMinutes(appContext, value.toInt()) }
-                                },
-                                valueRange = 1f..10f,
-                                steps = 8, // 1..10 → 10-2 = 8
-                                colors = SliderDefaults.colors(
-                                    activeTrackColor = Color(0xFF7F7FFF),
-                                    inactiveTrackColor = Color(0x33444444),
-                                    thumbColor = Color(0xFF7F7FFF),
-                                    activeTickColor = Color.Transparent,
-                                    inactiveTickColor = Color.Transparent
-                                ),
-                                modifier = Modifier.padding(horizontal = 8.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.reminder_popup_hint, reminderMinutes),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray,
-                                modifier = Modifier.padding(start = 8.dp, top = 4.dp)
-                            )
-                        }
-                    }
                 }
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = Color.Gray
+                )
             }
 
             // --- Shake to Extend ---------------------------------------------------------

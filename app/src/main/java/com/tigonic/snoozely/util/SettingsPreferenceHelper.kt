@@ -21,14 +21,18 @@ object SettingsPreferenceHelper {
     private val REMINDER_MINUTES = intPreferencesKey("reminder_minutes")
     private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
 
-
-    // Keys
+    // Shake-Keys
     private val KEY_SHAKE_ENABLED = booleanPreferencesKey("shake_extend_enabled")
     private val KEY_SHAKE_STRENGTH = intPreferencesKey("shake_strength")              // 0..100
     private val KEY_SHAKE_EXTEND_MIN = intPreferencesKey("shake_extend_minutes")      // 1..30
     private val KEY_SHAKE_SOUND_MODE = stringPreferencesKey("shake_sound_mode")       // "tone" | "vibrate"
     private val KEY_SHAKE_RINGTONE = stringPreferencesKey("shake_ringtone_uri")       // optional URI
     private val KEY_SHAKE_VOLUME = floatPreferencesKey("shake_volume")                // 0f..1f
+
+    // NEU: Unabhängige Toggles & Werte für Notification-Buttons
+    private val PROGRESS_EXTEND_ENABLED = booleanPreferencesKey("progress_extend_enabled")
+    private val REMINDER_EXTEND_ENABLED = booleanPreferencesKey("reminder_extend_enabled")
+    private val REMINDER_EXTEND_MINUTES = intPreferencesKey("reminder_extend_minutes")
 
     // -------- Getter --------
     fun getProgressExtendMinutes(context: Context): Flow<Int> =
@@ -71,7 +75,17 @@ object SettingsPreferenceHelper {
     fun getShakeRingtone(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_RINGTONE] ?: "" }
     fun getShakeVolume(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_VOLUME] ?: 1f }
 
-    // -------- Setter (mit Clamping wo sinnvoll) --------
+    // NEU
+    fun getProgressExtendEnabled(ctx: Context) =
+        ctx.dataStore.data.map { it[PROGRESS_EXTEND_ENABLED] ?: true }
+
+    fun getReminderExtendEnabled(ctx: Context) =
+        ctx.dataStore.data.map { it[REMINDER_EXTEND_ENABLED] ?: true }
+
+    fun getReminderExtendMinutes(ctx: Context) =
+        ctx.dataStore.data.map { prefs -> prefs[REMINDER_EXTEND_MINUTES] ?: (prefs[PROGRESS_EXTEND_MINUTES] ?: 5) }
+
+    // -------- Setter --------
     suspend fun setProgressExtendMinutes(context: Context, value: Int) {
         val v = value.coerceIn(1, 30)
         context.dataStore.edit { it[PROGRESS_EXTEND_MINUTES] = v }
@@ -119,10 +133,31 @@ object SettingsPreferenceHelper {
         context.dataStore.edit { it[IS_FIRST_RUN] = value }
     }
 
-    suspend fun setShakeEnabled(ctx: Context, v: Boolean) = ctx.dataStore.edit { it[KEY_SHAKE_ENABLED] = v }
-    suspend fun setShakeStrength(ctx: Context, v: Int) = ctx.dataStore.edit { it[KEY_SHAKE_STRENGTH] = v.coerceIn(0, 100) }
-    suspend fun setShakeExtendMinutes(ctx: Context, v: Int) = ctx.dataStore.edit { it[KEY_SHAKE_EXTEND_MIN] = v.coerceIn(1, 30) }
-    suspend fun setShakeSoundMode(ctx: Context, v: String) = ctx.dataStore.edit { it[KEY_SHAKE_SOUND_MODE] = if (v == "vibrate") "vibrate" else "tone" }
-    suspend fun setShakeRingtone(ctx: Context, uri: String) = ctx.dataStore.edit { it[KEY_SHAKE_RINGTONE] = uri }
-    suspend fun setShakeVolume(ctx: Context, rel: Float) = ctx.dataStore.edit { it[KEY_SHAKE_VOLUME] = rel.coerceIn(0f, 1f) }
+    suspend fun setShakeEnabled(ctx: Context, v: Boolean) =
+        ctx.dataStore.edit { it[KEY_SHAKE_ENABLED] = v }
+
+    suspend fun setShakeStrength(ctx: Context, v: Int) =
+        ctx.dataStore.edit { it[KEY_SHAKE_STRENGTH] = v.coerceIn(0, 100) }
+
+    suspend fun setShakeExtendMinutes(ctx: Context, v: Int) =
+        ctx.dataStore.edit { it[KEY_SHAKE_EXTEND_MIN] = v.coerceIn(1, 30) }
+
+    suspend fun setShakeSoundMode(ctx: Context, v: String) =
+        ctx.dataStore.edit { it[KEY_SHAKE_SOUND_MODE] = if (v == "vibrate") "vibrate" else "tone" }
+
+    suspend fun setShakeRingtone(ctx: Context, uri: String) =
+        ctx.dataStore.edit { it[KEY_SHAKE_RINGTONE] = uri }
+
+    suspend fun setShakeVolume(ctx: Context, rel: Float) =
+        ctx.dataStore.edit { it[KEY_SHAKE_VOLUME] = rel.coerceIn(0f, 1f) }
+
+    // NEU
+    suspend fun setProgressExtendEnabled(ctx: Context, v: Boolean) =
+        ctx.dataStore.edit { it[PROGRESS_EXTEND_ENABLED] = v }
+
+    suspend fun setReminderExtendEnabled(ctx: Context, v: Boolean) =
+        ctx.dataStore.edit { it[REMINDER_EXTEND_ENABLED] = v }
+
+    suspend fun setReminderExtendMinutes(ctx: Context, m: Int) =
+        ctx.dataStore.edit { it[REMINDER_EXTEND_MINUTES] = m.coerceIn(1, 30) }
 }
