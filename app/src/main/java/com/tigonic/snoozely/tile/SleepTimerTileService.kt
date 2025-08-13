@@ -12,7 +12,7 @@ class SleepTimerTileService : TileService() {
         super.onStartListening()
         // Kachelzustand updaten (aktiv/inaktiv)
         qsTile.state = Tile.STATE_INACTIVE
-        qsTile.label = "SleepTimer"
+        qsTile.label = "Snoozely"
         qsTile.updateTile()
     }
 
