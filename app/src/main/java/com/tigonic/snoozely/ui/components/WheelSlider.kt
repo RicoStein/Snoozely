@@ -6,12 +6,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -24,13 +20,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.floor
-import kotlin.math.hypot
-import kotlin.math.roundToInt
-import kotlin.math.sin
+import kotlin.math.*
 
 @Composable
 fun WheelSlider(
@@ -45,6 +35,8 @@ fun WheelSlider(
     wheelScale: Float = 1f,
     enabled: Boolean = true,
 ) {
+    val cs = MaterialTheme.colorScheme
+
     // Maße
     val size = 350.dp
     val stroke = 12.dp
@@ -73,22 +65,18 @@ fun WheelSlider(
         continuousAngleDeg = (clamped.toFloat() / stepsPerCircle) * 360f
     }
 
-    // Helpers
+    // Helpers (unverändert)
     fun polarAngleFrom(offset: Offset): Float {
         val x = offset.x - center.x
         val y = offset.y - center.y
         return (((Math.toDegrees(atan2(y.toDouble(), x.toDouble())) + 450.0) % 360.0).toFloat())
     }
-
     fun radialR(pos: Offset): Float {
         val dx = pos.x - center.x
         val dy = pos.y - center.y
         return (hypot(dx, dy) / wheelRadius).coerceIn(0f, 1f)
     }
-
-    fun radialSpeed(r: Float, maxBoost: Float = 3f): Float =
-        1f + (1f - r) * (maxBoost - 1f)
-
+    fun radialSpeed(r: Float, maxBoost: Float = 3f): Float = 1f + (1f - r) * (maxBoost - 1f)
     fun closestEquivalentAngle(target: Float, continuous: Float): Float {
         val base = floor((continuous - target) / 360f)
         val c1 = target + base * 360f
@@ -103,7 +91,6 @@ fun WheelSlider(
             else -> c2
         }
     }
-
     fun emitFromContinuous(): Int {
         val steps = ((continuousAngleDeg / 360f) * stepsPerCircle).roundToInt()
             .coerceIn(minValue, maxValue)
@@ -123,7 +110,7 @@ fun WheelSlider(
         y = (center.y + sin(radians) * wheelRadius).toFloat()
     )
 
-    // GEÄNDERT: Min/Max-Winkel zentral definieren
+    // Min/Max-Winkel
     val minAngle = (minValue.toFloat() / stepsPerCircle) * 360f
     val maxAngle = (maxValue.toFloat() / stepsPerCircle) * 360f
 
@@ -147,19 +134,14 @@ fun WheelSlider(
                                         val finger = polarAngleFrom(pos)
                                         continuousAngleDeg =
                                             closestEquivalentAngle(finger, continuousAngleDeg)
-                                        // GEÄNDERT: Begrenzung für Klick hinzufügen
                                         continuousAngleDeg = continuousAngleDeg.coerceIn(minAngle, maxAngle)
                                         emitFromContinuous()
-                                        try {
-                                            this.tryAwaitRelease()
-                                        } catch (_: Throwable) {
-                                        }
+                                        try { this.tryAwaitRelease() } catch (_: Throwable) {}
                                     },
                                     onTap = { pos ->
                                         val finger = polarAngleFrom(pos)
                                         continuousAngleDeg =
                                             closestEquivalentAngle(finger, continuousAngleDeg)
-                                        // GEÄNDERT: Begrenzung für Klick hinzufügen
                                         continuousAngleDeg = continuousAngleDeg.coerceIn(minAngle, maxAngle)
                                         emitFromContinuous()
                                     }
@@ -174,7 +156,6 @@ fun WheelSlider(
                                         if (snapMode) {
                                             continuousAngleDeg =
                                                 closestEquivalentAngle(finger, continuousAngleDeg)
-                                            // GEÄNDERT: Begrenzung auch hier anwenden
                                             continuousAngleDeg = continuousAngleDeg.coerceIn(minAngle, maxAngle)
                                             emitFromContinuous()
                                         }
@@ -183,11 +164,8 @@ fun WheelSlider(
                                         val r = radialR(change.position)
                                         val finger = polarAngleFrom(change.position)
 
-                                        if (!snapMode && r >= snapEnter) {
-                                            snapMode = true
-                                        } else if (snapMode && r < snapExit) {
-                                            snapMode = false
-                                        }
+                                        if (!snapMode && r >= snapEnter) snapMode = true
+                                        else if (snapMode && r < snapExit) snapMode = false
 
                                         if (snapMode) {
                                             continuousAngleDeg = closestEquivalentAngle(finger, continuousAngleDeg)
@@ -204,22 +182,21 @@ fun WheelSlider(
                                         continuousAngleDeg = continuousAngleDeg.coerceIn(minAngle, maxAngle)
                                         emitFromContinuous()
                                     },
-                                    onDragEnd = {
-                                    }
+                                    onDragEnd = { }
                                 )
                             }
                     } else Modifier
                 )
         ) {
-            // Hintergrundring
+            // Hintergrundring (theme)
             drawCircle(
-                color = Color(0xFF22252A),
+                color = cs.outlineVariant, // früher: Color(0xFF22252A)
                 radius = wheelRadius,
                 center = center,
                 style = Stroke(width = strokePx)
             )
 
-            // Fortschrittsbogen
+            // Fortschrittsbogen (Farben unverändert – reines Styling)
             if (drawSteps > 0) {
                 val sweepColors = listOf(
                     Color(0xFFFF2222), Color(0xFFFF531B), Color(0xFFFF851E),
@@ -228,10 +205,8 @@ fun WheelSlider(
                     Color(0xFFFF531B), Color(0xFFFF2222)
                 )
                 val steps = sweepColors.size - 1
-                val rotateCount =
-                    ((steps * sweep / 360f).roundToInt() + steps) % steps
-                val rotatedColors =
-                    sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
+                val rotateCount = ((steps * sweep / 360f).roundToInt() + steps) % steps
+                val rotatedColors = sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
 
                 drawArc(
                     brush = Brush.sweepGradient(colors = rotatedColors, center = center),
@@ -244,9 +219,9 @@ fun WheelSlider(
                 )
             }
 
-            // Handle im selben Canvas
+            // Handle (theme)
             drawCircle(
-                color = if (enabled) Color.White else Color(0x66FFFFFF),
+                color = if (enabled) cs.primary else cs.onSurface.copy(alpha = 0.4f),
                 radius = handlePx,
                 center = handleCenter
             )
