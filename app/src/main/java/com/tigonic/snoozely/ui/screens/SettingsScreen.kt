@@ -7,7 +7,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,11 +46,12 @@ private tailrec fun Context.asActivity(): Activity? = when (this) {
 fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateShakeSettings: () -> Unit,
-    onNavigateNotificationSettings: () -> Unit, // <- NEU
+    onNavigateNotificationSettings: () -> Unit,
 ) {
-    val appContext = LocalContext.current.applicationContext // nur ApplicationContext
+    val appContext = LocalContext.current.applicationContext
     val activity = LocalContext.current.asActivity()
     val scope = rememberCoroutineScope()
+    val cs = MaterialTheme.colorScheme
 
     val devicePolicyManager =
         appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
@@ -112,28 +112,29 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings)) },
+                title = { Text(stringResource(R.string.settings), color = cs.onPrimaryContainer) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = cs.onPrimaryContainer)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF101010),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
+                    containerColor = cs.primaryContainer,
+                    titleContentColor = cs.onPrimaryContainer,
+                    navigationIconContentColor = cs.onPrimaryContainer,
                 ),
             )
         },
         bottomBar = {
+            // dezente Fläche, die sich ans Theme anpasst
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .background(Color(0xFF101010))
+                    .background(cs.surface)
             )
         },
-        containerColor = Color(0xFF101010),
+        containerColor = cs.background,
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -146,13 +147,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
 
             // Sleep Timer
-            Text(
-                stringResource(R.string.sleep_timer),
-                color = Color(0xFF7F7FFF),
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
-            )
+            SectionHeader(text = stringResource(R.string.sleep_timer))
 
             SettingsRow(
                 icon = Icons.Default.PlayCircleFilled,
@@ -166,28 +161,28 @@ fun SettingsScreen(
             // Fade-Out
             Text(
                 stringResource(R.string.fade_out_duration),
-                color = Color.LightGray,
+                color = cs.onBackground,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 12.dp)
             )
             Text(
                 stringResource(R.string.seconds, fadeOut.toInt()),
-                color = Color.Gray,
+                color = cs.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
             Slider(
                 value = fadeOut,
-                onValueChange = { value -> scope.launch { SettingsPreferenceHelper.setFadeOut(appContext, value) } },
+                onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setFadeOut(appContext, v) } },
                 valueRange = 0f..120f,
                 steps = 11,
+                modifier = Modifier.padding(horizontal = 8.dp),
                 colors = SliderDefaults.colors(
-                    activeTrackColor = Color(0xFF7F7FFF),
-                    inactiveTrackColor = Color(0x33444444),
-                    thumbColor = Color(0xFF7F7FFF),
+                    activeTrackColor = cs.primary,
+                    inactiveTrackColor = cs.primary.copy(alpha = 0.30f),
+                    thumbColor = cs.primary,
                     activeTickColor = Color.Transparent,
                     inactiveTickColor = Color.Transparent
-                ),
-                modifier = Modifier.padding(horizontal = 8.dp)
+                )
             )
 
             // Bildschirm ausschalten (Device Admin)
@@ -281,15 +276,9 @@ fun SettingsScreen(
             Spacer(Modifier.height(12.dp))
 
             // --------- Benachrichtigungen ---------
-            Text(
-                stringResource(R.string.notification),
-                color = Color(0xFF7F7FFF),
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-            )
+            SectionHeader(text = stringResource(R.string.notification))
 
-            // NEU: Ein Eintrag, der zur separaten Seite navigiert
+            // Ein Eintrag, der zur separaten Seite navigiert
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -300,26 +289,26 @@ fun SettingsScreen(
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = null,
-                    tint = Color(0xFF7F7FFF),
+                    tint = cs.primary,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.notification), // falls vorhanden; sonst „Benachrichtigungen“
-                        color = Color.White,
+                        text = stringResource(R.string.notification),
+                        color = cs.onBackground,
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = stringResource(R.string.show_remaining_time), // vorhandener Subtext
-                        color = Color.Gray,
+                        text = stringResource(R.string.show_remaining_time),
+                        color = cs.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = Color.Gray
+                    tint = cs.onSurfaceVariant
                 )
             }
 
@@ -332,15 +321,9 @@ fun SettingsScreen(
                 .collectAsState(initial = 10)
 
             Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.shake_to_extend),
-                color = Color(0xFF7F7FFF),
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-            )
+            SectionHeader(text = stringResource(R.string.shake_to_extend))
 
-// Ganze Zeile als Button → immer zur Detailseite navigieren
+            // Ganze Zeile als Button → immer zur Detailseite navigieren
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -351,14 +334,14 @@ fun SettingsScreen(
                 Icon(
                     imageVector = Icons.Default.Vibration,
                     contentDescription = null,
-                    tint = if (shakeEnabled) Color(0xFF7F7FFF) else Color.LightGray,
+                    tint = if (shakeEnabled) cs.primary else cs.onSurfaceVariant,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.shake_to_extend),
-                        color = Color.White,
+                        color = cs.onBackground,
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
@@ -366,26 +349,19 @@ fun SettingsScreen(
                             stringResource(R.string.shake_to_extend_enabled_sub, shakeExtend)
                         else
                             stringResource(R.string.disabled),
-                        color = Color.Gray,
+                        color = cs.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                // Statt Switch: Chevron als visuelles „weiter“-Signal
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = Color.Gray
+                    tint = cs.onSurfaceVariant
                 )
             }
 
-
             // Haptik
-            Text(
-                stringResource(R.string.haptic_feedback),
-                color = Color(0xFF7F7FFF),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+            SectionSubheader(text = stringResource(R.string.haptic_feedback))
             SettingsRow(
                 icon = Icons.Default.PlayCircleFilled,
                 title = stringResource(R.string.timer),
@@ -398,12 +374,7 @@ fun SettingsScreen(
             )
 
             // Sprache
-            Text(
-                stringResource(R.string.language),
-                color = Color(0xFF7F7FFF),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+            SectionSubheader(text = stringResource(R.string.language))
             LanguageDropdown(
                 selectedLangCode = language,
                 onSelect = { code ->
@@ -420,6 +391,29 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SectionHeader(text: String) {
+    val cs = MaterialTheme.colorScheme
+    Text(
+        text = text,
+        color = cs.primary,
+        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+    )
+}
+
+@Composable
+private fun SectionSubheader(text: String) {
+    val cs = MaterialTheme.colorScheme
+    Text(
+        text = text,
+        color = cs.onBackground,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
+}
+
+@Composable
 fun SettingsRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
@@ -428,6 +422,7 @@ fun SettingsRow(
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true
 ) {
+    val cs = MaterialTheme.colorScheme
     Row(
         Modifier
             .fillMaxWidth()
@@ -437,39 +432,26 @@ fun SettingsRow(
         Icon(
             icon,
             contentDescription = null,
-            tint = if (enabled && checked) Color(0xFF7F7FFF)
-            else if (enabled) Color.LightGray
-            else Color(0xFF222222),
+            tint = if (enabled && checked) cs.primary else cs.onSurfaceVariant,
             modifier = Modifier.size(22.dp)
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = if (enabled) Color.White else Color.Gray,
+                color = if (enabled) cs.onBackground else cs.onSurfaceVariant,
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
                 text = subtitle,
-                color = Color.Gray,
+                color = cs.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
         }
         Switch(
             checked = checked,
             onCheckedChange = if (enabled) onCheckedChange else null,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color(0xFF7F7FFF),
-                checkedTrackColor = Color(0x447F7FFF),
-                uncheckedThumbColor = Color.LightGray,
-                uncheckedTrackColor = Color(0x33444444),
-                disabledCheckedThumbColor = Color.DarkGray,
-                disabledCheckedTrackColor = Color.Gray,
-                disabledUncheckedThumbColor = Color.DarkGray,
-                disabledUncheckedTrackColor = Color.Gray
-            ),
-            modifier = Modifier.size(36.dp)
+            enabled = enabled
         )
     }
 }
@@ -479,7 +461,7 @@ fun LanguageDropdown(
     selectedLangCode: String,
     onSelect: (String) -> Unit
 ) {
-    val context = LocalContext.current
+    val cs = MaterialTheme.colorScheme
     var expanded by remember { mutableStateOf(false) }
 
     val languageMap = mapOf(
@@ -494,7 +476,7 @@ fun LanguageDropdown(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .background(Color(0xFF181818), shape = MaterialTheme.shapes.medium)
+            .background(cs.surfaceVariant, shape = MaterialTheme.shapes.medium)
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Row(
@@ -506,14 +488,14 @@ fun LanguageDropdown(
         ) {
             Text(
                 text = label,
-                color = Color.White,
+                color = cs.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )
             Icon(
                 imageVector = Icons.Default.ArrowBack,
                 contentDescription = null,
-                tint = Color(0xFF7F7FFF),
+                tint = cs.primary,
                 modifier = Modifier
                     .size(20.dp)
                     .rotate(90f)
@@ -522,11 +504,11 @@ fun LanguageDropdown(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Color(0xFF242449))
+            modifier = Modifier.background(cs.surface)
         ) {
             languageMap.forEach { (name, code) ->
                 DropdownMenuItem(
-                    text = { Text(name, color = Color.White) },
+                    text = { Text(name, color = cs.onSurface) },
                     onClick = {
                         expanded = false
                         onSelect(code)
@@ -534,12 +516,10 @@ fun LanguageDropdown(
                 )
             }
         }
-
-
     }
+
     ThemeSection()
 }
-
 
 // ===== Theme (Dropdown + Dynamic Colors) =====
 @OptIn(ExperimentalMaterial3Api::class)
@@ -547,6 +527,7 @@ fun LanguageDropdown(
 fun ThemeSection() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    val cs = MaterialTheme.colorScheme
 
     val themeId by SettingsPreferenceHelper.getThemeMode(ctx).collectAsState(initial = "system")
     val dynamic by SettingsPreferenceHelper.getThemeDynamic(ctx).collectAsState(initial = true)
@@ -556,7 +537,7 @@ fun ThemeSection() {
     val selectedLabel = themes.firstOrNull { it.id == themeId }?.label ?: "System"
 
     Spacer(Modifier.height(16.dp))
-    Text("Theme", color = Color(0xFF7F7FFF), style = MaterialTheme.typography.titleMedium)
+    Text("Theme", color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
@@ -580,13 +561,4 @@ fun ThemeSection() {
         }
     }
 
-    Spacer(Modifier.height(8.dp))
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Dynamische Farben", modifier = Modifier.weight(1f))
-        Switch(
-            checked = dynamic,
-            onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setThemeDynamic(ctx, v) } }
-        )
-    }
 }

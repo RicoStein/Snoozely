@@ -30,7 +30,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +41,7 @@ import com.tigonic.snoozely.shake.ShakeDetector
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.tigonic.snoozely.ui.theme.LocalExtraColors // ← für shakeGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +49,8 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
     val appCtx = LocalContext.current.applicationContext
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
 
     // Physik-Konsistenz: identisch zum Detector
     val MIN_THR = 8f
@@ -152,26 +154,15 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
         }
     }
 
-
-    // Hysterese: erst wieder „scharf“, wenn wir deutlich unter die Linie zurückgehen
+    // Hysterese / Timing (LOGIK UNVERÄNDERT)
     var armed by remember { mutableStateOf(true) }
-
-// Optional: Minimalabstand zwischen zwei Auslösungen (ms), schützt vor Rattern
     var lastFiredAt by remember { mutableStateOf(0L) }
     val minIntervalMs = 500L
-
     LaunchedEffect(uiMagnitude, strength) {
         val thr = strength / 100f
-        val rearmBelow = (thr - 0.08f).coerceAtLeast(0f) // 8%-Punkte unter der Linie re-armen
-
+        val rearmBelow = (thr - 0.08f).coerceAtLeast(0f)
         val now = System.currentTimeMillis()
-
-        // Re-Arm: erst wenn wir deutlich unter die Linie zurückgehen
-        if (!armed && uiMagnitude < rearmBelow) {
-            armed = true
-        }
-
-        // Fire: exakt beim Erreichen/Überschreiten der Linie (und nicht zu schnell hintereinander)
+        if (!armed && uiMagnitude < rearmBelow) armed = true
         if (armed && uiMagnitude >= thr && (now - lastFiredAt) >= minIntervalMs) {
             if (mode == "vibrate") pulseVibrate() else playTestTone()
             lastFiredAt = now
@@ -179,25 +170,23 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
         }
     }
 
-
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.shake_strength)) },
+                title = { Text(stringResource(R.string.shake_strength), color = cs.onPrimaryContainer) },
                 navigationIcon = {
                     IconButton(onClick = { runCatching { preview?.stop() }; onBack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                        Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF101010),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    containerColor = cs.primaryContainer,
+                    titleContentColor = cs.onPrimaryContainer,
+                    navigationIconContentColor = cs.onPrimaryContainer
                 )
             )
         },
-        containerColor = Color(0xFF101010)
+        containerColor = cs.background
     ) { inner ->
         Column(
             modifier = Modifier
@@ -211,7 +200,9 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
             val innerPad = 2.dp
 
             Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
                 var innerTop by remember { mutableStateOf(0f) }
@@ -226,7 +217,6 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                                 if (innerHeight > 0f) {
                                     val clampedY = pos.y.coerceIn(innerTop, innerTop + innerHeight)
                                     val norm = 1f - ((clampedY - innerTop) / innerHeight) // 0..1
-                                    // Norm (0..1) -> absolute m/s² -> Prozent 0..100 (8..20 m/s²)
                                     val pct = (norm * 100f).roundToInt().coerceIn(0, 100)
                                     strength = pct
                                     scope.launch { SettingsPreferenceHelper.setShakeStrength(appCtx, pct) }
@@ -249,37 +239,34 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                     val W = size.width
                     val H = size.height
 
-                    // Rahmen
+                    // Rahmen (theme)
                     drawRoundRect(
-                        color = Color(0xFF2B2B2B),
+                        color = cs.outlineVariant,
                         size = size,
                         style = Stroke(width = 2.dp.toPx()),
                         cornerRadius = CornerRadius(barCorner.toPx())
                     )
 
-                    // Innenfläche
+                    // Innenfläche (theme)
                     val innerSize = Size(W - innerPad.toPx() * 2, H - innerPad.toPx() * 2)
                     val innerTopLeft = Offset(innerPad.toPx(), innerPad.toPx())
 
                     innerTop = innerTopLeft.y
                     innerHeight = innerSize.height
 
-                    // Hintergrund
                     drawRoundRect(
-                        color = Color(0xFF2A2A2A),
+                        color = cs.surfaceVariant,
                         size = innerSize,
                         topLeft = innerTopLeft,
                         cornerRadius = CornerRadius((barCorner - 2.dp).toPx())
                     )
 
-                    // Füllung = absolute Magnitude (0..1)
+                    // Füllung = absolute Magnitude (0..1) – Gradient aus ExtraColors
                     if (uiMagnitude > 0.002f) {
                         val fillHeight = innerSize.height * uiMagnitude.coerceIn(0f, 1f)
                         val top = innerTopLeft.y + innerSize.height - fillHeight
                         val brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFFFFE000), Color(0xFF7CD458), Color(0xFF0AB1A4)
-                            ),
+                            colors = extra.shakeGradient,
                             startY = top,
                             endY = innerTopLeft.y + innerSize.height
                         )
@@ -291,10 +278,10 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    // Linie bei echter Schwelle (threshold/MAX_MAG)
+                    // Linie bei echter Schwelle – theme
                     val y = innerTopLeft.y + innerSize.height * (1f - (strength / 100f))
                     drawLine(
-                        color = Color(0x88FFFFFF),
+                        color = cs.onSurface.copy(alpha = 0.5f),
                         start = Offset(innerTopLeft.x - 6.dp.toPx(), y),
                         end = Offset(innerTopLeft.x + innerSize.width + 6.dp.toPx(), y),
                         strokeWidth = 2.dp.toPx()
@@ -304,14 +291,23 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(10.dp))
 
-            Text(text = stringResource(R.string.shake_strength), color = Color.White,
-                style = MaterialTheme.typography.titleMedium)
-            Text(text = "${strength}%", color = Color(0xFFBDBDBD),
-                style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = stringResource(R.string.shake_strength),
+                color = cs.onBackground,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "${strength}%",
+                color = cs.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
 
             Spacer(Modifier.height(8.dp))
-            Text(text = stringResource(R.string.shake_strength_hint), color = Color(0xFF9E9E9E),
-                style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = stringResource(R.string.shake_strength_hint),
+                color = cs.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
             Spacer(Modifier.height(8.dp))
         }
     }

@@ -21,7 +21,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +46,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
+    val cs = MaterialTheme.colorScheme
 
     // Live-States aus DataStore
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 5)
@@ -106,7 +106,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(cs.background) // statt Color.Black
     ) {
         Column(
             modifier = Modifier
@@ -125,14 +125,14 @@ fun HomeScreen(
                 Text(
                     text = stringResource(R.string.app_name),
                     fontSize = MaterialTheme.typography.headlineLarge.fontSize,
-                    color = Color.White,
+                    color = cs.onBackground, // statt Color.White
                     fontWeight = FontWeight.Bold
                 )
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Filled.Settings,
                         contentDescription = stringResource(R.string.settings),
-                        tint = Color.White
+                        tint = cs.onBackground // statt Color.White
                     )
                 }
             }
@@ -198,7 +198,7 @@ fun HomeScreen(
 
                             context.startForegroundServiceCompat(startIntent)
 
-                            // DataStore „Start“ direkt auch setzen (doppelt hält besser, aber Service verlässt sich NICHT mehr drauf)
+                            // DataStore „Start“ direkt auch setzen
                             TimerPreferenceHelper.startTimer(context, sliderMinutes)
 
                         } else if (timerRunning) {
@@ -211,19 +211,18 @@ fun HomeScreen(
                 },
                 modifier = Modifier
                     .size(72.dp)
-                    .background(Color.White, shape = MaterialTheme.shapes.extraLarge)
+                    .background(cs.primary, shape = MaterialTheme.shapes.extraLarge) // statt Color.White
             ) {
                 Icon(
                     imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (timerRunning) stringResource(R.string.pause) else stringResource(R.string.play),
-                    tint = Color.Black,
+                    tint = cs.onPrimary, // statt Color.Black
                     modifier = Modifier.size(44.dp)
                 )
             }
         }
     }
 }
-
 
 /** Startet nur für ACTION_START als Foreground-Service (O+), sonst normal. */
 /** Startet nur als Foreground-Service, wenn Progress-Notifications erlaubt sind. */
@@ -255,8 +254,6 @@ fun Context.startForegroundServiceCompat(intent: Intent) {
     }
 }
 
-
-
 fun hasNotificationPermission(context: Context): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
@@ -265,5 +262,3 @@ fun hasNotificationPermission(context: Context): Boolean {
         true
     }
 }
-
-

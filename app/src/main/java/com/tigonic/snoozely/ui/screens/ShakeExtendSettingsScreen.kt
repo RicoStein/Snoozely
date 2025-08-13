@@ -24,18 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,11 +42,12 @@ import kotlinx.coroutines.launch
 fun ShakeExtendSettingsScreen(
     onBack: () -> Unit,
     onNavigateShakeStrength: () -> Unit,
-    onPickSound: () -> Unit
+    onPickSound: () -> Unit // (optional, falls extern genutzt)
 ) {
     val appCtx = LocalContext.current.applicationContext
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    val cs = MaterialTheme.colorScheme
 
     val enabled by SettingsPreferenceHelper.getShakeEnabled(appCtx).collectAsState(initial = false)
     val extendMin by SettingsPreferenceHelper.getShakeExtendMinutes(appCtx).collectAsState(initial = 10)
@@ -149,9 +139,7 @@ fun ShakeExtendSettingsScreen(
         if (mode != "tone") return
         if (!audioPermGranted) return
         val uri = chosenOrDefaultTone() ?: return
-
         runCatching {
-            // Stoppe vorherigen Player NICHT aggressiv – nur ersetzen, falls neu gestartet wird
             preview?.stop()
             val r = RingtoneManager.getRingtone(ctx, uri)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -161,7 +149,7 @@ fun ShakeExtendSettingsScreen(
                     .build()
             }
             preview = r
-            r.play() // spielt einmal komplett; wir stoppen nicht bei Finger-loslassen
+            r.play()
         }
     }
 
@@ -197,10 +185,11 @@ fun ShakeExtendSettingsScreen(
         sysVol = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION).toFloat() / maxVol
     }
 
+    // Einheitliche, theme-basierte Sliderfarben (keine Punkte sichtbar dank Transparent-Ticks)
     val sliderColors = SliderDefaults.colors(
-        activeTrackColor = Color(0xFF7F7FFF),
-        inactiveTrackColor = Color(0x33444444),
-        thumbColor = Color(0xFF7F7FFF),
+        activeTrackColor = cs.primary,
+        inactiveTrackColor = cs.primary.copy(alpha = 0.30f),
+        thumbColor = cs.primary,
         activeTickColor = Color.Transparent,
         inactiveTickColor = Color.Transparent
     )
@@ -208,20 +197,20 @@ fun ShakeExtendSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.shake_to_extend)) },
+                title = { Text(stringResource(R.string.shake_to_extend), color = cs.onPrimaryContainer) },
                 navigationIcon = {
                     IconButton(onClick = { runCatching { preview?.stop() }; onBack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF101010),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
+                    containerColor = cs.primaryContainer,
+                    titleContentColor = cs.onPrimaryContainer,
+                    navigationIconContentColor = cs.onPrimaryContainer,
                 ),
             )
         },
-        containerColor = Color(0xFF101010),
+        containerColor = cs.background,
     ) { inner ->
         Column(
             Modifier
@@ -240,7 +229,7 @@ fun ShakeExtendSettingsScreen(
             ) {
                 Text(
                     text = stringResource(R.string.shake_to_extend),
-                    color = Color.White,
+                    color = cs.onBackground,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )
@@ -249,7 +238,7 @@ fun ShakeExtendSettingsScreen(
                     onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setShakeEnabled(appCtx, v) } }
                 )
             }
-            Divider(color = Color(0x22FFFFFF))
+            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 2) Schüttelkraft
             Row(
@@ -262,40 +251,40 @@ fun ShakeExtendSettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.shake_strength),
-                        color = Color.White,
+                        color = cs.onBackground,
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
                         text = stringResource(R.string.shake_strength_sub),
-                        color = Color.Gray,
+                        color = cs.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
                 Icon(
                     imageVector = Icons.Filled.ChevronRight,
                     contentDescription = null,
-                    tint = Color.Gray
+                    tint = cs.onSurfaceVariant
                 )
             }
-            Divider(color = Color(0x22FFFFFF))
+            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 3) Verlängerungstimer
             Spacer(Modifier.height(6.dp))
             Text(
                 stringResource(R.string.extend_by_minutes),
-                color = Color.White,
+                color = cs.onBackground,
                 style = MaterialTheme.typography.titleMedium
             )
-            Text(stringResource(R.string.timer_plus_x, extendMin), color = Color.Gray)
+            Text(stringResource(R.string.timer_plus_x, extendMin), color = cs.onSurfaceVariant)
             Slider(
                 value = extendMin.toFloat(),
                 onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, v.toInt()) } },
                 valueRange = 1f..30f,
-                steps = 29,
+                steps = 29, // diskret, aber Ticks sind ausgeblendet (transparent)
                 colors = sliderColors,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
-            Divider(color = Color(0x22FFFFFF), modifier = Modifier.padding(top = 8.dp))
+            Divider(color = cs.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
 
             // 4) Benachrichtigungston
             Row(
@@ -308,18 +297,18 @@ fun ShakeExtendSettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.notification_sound),
-                        color = Color.White,
+                        color = cs.onBackground,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Text(toneTitle, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                    Text(toneTitle, color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
                 Icon(
                     imageVector = Icons.Filled.ChevronRight,
                     contentDescription = null,
-                    tint = Color.Gray
+                    tint = cs.onSurfaceVariant
                 )
             }
-            Divider(color = Color(0x22FFFFFF))
+            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 5) Vibration
             Row(
@@ -330,7 +319,7 @@ fun ShakeExtendSettingsScreen(
             ) {
                 Text(
                     text = stringResource(R.string.vibrate),
-                    color = Color.White,
+                    color = cs.onBackground,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )
@@ -354,30 +343,28 @@ fun ShakeExtendSettingsScreen(
             }
             Text(
                 text = stringResource(R.string.shake_vibration_hint),
-                color = Color.Gray,
+                color = cs.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
             )
-            Divider(color = Color(0x22FFFFFF))
+            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 6) Benachrichtigungslautstärke
             Text(
                 stringResource(R.string.notification_volume),
-                color = Color.White,
+                color = cs.onBackground,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 8.dp)
             )
             Text(
                 stringResource(R.string.volume_relative_hint),
-                color = Color.Gray,
+                color = cs.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
 
-            // → Vorschau-Logik: Tippen ODER Wischen soll voll abspielen.
             val volumeInteraction = remember { MutableInteractionSource() }
             val pressed by volumeInteraction.collectIsPressedAsState()
 
-            // Bei Beginn einer Interaktion (auch Tap auf Track/Thumb) einmal starten.
             LaunchedEffect(pressed) {
                 if (pressed) {
                     ensureAudioPermission { playPreviewOnce() }
@@ -390,14 +377,12 @@ fun ShakeExtendSettingsScreen(
                     sysVol = v
                     val newVol = (v * maxVol).coerceIn(0f, maxVol.toFloat()).toInt()
                     audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, newVol, 0)
-                    // Beim Ziehen erneut anstoßen (ersetzt den laufenden Player ohne zu schneiden)
                     ensureAudioPermission { playPreviewOnce() }
                 },
-                // WICHTIG: NICHT stoppen – der Ton darf ausklingen
-                onValueChangeFinished = { /* no stop */ },
+                onValueChangeFinished = { /* nicht stoppen – Ton darf ausklingen */ },
                 valueRange = 0f..1f,
-                steps = 0,
-                colors = sliderColors,
+                steps = 0,               // stufenlos
+                colors = sliderColors,   // Ticks trotzdem transparent gesetzt
                 interactionSource = volumeInteraction,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
