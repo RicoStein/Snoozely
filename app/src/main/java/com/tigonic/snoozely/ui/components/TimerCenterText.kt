@@ -5,7 +5,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -21,18 +20,18 @@ fun TimerCenterText(
     seconds: Int = 0,
     showLabel: Boolean = true
 ) {
+    val cs = MaterialTheme.colorScheme
     val timeText = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = androidx.compose.ui.Modifier.semantics {
-            contentDescription = timeText
-        }
+        modifier = androidx.compose.ui.Modifier.semantics { contentDescription = timeText }
     ) {
         Text(
             text = timeText,
             fontWeight = FontWeight.ExtraBold,
             style = MaterialTheme.typography.displayLarge,
-            color = Color.White,
+            color = cs.onBackground,              // theme-basiert
             // Monospace verhindert „Springen“ beim Wechsel der Ziffernbreite
             fontFamily = FontFamily.Monospace
         )
@@ -40,7 +39,7 @@ fun TimerCenterText(
             Text(
                 text = stringResource(R.string.minutes),
                 fontWeight = FontWeight.Normal,
-                color = Color(0xAAFFFFFF),
+                color = cs.onSurfaceVariant,      // dezenter Label-Ton
                 style = MaterialTheme.typography.titleMedium,
                 letterSpacing = 2.sp
             )
