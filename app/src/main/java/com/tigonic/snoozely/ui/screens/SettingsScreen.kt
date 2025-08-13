@@ -360,21 +360,10 @@ fun SettingsScreen(
                 )
             }
 
-            // Haptik
-            SectionSubheader(text = stringResource(R.string.haptic_feedback))
-            SettingsRow(
-                icon = Icons.Default.PlayCircleFilled,
-                title = stringResource(R.string.timer),
-                subtitle = stringResource(R.string.device_vibrate_on_timer),
-                checked = timerVibrate,
-                onCheckedChange = { value ->
-                    scope.launch { SettingsPreferenceHelper.setTimerVibrate(appContext, value) }
-                },
-                enabled = true
-            )
+            Spacer(Modifier.height(8.dp))
 
             // Sprache
-            SectionSubheader(text = stringResource(R.string.language))
+            SectionHeader(text = stringResource(R.string.language))
             LanguageDropdown(
                 selectedLangCode = language,
                 onSelect = { code ->
@@ -456,6 +445,7 @@ fun SettingsRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanguageDropdown(
     selectedLangCode: String,
@@ -464,51 +454,35 @@ fun LanguageDropdown(
     val cs = MaterialTheme.colorScheme
     var expanded by remember { mutableStateOf(false) }
 
-    val languageMap = mapOf(
-        stringResource(R.string.german) to "de",
-        stringResource(R.string.english) to "en",
-        stringResource(R.string.french) to "fr"
+    val options = listOf(
+        "de" to stringResource(R.string.german),
+        "en" to stringResource(R.string.english),
+        "fr" to stringResource(R.string.french)
     )
-    val languages = languageMap.keys.toList()
-    val label = languageMap.entries.firstOrNull { it.value == selectedLangCode }?.key ?: languages.first()
+    val selectedLabel = options.firstOrNull { it.first == selectedLangCode }?.second ?: options.first().second
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .background(cs.surfaceVariant, shape = MaterialTheme.shapes.medium)
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+    // WICHTIG: Keine eigene Überschrift & kein Label → sonst doppelt
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
     ) {
-        Row(
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},            // read-only
+            readOnly = true,
+            // KEIN label = {...} -> verhindert “zweites Language”
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier
+                .menuAnchor()
                 .fillMaxWidth()
-                .clickable { expanded = true }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                color = cs.onSurface,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Default.ArrowBack,
-                contentDescription = null,
-                tint = cs.primary,
-                modifier = Modifier
-                    .size(20.dp)
-                    .rotate(90f)
-            )
-        }
-        DropdownMenu(
+        )
+        ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(cs.surface)
+            onDismissRequest = { expanded = false }
         ) {
-            languageMap.forEach { (name, code) ->
+            options.forEach { (code, label) ->
                 DropdownMenuItem(
-                    text = { Text(name, color = cs.onSurface) },
+                    text = { Text(label) },
                     onClick = {
                         expanded = false
                         onSelect(code)
@@ -517,7 +491,7 @@ fun LanguageDropdown(
             }
         }
     }
-
+    Spacer(Modifier.height(8.dp))
     ThemeSection()
 }
 
@@ -527,7 +501,6 @@ fun LanguageDropdown(
 fun ThemeSection() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val cs = MaterialTheme.colorScheme
 
     val themeId by SettingsPreferenceHelper.getThemeMode(ctx).collectAsState(initial = "system")
     val dynamic by SettingsPreferenceHelper.getThemeDynamic(ctx).collectAsState(initial = true)
@@ -536,15 +509,15 @@ fun ThemeSection() {
     val themes = remember { com.tigonic.snoozely.ui.theme.ThemeRegistry.themes }
     val selectedLabel = themes.firstOrNull { it.id == themeId }?.label ?: "System"
 
-    Spacer(Modifier.height(16.dp))
-    Text("Theme", color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+    // Überschrift im selben Stil wie andere Kapitel (primary, bold)
+    SectionHeader(text = stringResource(R.string.theme))
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = selectedLabel,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Theme") },
+            // Label bleibt neutral oder kann entfallen – die Überschrift oben ist die “Section”-Betitelung
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier.menuAnchor().fillMaxWidth()
         )
@@ -560,5 +533,8 @@ fun ThemeSection() {
             }
         }
     }
+
+
+
 
 }

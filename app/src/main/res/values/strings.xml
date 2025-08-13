@@ -122,4 +122,6 @@
     <string name="runtime">Laufzeit</string>
     <string name="last_minute">Letzte Minute</string>
     <string name="extend_type">Verlängerungsart</string>
+    <string name="dynamic_colors">Dynamische Farben</string>
+    <string name="theme">Theme</string>
 </resources>
