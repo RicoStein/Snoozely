@@ -60,9 +60,9 @@
 
         <!-- Bluetooth -->
         <service
-            android:name=".service.BluetoothDisableService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:name=".service.BluetoothService"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- WLAN -->
         <service

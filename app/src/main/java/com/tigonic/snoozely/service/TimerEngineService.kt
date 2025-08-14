@@ -635,28 +635,47 @@ class TimerEngineService : Service() {
             }
         } catch (_: Throwable) {}
 
-        kotlin.runCatching {
-            // Nur starten, wenn Nutzer es in den Settings wünscht und es die API erlaubt
-            com.tigonic.snoozely.service.BluetoothDisableService.startIfAllowed(applicationContext)
-        }
 
-        // WLAN ggf. ausschalten (nur bis API 28 möglich)
-        kotlin.runCatching {
-            val ctx = applicationContext
-            val requested = kotlinx.coroutines.runBlocking {
-                com.tigonic.snoozely.util.SettingsPreferenceHelper.getWifiDisableRequested(ctx).first()
-            }
-            if (requested && android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
-                com.tigonic.snoozely.service.WifiControlService.start(ctx)
-            }
-        }
 
+        disableBluetooth()
+        disableWifi()
         stopShakeDetectorAndSound()
         stopForegroundCompat()
         stopSelf()
     }
 
+    private fun disableBluetooth() {
+        kotlin.runCatching {
+            val ctx = applicationContext
+            val requested = kotlinx.coroutines.runBlocking {
+                com.tigonic.snoozely.util.SettingsPreferenceHelper
+                    .getBluetoothDisableRequested(ctx)
+                    .first()
+            }
+            if (requested && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+                val intent = android.content.Intent(
+                    ctx,
+                    com.tigonic.snoozely.service.BluetoothService::class.java
+                ).setAction(com.tigonic.snoozely.service.BluetoothService.ACTION_DISABLE_BT)
+                ctx.startService(intent)
+            }
+        }
+    }
 
+    private fun disableWifi() {
+        // WLAN ggf. ausschalten (nur bis API 28 möglich)
+        kotlin.runCatching {
+            val ctx = applicationContext
+            val requested = kotlinx.coroutines.runBlocking {
+                com.tigonic.snoozely.util.SettingsPreferenceHelper
+                    .getWifiDisableRequested(ctx)
+                    .first()
+            }
+            if (requested && android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+                com.tigonic.snoozely.service.WifiControlService.start(ctx)
+            }
+        }
+    }
 
     private fun startServiceSafe(intent: Intent) {
         try {
