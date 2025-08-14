@@ -1,7 +1,11 @@
 package com.tigonic.snoozely.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -16,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
@@ -25,35 +31,103 @@ import kotlinx.coroutines.launch
 @Composable
 fun NotificationSettingsScreen(onBack: () -> Unit) {
     val ctx = LocalContext.current
+    val act = ctx as? Activity
     val scope = rememberCoroutineScope()
     val extra = LocalExtraColors.current
     val cs = MaterialTheme.colorScheme
 
-    // Master
+    // State aus DataStore
     val notificationEnabled by SettingsPreferenceHelper
-        .getNotificationEnabled(ctx).collectAsState(initial = true)
-
-    // Statusbar
+        .getNotificationEnabled(ctx).collectAsState(initial = false)
     val showProgress by SettingsPreferenceHelper
-        .getShowProgressNotification(ctx).collectAsState(initial = true)
-
-    // Gemeinsamer Verlängerungs-Schritt (1..30)
+        .getShowProgressNotification(ctx).collectAsState(initial = false)
     val extendMinutes by SettingsPreferenceHelper
         .getProgressExtendMinutes(ctx).collectAsState(initial = 5)
-
-    // Reminder
     val showReminder by SettingsPreferenceHelper
         .getShowReminderPopup(ctx).collectAsState(initial = false)
     val reminderMinutes by SettingsPreferenceHelper
         .getReminderMinutes(ctx).collectAsState(initial = 5)
 
-    // Android 13+ Permission
+    // Dialog steuern, wenn Permission „dauerhaft“ verweigert ist
+    var showGoToSettings by remember { mutableStateOf(false) }
+
+    // System-Launcher für die Berechtigung
     val notifPermissionLauncher =
         if (Build.VERSION.SDK_INT >= 33)
             rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-                scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, granted) }
+                scope.launch {
+                    if (granted) {
+                        SettingsPreferenceHelper.setNotificationEnabled(ctx, true)
+                    } else {
+                        SettingsPreferenceHelper.setNotificationEnabled(ctx, false)
+
+                        // Prüfen, ob der Dialog künftig nicht mehr erscheint (permanent verweigert)
+                        val rational =
+                            act?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.POST_NOTIFICATIONS) }
+                                ?: false
+                        // Wenn kein Rationale -> meist „Nicht mehr fragen“/permanent verweigert
+                        if (!rational) showGoToSettings = true
+                    }
+                }
             }
         else null
+
+    fun requestOrExplain() {
+        if (Build.VERSION.SDK_INT < 33) {
+            // Keine Runtime-Permission nötig
+            scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, true) }
+            return
+        }
+        // Schon erteilt?
+        val granted = ContextCompat.checkSelfPermission(
+            ctx, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (granted) {
+            scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, true) }
+            return
+        }
+
+        // Falls Activity fehlt (sehr selten), direkt in Settings leiten
+        if (act == null) { showGoToSettings = true; return }
+
+        // Ob wir ein Rationale zeigen sollten (nur Info; wir starten direkt die Anfrage)
+        // Hinweis: Beim allerersten Mal ist das i.d.R. false – das ist ok.
+        notifPermissionLauncher?.launch(Manifest.permission.POST_NOTIFICATIONS)
+            ?: run { showGoToSettings = true }
+    }
+
+    // Dialog: In App-Einstellungen leiten
+    if (showGoToSettings) {
+        AlertDialog(
+            onDismissRequest = { showGoToSettings = false },
+            title = { Text(stringResource(R.string.notif_perm_needed_title)) },
+            text = { Text(stringResource(R.string.notif_perm_needed_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showGoToSettings = false
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            act?.startActivity(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                            )
+                        } else {
+                            act?.startActivity(
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                    .setData(android.net.Uri.parse("package:${ctx.packageName}"))
+                            )
+                        }
+                    } catch (_: Throwable) { /* ignore */ }
+                }) { Text(stringResource(R.string.open_settings)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGoToSettings = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -81,7 +155,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Benachrichtigung aktivieren (toggle)
+            // Master-Toggle
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.notifications_master),
@@ -91,11 +165,8 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 Switch(
                     checked = notificationEnabled,
                     onCheckedChange = { v ->
-                        if (Build.VERSION.SDK_INT >= 33 && v && notifPermissionLauncher != null) {
-                            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, v) }
-                        }
+                        if (v) requestOrExplain()
+                        else scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, false) }
                     },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = extra.toggle,
@@ -106,7 +177,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 )
             }
 
-            // Verlängerungstimer (Slider 1–30)
+            // Verlängerungs-Slider
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -137,7 +208,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
 
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
-            // Fortschritt in der Statusleiste anzeigen? (toggle)
+            // Fortschritt in Statusleiste
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.notifications_progress_show),
@@ -161,14 +232,13 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
 
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
-            // Erinnerung (Überschrift)
+            // Reminder
             Text(
                 text = stringResource(R.string.notifications_section_reminder),
-                color = extra.heading,
+                color = LocalExtraColors.current.heading,
                 style = MaterialTheme.typography.titleMedium
             )
 
-            // Reminder vor Ablauf? (toggle)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.notifications_reminder_show),
@@ -190,7 +260,6 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 )
             }
 
-            // Minuten vorher (Slider 1–10)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -219,7 +288,6 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 )
             }
 
-            // Optional: kleiner Bottom-Spacer
             Spacer(Modifier.height(24.dp))
         }
     }

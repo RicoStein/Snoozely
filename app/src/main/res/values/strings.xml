@@ -88,6 +88,9 @@
 
     <string name="notifications_extend_minutes">Verlängerungsschritt: %1$d Minuten</string>
 
+    <string name="notif_perm_needed_title">Benachrichtigungen erlauben</string>
+    <string name="notif_perm_needed_body">Du hast die Systemanfrage mehrmals abgelehnt. Um Benachrichtigungen zu aktivieren, öffne bitte die App-Einstellungen und erlaube Benachrichtigungen dort.</string>
+
     <!-- Reminder Popup -->
     <string name="reminder_popup_title">Erinnerung</string>
     <string name="reminder_popup_message">Timer läuft gleich ab.</string>
