@@ -255,15 +255,35 @@ fun SettingsScreen(
                 )
             }
 
-            // Dummy Einstellungen ...
+            // ---- Bluetooth (nur bis Android 11 per App deaktivierbar) ----
+            val btSupported = remember { Build.VERSION.SDK_INT <= Build.VERSION_CODES.R }
+            val btRequested by SettingsPreferenceHelper
+                .getBluetoothDisableRequested(appContext)
+                .collectAsState(initial = false)
+
             SettingsRow(
                 icon = Icons.Default.BluetoothDisabled,
                 title = stringResource(R.string.bluetooth),
-                subtitle = stringResource(R.string.bluetooth_android_13_removed),
-                checked = false,
-                onCheckedChange = {},
-                enabled = false
+                subtitle = if (btSupported)
+                    stringResource(R.string.bluetooth_disable_supported_sub)
+                else
+                    stringResource(R.string.bluetooth_android_13_removed),
+                checked = btRequested && btSupported,
+                onCheckedChange = { enable ->
+                    if (!btSupported) return@SettingsRow
+                    scope.launch {
+                        // Wunsch speichern
+                        SettingsPreferenceHelper.setBluetoothDisableRequested(appContext, enable)
+                    }
+                    if (enable) {
+                        // sofort versuchen auszuschalten (kurzlebiger Service)
+                        com.tigonic.snoozely.service.BluetoothToggleService.start(appContext)
+                    }
+                },
+                enabled = btSupported
             )
+
+            // ---- WLAN (nur bis Android 11 per App deaktivierbar) ----
             SettingsRow(
                 icon = Icons.Default.WifiOff,
                 title = stringResource(R.string.wifi),
@@ -533,8 +553,4 @@ fun ThemeSection() {
             }
         }
     }
-
-
-
-
 }

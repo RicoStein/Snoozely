@@ -124,4 +124,7 @@
     <string name="extend_type">Verlängerungsart</string>
     <string name="dynamic_colors">Dynamische Farben</string>
     <string name="theme">Theme</string>
+
+    <!-- Bluetooth -->
+    <string name="bluetooth_disable_supported_sub">Bluetooth kann von der App ausgeschaltet werden (Android 11 und älter)</string>
 </resources>

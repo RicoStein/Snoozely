@@ -38,6 +38,9 @@ object SettingsPreferenceHelper {
     private val THEME_MODE = stringPreferencesKey("theme_mode")            // z.B. "system"|"light"|"dark"|...
     private val THEME_DYNAMIC = booleanPreferencesKey("theme_dynamic")     // true/false
 
+    // --- Bluetooth ---
+    private val KEY_BLUETOOTH_DISABLE_REQUESTED = booleanPreferencesKey("bluetooth_disable_requested")
+
     // -------- Getter --------
     fun getProgressExtendMinutes(context: Context): Flow<Int> =
         context.dataStore.data.map { it[PROGRESS_EXTEND_MINUTES] ?: 5 }
@@ -182,5 +185,16 @@ object SettingsPreferenceHelper {
 
     suspend fun setThemeDynamic(ctx: Context, enabled: Boolean) {
         ctx.dataStore.edit { it[THEME_DYNAMIC] = enabled }
+    }
+
+    fun getBluetoothDisableRequested(ctx: Context): Flow<Boolean> =
+        ctx.dataStore.data.map { prefs ->
+            prefs[KEY_BLUETOOTH_DISABLE_REQUESTED] ?: false
+        }
+
+    suspend fun setBluetoothDisableRequested(ctx: Context, value: Boolean) {
+        ctx.dataStore.edit { prefs ->
+            prefs[KEY_BLUETOOTH_DISABLE_REQUESTED] = value
+        }
     }
 }
