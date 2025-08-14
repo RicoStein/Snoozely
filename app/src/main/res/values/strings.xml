@@ -33,8 +33,6 @@
     <string name="turn_off_screen">Bildschirm ausschalten</string>
 
     <!-- Bluetooth / WiFi -->
-    <string name="bluetooth">Bluetooth</string>
-    <string name="bluetooth_android_13_removed">Diese Funktion wurde in Android 13 entfernt</string>
     <string name="wifi">WLAN</string>
     <string name="wifi_android_10_removed">Diese Funktion wurde von Google ab Android 10 entfernt</string>
 
@@ -127,4 +125,13 @@
 
     <!-- Bluetooth -->
     <string name="bluetooth_disable_supported_sub">Bluetooth kann von der App ausgeschaltet werden (Android 11 und älter)</string>
+    <string name="bluetooth_turn_off">Bluetooth am Timer-Ende deaktivieren</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="bluetooth_android_13_removed">Diese Funktion wurde in Android 13 entfernt</string>
+    <string name="notif_channel_bt_title">Bluetooth-Steuerung</string>
+    <string name="notif_channel_bt_desc">Kurzer Systemdienst zum Deaktivieren von Bluetooth</string>
+    <string name="notif_bt_disabling_title">Bluetooth wird deaktiviert</string>
+    <string name="notif_bt_disabling_text">Einstellungen werden angewendet …</string>
+
+
 </resources>

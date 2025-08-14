@@ -634,6 +634,11 @@ class TimerEngineService : Service() {
                 cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_REMINDER)
             }
         } catch (_: Throwable) {}
+
+        kotlin.runCatching {
+            // Nur starten, wenn Nutzer es in den Settings wünscht und es die API erlaubt
+            com.tigonic.snoozely.service.BluetoothDisableService.startIfAllowed(applicationContext)
+        }
         stopShakeDetectorAndSound()
         stopForegroundCompat()
         stopSelf()

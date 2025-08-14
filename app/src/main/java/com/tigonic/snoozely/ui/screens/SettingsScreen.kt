@@ -256,31 +256,25 @@ fun SettingsScreen(
             }
 
             // ---- Bluetooth (nur bis Android 11 per App deaktivierbar) ----
-            val btSupported = remember { Build.VERSION.SDK_INT <= Build.VERSION_CODES.R }
-            val btRequested by SettingsPreferenceHelper
+            val supportsBtToggle = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+            val bluetoothDisableRequested by SettingsPreferenceHelper
                 .getBluetoothDisableRequested(appContext)
                 .collectAsState(initial = false)
 
             SettingsRow(
                 icon = Icons.Default.BluetoothDisabled,
                 title = stringResource(R.string.bluetooth),
-                subtitle = if (btSupported)
-                    stringResource(R.string.bluetooth_disable_supported_sub)
+                subtitle = if (supportsBtToggle)
+                    stringResource(R.string.bluetooth_turn_off)
                 else
                     stringResource(R.string.bluetooth_android_13_removed),
-                checked = btRequested && btSupported,
-                onCheckedChange = { enable ->
-                    if (!btSupported) return@SettingsRow
+                checked = if (supportsBtToggle) bluetoothDisableRequested else false,
+                onCheckedChange = { value ->
                     scope.launch {
-                        // Wunsch speichern
-                        SettingsPreferenceHelper.setBluetoothDisableRequested(appContext, enable)
-                    }
-                    if (enable) {
-                        // sofort versuchen auszuschalten (kurzlebiger Service)
-                        com.tigonic.snoozely.service.BluetoothToggleService.start(appContext)
+                        SettingsPreferenceHelper.setBluetoothDisableRequested(appContext, value)
                     }
                 },
-                enabled = btSupported
+                enabled = supportsBtToggle
             )
 
             // ---- WLAN (nur bis Android 11 per App deaktivierbar) ----

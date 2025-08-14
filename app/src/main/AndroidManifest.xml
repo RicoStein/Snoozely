@@ -19,6 +19,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
 
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:ignore="UnusedAttribute" />
 
     <application
         android:allowBackup="true"
@@ -53,6 +54,12 @@
         <service
             android:name=".service.ScreenLockService"
             android:exported="false" />
+
+        <!-- Bluetooth -->
+        <service
+            android:name=".service.BluetoothDisableService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- Haptik -->
         <service
