@@ -300,6 +300,9 @@ fun SettingsScreen(
             // --------- Benachrichtigungen ---------
             SectionHeader(text = stringResource(R.string.notification))
 
+            val notificationEnabled by SettingsPreferenceHelper
+                .getNotificationEnabled(appContext)
+                .collectAsState(initial = false)
             // Ein Eintrag, der zur separaten Seite navigiert
             Row(
                 modifier = Modifier
@@ -322,7 +325,10 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = stringResource(R.string.show_remaining_time),
+                        text = if (notificationEnabled)
+                            stringResource(R.string.enabled)
+                        else
+                            stringResource(R.string.disabled),
                         color = cs.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )

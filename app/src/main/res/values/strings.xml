@@ -99,7 +99,7 @@
 
     <!-- Shake to Extend -->
     <string name="shake_to_extend">Schütteln zum Verlängern</string>
-    <string name="shake_to_extend_enabled_sub">Aktiv · +%1$d Min.</string>
+    <string name="shake_to_extend_enabled_sub">Aktiviert · +%1$d Min.</string>
     <string name="enabled">Aktiviert</string>
     <string name="disabled">Deaktiviert</string>
     <string name="shake_strength">Schüttelkraft</string>
