@@ -147,7 +147,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
 
             // Sleep Timer
-            SectionHeader(text = stringResource(R.string.sleep_timer))
+            SectionHeader(text = stringResource(R.string.app_name))
 
             SettingsRow(
                 icon = Icons.Default.PlayCircleFilled,
