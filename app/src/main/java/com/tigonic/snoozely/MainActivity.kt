@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
         // Engine ggf. wieder starten (wenn Timer schon lief)
         lifecycleScope.launch { maybeStartEngineIfTimerRunning() }
 
+        /*
         // POST_NOTIFICATIONS anfragen (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -53,7 +54,7 @@ class MainActivity : ComponentActivity() {
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
             }
         }
-
+*/
         // Theme-Presets registrieren (einmalig)
         registerDefaultThemes()
 

@@ -55,7 +55,7 @@ object SettingsPreferenceHelper {
         context.dataStore.data.map { it[SCREEN_OFF] ?: false }
 
     fun getNotificationEnabled(context: Context): Flow<Boolean> =
-        context.dataStore.data.map { it[NOTIFICATION_ENABLED] ?: true }
+        context.dataStore.data.map { it[NOTIFICATION_ENABLED] ?: false }
 
     fun getTimerVibrate(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[TIMER_VIBRATE] ?: false }
@@ -67,10 +67,10 @@ object SettingsPreferenceHelper {
         context.dataStore.data.map { it[LANGUAGE] ?: "de" }
 
     fun getShowProgressNotification(context: Context): Flow<Boolean> =
-        context.dataStore.data.map { it[SHOW_PROGRESS_NOTIFICATION] ?: true }
+        context.dataStore.data.map { it[SHOW_PROGRESS_NOTIFICATION] ?: false }
 
     fun getShowReminderPopup(context: Context): Flow<Boolean> =
-        context.dataStore.data.map { it[SHOW_REMINDER_POPUP] ?: true }
+        context.dataStore.data.map { it[SHOW_REMINDER_POPUP] ?: false }
 
     fun getReminderMinutes(context: Context): Flow<Int> =
         context.dataStore.data.map { it[REMINDER_MINUTES] ?: 2 }
@@ -174,7 +174,7 @@ object SettingsPreferenceHelper {
 
     fun getThemeMode(ctx: Context) = ctx.dataStore.data.map { prefs ->
         // Default: "system"
-        prefs[THEME_MODE] ?: "system"
+        prefs[THEME_MODE] ?: "dark"
     }
 
     suspend fun setThemeMode(ctx: Context, id: String) {
