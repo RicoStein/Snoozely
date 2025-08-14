@@ -17,9 +17,12 @@
     <!-- Bluetooth -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
-
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:ignore="UnusedAttribute" />
+
+    <!-- WLAN -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
     <application
         android:allowBackup="true"
@@ -60,6 +63,11 @@
             android:name=".service.BluetoothDisableService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- WLAN -->
+        <service
+            android:name=".service.WifiControlService"
+            android:exported="false" />
 
         <!-- Haptik -->
         <service

@@ -639,6 +639,18 @@ class TimerEngineService : Service() {
             // Nur starten, wenn Nutzer es in den Settings wünscht und es die API erlaubt
             com.tigonic.snoozely.service.BluetoothDisableService.startIfAllowed(applicationContext)
         }
+
+        // WLAN ggf. ausschalten (nur bis API 28 möglich)
+        kotlin.runCatching {
+            val ctx = applicationContext
+            val requested = kotlinx.coroutines.runBlocking {
+                com.tigonic.snoozely.util.SettingsPreferenceHelper.getWifiDisableRequested(ctx).first()
+            }
+            if (requested && android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+                com.tigonic.snoozely.service.WifiControlService.start(ctx)
+            }
+        }
+
         stopShakeDetectorAndSound()
         stopForegroundCompat()
         stopSelf()

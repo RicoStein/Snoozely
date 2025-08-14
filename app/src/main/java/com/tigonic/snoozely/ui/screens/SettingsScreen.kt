@@ -277,14 +277,22 @@ fun SettingsScreen(
                 enabled = supportsBtToggle
             )
 
-            // ---- WLAN (nur bis Android 11 per App deaktivierbar) ----
+            // --- WLAN (nur bis Android 9 steuerbar) ---
+            val wifiToggleSupported = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+            val wifiDisableRequested by SettingsPreferenceHelper.getWifiDisableRequested(appContext).collectAsState(initial = false)
+
             SettingsRow(
                 icon = Icons.Default.WifiOff,
                 title = stringResource(R.string.wifi),
-                subtitle = stringResource(R.string.wifi_android_10_removed),
-                checked = false,
-                onCheckedChange = {},
-                enabled = false
+                subtitle = if (wifiToggleSupported)
+                    stringResource(R.string.wifi_turn_off)
+                else
+                    stringResource(R.string.wifi_android_10_removed),
+                checked = if (wifiToggleSupported) wifiDisableRequested else false,
+                onCheckedChange = { v ->
+                    scope.launch { SettingsPreferenceHelper.setWifiDisableRequested(appContext, v) }
+                },
+                enabled = wifiToggleSupported
             )
 
             Spacer(Modifier.height(12.dp))

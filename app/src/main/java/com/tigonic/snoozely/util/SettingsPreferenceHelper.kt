@@ -41,6 +41,9 @@ object SettingsPreferenceHelper {
     // --- Bluetooth ---
     private val KEY_BLUETOOTH_DISABLE_REQUESTED = booleanPreferencesKey("bluetooth_disable_requested")
 
+    // --- WLAN ---
+    private val KEY_WIFI_DISABLE_REQUESTED = booleanPreferencesKey("wifi_disable_requested")
+
     // -------- Getter --------
     fun getProgressExtendMinutes(context: Context): Flow<Int> =
         context.dataStore.data.map { it[PROGRESS_EXTEND_MINUTES] ?: 5 }
@@ -197,4 +200,10 @@ object SettingsPreferenceHelper {
             prefs[KEY_BLUETOOTH_DISABLE_REQUESTED] = value
         }
     }
+
+    fun getWifiDisableRequested(ctx: Context) =
+        ctx.dataStore.data.map { it[KEY_WIFI_DISABLE_REQUESTED] ?: false }
+
+    suspend fun setWifiDisableRequested(ctx: Context, v: Boolean) =
+        ctx.dataStore.edit { it[KEY_WIFI_DISABLE_REQUESTED] = v }
 }
