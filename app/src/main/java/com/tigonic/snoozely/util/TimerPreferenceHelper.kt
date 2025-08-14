@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlin.math.max
 
@@ -13,9 +14,20 @@ object TimerPreferenceHelper {
     private val TIMER_KEY = intPreferencesKey("timer_minutes")
     private val TIMER_START_TIME = longPreferencesKey("timer_start_time") // ms
     private val TIMER_RUNNING = booleanPreferencesKey("timer_running")
+    private val TIMER_USER_BASE = intPreferencesKey("timer_user_base_minutes")
 
+    /**
+     * Liefert den Timer-Wert. Falls noch keiner gespeichert ist,
+     * kommt der Default aus SettingsPreferenceHelper zurück.
+     * Ergebnis ist immer >= 1.
+     */
     fun getTimer(context: Context): Flow<Int> =
-        context.dataStore.data.map { it[TIMER_KEY] ?: 0 }
+        combine(
+            context.dataStore.data.map { it[TIMER_KEY] },                        // gespeicherter Wert oder null
+            SettingsPreferenceHelper.getDefaultTimerMinutes(context)             // Default aus Settings
+        ) { saved, def ->
+            (saved ?: def).coerceAtLeast(1)
+        }
 
     suspend fun setTimer(context: Context, minutes: Int) {
         val safe = max(1, minutes)
@@ -36,19 +48,19 @@ object TimerPreferenceHelper {
         context.dataStore.edit { it[TIMER_RUNNING] = running }
     }
 
-    /** Startet den Timer atomar: Minuten setzen, Startzeit setzen, Running=true */
+    /** Startet den Timer atomar: Minuten setzen, User-Startwert mitschreiben, Startzeit setzen, Running=true */
     suspend fun startTimer(context: Context, minutes: Int) {
         val safe = max(1, minutes)
         val now = System.currentTimeMillis()
         context.dataStore.edit { prefs ->
-            prefs[TIMER_KEY] = safe               // laufender Zielwert (kann später steigen)
-            prefs[TIMER_USER_BASE] = safe         // <- NEU: User-Startwert
+            prefs[TIMER_KEY] = safe             // laufender Zielwert
+            prefs[TIMER_USER_BASE] = safe       // User-Startwert für Rücksetz-Logik
             prefs[TIMER_START_TIME] = now
             prefs[TIMER_RUNNING] = true
         }
     }
 
-    /** Stoppt den Timer atomar: Minuten merken (z. B. letzte User-Auswahl), Startzeit löschen, Running=false */
+    /** Stoppt den Timer atomar: sichtbaren Minutenwert merken, Startzeit löschen, Running=false */
     suspend fun stopTimer(context: Context, minutes: Int) {
         val safe = max(1, minutes)
         context.dataStore.edit { prefs ->
@@ -57,8 +69,6 @@ object TimerPreferenceHelper {
             prefs[TIMER_RUNNING] = false
         }
     }
-
-    private val TIMER_USER_BASE = intPreferencesKey("timer_user_base_minutes")
 
     fun getTimerUserBase(context: Context): Flow<Int> =
         context.dataStore.data.map { it[TIMER_USER_BASE] ?: 0 }

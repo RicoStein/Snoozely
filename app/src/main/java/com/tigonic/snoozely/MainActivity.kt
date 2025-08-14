@@ -135,9 +135,7 @@ class MainActivity : ComponentActivity() {
         val minutes = TimerPreferenceHelper.getTimer(ctx).first()
 
         if (running && start > 0L && minutes > 0) {
-            val intent = Intent(ctx, TimerEngineService::class.java).apply {
-                action = TimerContracts.ACTION_START
-            }
+            val intent = Intent(ctx, TimerEngineService::class.java) // keine Action setzen
             ctx.startForegroundServiceCompat(intent)
         }
     }

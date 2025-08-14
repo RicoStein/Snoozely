@@ -10,6 +10,10 @@ private val Context.dataStore by preferencesDataStore(name = "settings_preferenc
 private val PROGRESS_EXTEND_MINUTES = intPreferencesKey("progress_extend_minutes")
 
 object SettingsPreferenceHelper {
+
+    // Wheel
+    private val DEFAULT_TIMER_MINUTES = intPreferencesKey("default_timer_minutes")
+
     private val STOP_AUDIO = booleanPreferencesKey("stop_audio")
     private val SCREEN_OFF = booleanPreferencesKey("screen_off")
     private val NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
@@ -73,7 +77,7 @@ object SettingsPreferenceHelper {
         context.dataStore.data.map { it[SHOW_REMINDER_POPUP] ?: false }
 
     fun getReminderMinutes(context: Context): Flow<Int> =
-        context.dataStore.data.map { it[REMINDER_MINUTES] ?: 2 }
+        context.dataStore.data.map { it[REMINDER_MINUTES] ?: 5 }
 
     fun getIsFirstRun(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[IS_FIRST_RUN] ?: true }
@@ -87,10 +91,10 @@ object SettingsPreferenceHelper {
 
     // NEU
     fun getProgressExtendEnabled(ctx: Context) =
-        ctx.dataStore.data.map { it[PROGRESS_EXTEND_ENABLED] ?: true }
+        ctx.dataStore.data.map { it[PROGRESS_EXTEND_ENABLED] ?: false }
 
     fun getReminderExtendEnabled(ctx: Context) =
-        ctx.dataStore.data.map { it[REMINDER_EXTEND_ENABLED] ?: true }
+        ctx.dataStore.data.map { it[REMINDER_EXTEND_ENABLED] ?: false }
 
     fun getReminderExtendMinutes(ctx: Context) =
         ctx.dataStore.data.map { prefs -> prefs[REMINDER_EXTEND_MINUTES] ?: (prefs[PROGRESS_EXTEND_MINUTES] ?: 5) }
@@ -206,4 +210,10 @@ object SettingsPreferenceHelper {
 
     suspend fun setWifiDisableRequested(ctx: Context, v: Boolean) =
         ctx.dataStore.edit { it[KEY_WIFI_DISABLE_REQUESTED] = v }
+
+    fun getDefaultTimerMinutes(ctx: Context) =
+        ctx.dataStore.data.map { it[DEFAULT_TIMER_MINUTES] ?: 15 }
+
+    suspend fun setDefaultTimerMinutes(ctx: Context, minutes: Int) =
+        ctx.dataStore.edit { it[DEFAULT_TIMER_MINUTES] = minutes.coerceIn(1, 600) }
 }

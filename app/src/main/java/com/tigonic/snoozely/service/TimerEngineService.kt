@@ -116,9 +116,6 @@ class TimerEngineService : Service() {
                     // User-Basis für diesen Run cachen (für den Rücksetzer beim Stop)
                     lastStartMinutesCache = minutes
 
-                    // ATOMAR starten (schreibt jetzt auch den User-Base-Key mit, s. Helper)
-                    TimerPreferenceHelper.startTimer(ctx, minutes)
-
                     // ATOMAR starten
                     TimerPreferenceHelper.startTimer(ctx, minutes)
 
