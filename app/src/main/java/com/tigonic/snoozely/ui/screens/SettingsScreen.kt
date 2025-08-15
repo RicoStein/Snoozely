@@ -267,7 +267,7 @@ fun SettingsScreen(
             }
 
             // ===== Sprache / Theme =====
-            SectionHeader(text = stringResource(R.string.language))
+            SectionHeader(text = stringResource(R.string.display_and_language))
             LanguageDropdown(
                 selectedLangCode = language,
                 onSelect = { code ->
@@ -362,6 +362,7 @@ private fun LanguageDropdown(
             value = selectedLabel,
             onValueChange = {},
             readOnly = true,
+            label = { Text(stringResource(R.string.language)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier.menuAnchor().fillMaxWidth(),
             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
@@ -392,13 +393,12 @@ private fun ThemeSection() {
     val themes = remember { ThemeRegistry.themes }
     val selectedLabel = themes.firstOrNull { it.id == themeId }?.label ?: "Light"
 
-    SectionHeader(text = stringResource(R.string.theme))
-
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = selectedLabel,
             onValueChange = {},
             readOnly = true,
+            label = { Text(stringResource(R.string.theme)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier.menuAnchor().fillMaxWidth(),
             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(

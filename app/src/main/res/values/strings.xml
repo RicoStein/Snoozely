@@ -136,6 +136,7 @@
     <string name="wifi_turn_off">WLAN am Timer-Ende deaktivieren</string>
     <string name="wifi_android_10_removed">Diese Funktion wurde in Android 10 entfernt</string>
     <string name="tap_for_details">Für Details klicken</string>
+    <string name="display_and_language">Darstellung &amp; Sprache</string>
 
 
 </resources>
