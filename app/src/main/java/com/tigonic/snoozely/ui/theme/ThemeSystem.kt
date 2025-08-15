@@ -83,58 +83,67 @@ private object ThemeColors {
 
     // -------- DARK (Bild 1) --------
     object Dark {
-        // Brand
         val primary    = Color(0xFF6A6CFF) // electric blue
         val secondary  = Color(0xFF00B3FF) // cyan
         val success    = Color(0xFF22C55E)
         val warning    = Color(0xFFF59E0B)
         val info       = Color(0xFF60A5FA)
 
-        // Surfaces
         val background = Color(0xFF0F1115)
         val surface    = Color(0xFF151824)
         val onSurface  = Color(0xFFE6E8EF)
 
-        // Effects
-        val wheelGradient = listOf(Color(0xFF1E3A8A), primary, secondary)
+        // Verlauf: Electric Blue → Cyan → leichtes Türkis
+        val wheelGradient = listOf(
+            Color(0xFF1E3A8A), // tiefes Blau
+            primary,           // Electric Blue
+            secondary,         // Cyan
+            Color(0xFF0AE7CC)  // Türkis
+        )
         val shakeGradient = listOf(primary, secondary, Color(0xFF0EA5E9))
     }
 
     // -------- LIGHT (Bild 2) --------
     object Light {
-        // Brand
         val primary    = Color(0xFF8B5CF6) // violet
         val secondary  = Color(0xFF6366F1) // indigo
         val success    = Color(0xFF16A34A)
         val warning    = Color(0xFFF59E0B)
         val info       = Color(0xFF0EA5E9)
 
-        // Surfaces
-        val background = Color(0xFFF6F6FC) // leicht violett getönt
+        val background = Color(0xFFF6F6FC)
         val surface    = Color(0xFFFFFFFF)
         val onSurface  = Color(0xFF101112)
 
-        // Effects
-        val wheelGradient = listOf(Color(0xFFE9D5FF), primary, secondary)
+        // Verlauf: helles Violett → Primary → Indigo → sanftes Blau
+        val wheelGradient = listOf(
+            Color(0xFFE9D5FF), // sehr helles Violett
+            primary,           // Violett
+            secondary,         // Indigo
+            Color(0xFF3B82F6)  // sanftes Blau
+        )
         val shakeGradient = listOf(primary, secondary, Color(0xFFC084FC))
     }
 
     // -------- AMOLED (Bild 3) --------
     object Amoled {
-        // Brand
         val primary    = Color(0xFFD946EF) // neon magenta
         val secondary  = Color(0xFF9333EA) // purple
         val success    = Color(0xFF22C55E)
         val warning    = Color(0xFFF97316)
         val info       = Color(0xFF67E8F9)
 
-        // Surfaces
         val background = Color(0xFF000000)
         val surface    = Color(0xFF000000)
         val onSurface  = Color(0xFFEDEDED)
 
-        // Effects
-        val wheelGradient = listOf(primary, secondary, Color(0xFF7C3AED))
+        // Verlauf: Neon Magenta → Primary → Purple → Neon Pink
+        val wheelGradient = listOf(
+            Color(0xFFFF00FF), // neon pink
+            primary,           // neon magenta
+            secondary,         // purple
+            Color(0xFF7C3AED)  // tiefer Purple-Ton
+        )
         val shakeGradient = listOf(primary, Color(0xFFFAFAFA), secondary)
     }
 }

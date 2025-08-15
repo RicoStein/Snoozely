@@ -17,9 +17,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import kotlin.math.*
 
 @Composable
@@ -28,14 +30,16 @@ fun WheelSlider(
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
     minValue: Int = 1,
-    maxValue: Int = 600,
+    maxValue: Int = 1000,
     stepsPerCircle: Int = 60,
     showCenterText: Boolean = true,
     wheelAlpha: Float = 1f,
     wheelScale: Float = 1f,
     enabled: Boolean = true,
 ) {
+
     val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current // Neu: Zugriff auf Theme-Gradients
 
     // Maße
     val size = 350.dp
@@ -190,38 +194,41 @@ fun WheelSlider(
         ) {
             // Hintergrundring (theme)
             drawCircle(
-                color = cs.outlineVariant, // früher: Color(0xFF22252A)
+                color = extra.slider.copy(alpha = 0.25f),
                 radius = wheelRadius,
                 center = center,
                 style = Stroke(width = strokePx)
             )
 
-            // Fortschrittsbogen (Farben unverändert – reines Styling)
+            // Fortschrittsbogen aus Theme-Gradient
             if (drawSteps > 0) {
-                val sweepColors = listOf(
-                    Color(0xFFFF2222), Color(0xFFFF531B), Color(0xFFFF851E),
-                    Color(0xFFFFB719), Color(0xFFFFEA16), Color(0xFFFFFF15),
-                    Color(0xFFFFEA16), Color(0xFFFFB719), Color(0xFFFF851E),
-                    Color(0xFFFF531B), Color(0xFFFF2222)
-                )
-                val steps = sweepColors.size - 1
-                val rotateCount = ((steps * sweep / 360f).roundToInt() + steps) % steps
-                val rotatedColors = sweepColors.drop(rotateCount) + sweepColors.take(rotateCount) + sweepColors[rotateCount]
+                val base = extra.wheelGradient
+                val closed = if (base.isNotEmpty() && base.first() != base.last()) {
+                    base + base.first()
+                } else base
 
-                drawArc(
-                    brush = Brush.sweepGradient(colors = rotatedColors, center = center),
-                    startAngle = -90f,
-                    sweepAngle = sweep,
-                    useCenter = false,
-                    style = Stroke(width = strokePx, cap = StrokeCap.Butt),
-                    topLeft = Offset(center.x - wheelRadius, center.y - wheelRadius),
-                    size = Size(wheelRadius * 2, wheelRadius * 2)
-                )
+                // Wenn du irgendwann >360° zulässt, vermeidet das sichtbare Artefakte:
+                val sweepClamped = sweep.coerceAtMost(359.999f)
+
+                // Shader um -90° drehen, Startwinkel kompensieren (0° im rotierten Space)
+                withTransform({
+                    rotate(degrees = -90f, pivot = center)
+                }) {
+                    drawArc(
+                        brush = Brush.sweepGradient(colors = closed, center = center),
+                        startAngle = 0f,                  // Start jetzt auf der (rotierten) Naht
+                        sweepAngle = sweepClamped,
+                        useCenter = false,
+                        style = Stroke(width = strokePx, cap = StrokeCap.Butt),
+                        topLeft = Offset(center.x - wheelRadius, center.y - wheelRadius),
+                        size = Size(wheelRadius * 2, wheelRadius * 2)
+                    )
+                }
             }
 
-            // Handle (theme)
+            // Handle aus Theme
             drawCircle(
-                color = if (enabled) cs.primary else cs.onSurface.copy(alpha = 0.4f),
+                color = if (enabled) extra.toggle else cs.onSurface.copy(alpha = 0.4f),
                 radius = handlePx,
                 center = handleCenter
             )
