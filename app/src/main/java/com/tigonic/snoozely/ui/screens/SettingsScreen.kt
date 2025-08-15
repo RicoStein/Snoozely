@@ -1,6 +1,5 @@
 package com.tigonic.snoozely.ui.screens
 
-import android.Manifest
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -22,19 +21,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.ui.theme.LocalExtraColors
+import com.tigonic.snoozely.ui.theme.ThemeRegistry
 import com.tigonic.snoozely.util.LocaleHelper
-import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
+import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
 
-// Helper: Context → Activity (vermeidet direkten Cast von LocalContext)
+// ---- Helper: Context -> Activity
 private tailrec fun Context.asActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.asActivity()
@@ -48,65 +48,45 @@ fun SettingsScreen(
     onNavigateShakeSettings: () -> Unit,
     onNavigateNotificationSettings: () -> Unit,
 ) {
-    val appContext = LocalContext.current.applicationContext
-    val activity = LocalContext.current.asActivity()
+    val ctx = LocalContext.current
+    val app = ctx.applicationContext
+    val activity = ctx.asActivity()
     val scope = rememberCoroutineScope()
+
     val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
 
-    val devicePolicyManager =
-        appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-    val adminComponent = ComponentName(appContext, ScreenOffAdminReceiver::class.java)
+    // --- Admin / Screen-Off
+    val dpm = app.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    val admin = ComponentName(app, ScreenOffAdminReceiver::class.java)
+    var isAdmin by remember { mutableStateOf(dpm.isAdminActive(admin)) }
 
-    var isAdmin by remember { mutableStateOf(devicePolicyManager.isAdminActive(adminComponent)) }
-    val stopAudio by SettingsPreferenceHelper.getStopAudio(appContext).collectAsState(initial = true)
-    val screenOff by SettingsPreferenceHelper.getScreenOff(appContext).collectAsState(initial = false)
-    val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(appContext).collectAsState(initial = false)
-    val timerVibrate by SettingsPreferenceHelper.getTimerVibrate(appContext).collectAsState(initial = false)
-    val fadeOut by SettingsPreferenceHelper.getFadeOut(appContext).collectAsState(initial = 30f)
-    val language by SettingsPreferenceHelper.getLanguage(appContext).collectAsState(initial = "de")
-    val showReminderPopup by SettingsPreferenceHelper.getShowReminderPopup(appContext).collectAsState(initial = false)
-    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(appContext).collectAsState(initial = 5)
-    val extendStep by SettingsPreferenceHelper.getProgressExtendMinutes(appContext).collectAsState(initial = 5)
+    // --- Settings States
+    val stopAudio by SettingsPreferenceHelper.getStopAudio(app).collectAsState(initial = true)
+    val screenOff by SettingsPreferenceHelper.getScreenOff(app).collectAsState(initial = false)
+    val fadeOut by SettingsPreferenceHelper.getFadeOut(app).collectAsState(initial = 30f)
+    val language by SettingsPreferenceHelper.getLanguage(app).collectAsState(initial = "de")
+    val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(app).collectAsState(initial = false)
+    val wifiDisableRequested by SettingsPreferenceHelper.getWifiDisableRequested(app).collectAsState(initial = false)
+    val bluetoothDisableRequested by SettingsPreferenceHelper.getBluetoothDisableRequested(app).collectAsState(initial = false)
 
+    val supportsBtToggle = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+    val supportsWifiToggle = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+
+    // --- Admin-Flow
     val adminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
-        isAdmin = nowIsAdmin
-        scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, nowIsAdmin) }
-        Toast.makeText(
-            appContext,
-            if (nowIsAdmin) appContext.getString(R.string.device_admin_enabled)
-            else appContext.getString(R.string.device_admin_failed),
-            Toast.LENGTH_SHORT
-        ).show()
+        val now = dpm.isAdminActive(admin)
+        isAdmin = now
+        scope.launch { SettingsPreferenceHelper.setScreenOff(app, now) }
+        Toast.makeText(app, if (now) app.getString(R.string.device_admin_enabled) else app.getString(R.string.device_admin_failed), Toast.LENGTH_SHORT).show()
     }
-
     var showRemoveAdminDialog by remember { mutableStateOf(false) }
-    var showNotificationPermissionDialog by remember { mutableStateOf(false) }
-    var showDisableNotificationDialog by remember { mutableStateOf(false) }
-
-    // Notification Permission (Android 13+)
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        scope.launch {
-            SettingsPreferenceHelper.setNotificationEnabled(appContext, isGranted)
-            if (!isGranted) {
-                Toast.makeText(
-                    appContext,
-                    appContext.getString(R.string.notification_permission_denied),
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-    }
 
     // Admin-Status mit Switch synchron halten
     LaunchedEffect(screenOff) {
-        val nowIsAdmin = devicePolicyManager.isAdminActive(adminComponent)
-        isAdmin = nowIsAdmin
-        if (!nowIsAdmin && screenOff) {
-            scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, false) }
-        }
+        val now = dpm.isAdminActive(admin)
+        isAdmin = now
+        if (!now && screenOff) scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
     }
 
     Scaffold(
@@ -121,12 +101,12 @@ fun SettingsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = cs.primaryContainer,
                     titleContentColor = cs.onPrimaryContainer,
-                    navigationIconContentColor = cs.onPrimaryContainer,
-                ),
+                    navigationIconContentColor = cs.onPrimaryContainer
+                )
             )
         },
         bottomBar = {
-            // dezente Fläche, die sich ans Theme anpasst
+            // dezente Fläche, greift Theme-Farben
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -134,19 +114,18 @@ fun SettingsScreen(
                     .background(cs.surface)
             )
         },
-        containerColor = cs.background,
-    ) { innerPadding ->
+        containerColor = cs.background
+    ) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp)
-                .padding(top = 8.dp, bottom = 8.dp)
+                .padding(inner)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Spacer(Modifier.height(8.dp))
 
-            // Sleep Timer
+            // ===== App / Playback =====
             SectionHeader(text = stringResource(R.string.app_name))
 
             SettingsRow(
@@ -154,71 +133,56 @@ fun SettingsScreen(
                 title = stringResource(R.string.playback),
                 subtitle = stringResource(R.string.stop_audio_video),
                 checked = stopAudio,
-                onCheckedChange = { value -> scope.launch { SettingsPreferenceHelper.setStopAudio(appContext, value) } },
-                enabled = true
+                onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setStopAudio(app, v) } }
             )
 
             // Fade-Out
-            Text(
-                stringResource(R.string.fade_out_duration),
-                color = cs.onBackground,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 12.dp)
-            )
-            Text(
-                stringResource(R.string.seconds, fadeOut.toInt()),
-                color = cs.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Slider(
-                value = fadeOut,
-                onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setFadeOut(appContext, v) } },
-                valueRange = 0f..120f,
-                steps = 11,
-                modifier = Modifier.padding(horizontal = 8.dp),
-                colors = SliderDefaults.colors(
-                    activeTrackColor = cs.primary,
-                    inactiveTrackColor = cs.primary.copy(alpha = 0.30f),
-                    thumbColor = cs.primary,
-                    activeTickColor = Color.Transparent,
-                    inactiveTickColor = Color.Transparent
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.fade_out_duration), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.seconds, fadeOut.toInt()), color = extra.infoText, style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = fadeOut,
+                    onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setFadeOut(app, v) } },
+                    valueRange = 0f..120f,
+                    steps = 11,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = extra.slider,
+                        inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
+                        thumbColor = extra.slider,
+                        activeTickColor = Color.Transparent,
+                        inactiveTickColor = Color.Transparent
+                    )
                 )
-            )
+            }
 
-            // Bildschirm ausschalten (Device Admin)
+            // ===== Screen / Admin =====
             SettingsRow(
                 icon = Icons.Default.Brightness2,
                 title = stringResource(R.string.screen),
-                subtitle = if (isAdmin)
-                    stringResource(R.string.turn_off_screen)
-                else
-                    stringResource(R.string.admin_permission_required),
+                subtitle = if (isAdmin) stringResource(R.string.turn_off_screen) else stringResource(R.string.admin_permission_required),
                 checked = screenOff && isAdmin,
-                onCheckedChange = { value ->
-                    if (value) {
+                onCheckedChange = { enabled ->
+                    if (enabled) {
                         if (!isAdmin && activity != null) {
                             val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
-                                putExtra(
-                                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                                    appContext.getString(R.string.device_admin_explanation)
-                                )
+                                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                                putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, app.getString(R.string.device_admin_explanation))
                             }
                             adminLauncher.launch(intent)
                         } else {
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, true) }
-                            Toast.makeText(appContext, appContext.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(app, true) }
+                            Toast.makeText(app, app.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         if (isAdmin && activity != null) {
                             showRemoveAdminDialog = true
                         } else {
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, false) }
-                            Toast.makeText(appContext, appContext.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
+                            Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
                         }
                     }
-                },
-                enabled = true
+                }
             )
 
             if (showRemoveAdminDialog) {
@@ -229,81 +193,37 @@ fun SettingsScreen(
                     confirmButton = {
                         TextButton(onClick = {
                             showRemoveAdminDialog = false
-                            try {
-                                devicePolicyManager.removeActiveAdmin(adminComponent)
-                                isAdmin = false
-                                scope.launch { SettingsPreferenceHelper.setScreenOff(appContext, false) }
-                                Toast.makeText(
-                                    appContext,
-                                    appContext.getString(R.string.device_admin_disabled),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } catch (e: Exception) {
-                                Toast.makeText(
-                                    appContext,
-                                    appContext.getString(R.string.device_admin_remove_manual_hint),
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
+                            runCatching { dpm.removeActiveAdmin(admin) }
+                            isAdmin = false
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
+                            Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
                         }) { Text(stringResource(R.string.remove_admin_confirm_button)) }
                     },
-                    dismissButton = {
-                        TextButton(onClick = { showRemoveAdminDialog = false }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                    }
+                    dismissButton = { TextButton(onClick = { showRemoveAdminDialog = false }) { Text(stringResource(R.string.cancel)) } }
                 )
             }
 
-            // ---- Bluetooth (nur bis Android 11 per App deaktivierbar) ----
-            val supportsBtToggle = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
-            val bluetoothDisableRequested by SettingsPreferenceHelper
-                .getBluetoothDisableRequested(appContext)
-                .collectAsState(initial = false)
-
+            // ===== Radios =====
             SettingsRow(
                 icon = Icons.Default.BluetoothDisabled,
                 title = stringResource(R.string.bluetooth),
-                subtitle = if (supportsBtToggle)
-                    stringResource(R.string.bluetooth_turn_off)
-                else
-                    stringResource(R.string.bluetooth_android_13_removed),
+                subtitle = if (supportsBtToggle) stringResource(R.string.bluetooth_turn_off) else stringResource(R.string.bluetooth_android_13_removed),
                 checked = if (supportsBtToggle) bluetoothDisableRequested else false,
-                onCheckedChange = { value ->
-                    scope.launch {
-                        SettingsPreferenceHelper.setBluetoothDisableRequested(appContext, value)
-                    }
-                },
+                onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setBluetoothDisableRequested(app, v) } },
                 enabled = supportsBtToggle
             )
-
-            // --- WLAN (nur bis Android 9 steuerbar) ---
-            val wifiToggleSupported = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
-            val wifiDisableRequested by SettingsPreferenceHelper.getWifiDisableRequested(appContext).collectAsState(initial = false)
 
             SettingsRow(
                 icon = Icons.Default.WifiOff,
                 title = stringResource(R.string.wifi),
-                subtitle = if (wifiToggleSupported)
-                    stringResource(R.string.wifi_turn_off)
-                else
-                    stringResource(R.string.wifi_android_10_removed),
-                checked = if (wifiToggleSupported) wifiDisableRequested else false,
-                onCheckedChange = { v ->
-                    scope.launch { SettingsPreferenceHelper.setWifiDisableRequested(appContext, v) }
-                },
-                enabled = wifiToggleSupported
+                subtitle = if (supportsWifiToggle) stringResource(R.string.wifi_turn_off) else stringResource(R.string.wifi_android_10_removed),
+                checked = if (supportsWifiToggle) wifiDisableRequested else false,
+                onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setWifiDisableRequested(app, v) } },
+                enabled = supportsWifiToggle
             )
 
-            Spacer(Modifier.height(12.dp))
-
-            // --------- Benachrichtigungen ---------
+            // ===== Notifications =====
             SectionHeader(text = stringResource(R.string.notification))
-
-            val notificationEnabled by SettingsPreferenceHelper
-                .getNotificationEnabled(appContext)
-                .collectAsState(initial = false)
-            // Ein Eintrag, der zur separaten Seite navigiert
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -314,44 +234,22 @@ fun SettingsScreen(
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = null,
-                    tint = cs.primary,
-                    modifier = Modifier.size(22.dp)
+                    tint = if (notificationEnabled) extra.icon else cs.onSurfaceVariant
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
+                    Text(text = stringResource(R.string.notification), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = stringResource(R.string.notification),
-                        color = cs.onBackground,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = if (notificationEnabled)
-                            stringResource(R.string.enabled)
-                        else
-                            stringResource(R.string.disabled),
-                        color = cs.onSurfaceVariant,
+                        text = if (notificationEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
+                        color = extra.infoText,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = cs.onSurfaceVariant
-                )
+                Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
             }
 
-            // --- Shake to Extend ---------------------------------------------------------
-            val shakeEnabled by SettingsPreferenceHelper
-                .getShakeEnabled(appContext)
-                .collectAsState(initial = false)
-            val shakeExtend by SettingsPreferenceHelper
-                .getShakeExtendMinutes(appContext)
-                .collectAsState(initial = 10)
-
-            Spacer(Modifier.height(12.dp))
+            // ===== Shake to extend =====
             SectionHeader(text = stringResource(R.string.shake_to_extend))
-
-            // Ganze Zeile als Button → immer zur Detailseite navigieren
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -359,79 +257,51 @@ fun SettingsScreen(
                     .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Vibration,
-                    contentDescription = null,
-                    tint = if (shakeEnabled) cs.primary else cs.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp)
-                )
+                Icon(imageVector = Icons.Default.Vibration, contentDescription = null, tint = extra.icon)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.shake_to_extend),
-                        color = cs.onBackground,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = if (shakeEnabled)
-                            stringResource(R.string.shake_to_extend_enabled_sub, shakeExtend)
-                        else
-                            stringResource(R.string.disabled),
-                        color = cs.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text(text = stringResource(R.string.shake_to_extend), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                    Text(text = stringResource(R.string.tap_for_details), color = extra.infoText, style = MaterialTheme.typography.bodySmall)
                 }
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = cs.onSurfaceVariant
-                )
+                Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            // Sprache
+            // ===== Sprache / Theme =====
             SectionHeader(text = stringResource(R.string.language))
             LanguageDropdown(
                 selectedLangCode = language,
                 onSelect = { code ->
                     activity?.let {
                         LocaleHelper.setAppLocaleAndRestart(it, code)
-                        scope.launch { SettingsPreferenceHelper.setLanguage(appContext, code) }
+                        scope.launch { SettingsPreferenceHelper.setLanguage(app, code) }
                     }
                 }
             )
 
-            Spacer(Modifier.height(24.dp))
+            ThemeSection()
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
+// ---- Building blocks (farblich 100% aus ThemeSystem) ----
+
 @Composable
 private fun SectionHeader(text: String) {
     val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
     Text(
         text = text,
-        color = cs.primary,
+        color = extra.heading, // zentral über ThemeSystem steuerbar
         fontWeight = FontWeight.Bold,
         style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+        modifier = Modifier.padding(top = 8.dp, bottom = 6.dp)
     )
+    Divider(color = cs.outlineVariant.copy(alpha = 0.35f))
 }
 
 @Composable
-private fun SectionSubheader(text: String) {
-    val cs = MaterialTheme.colorScheme
-    Text(
-        text = text,
-        color = cs.onBackground,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(vertical = 4.dp)
-    )
-}
-
-@Composable
-fun SettingsRow(
+private fun SettingsRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
@@ -440,6 +310,7 @@ fun SettingsRow(
     enabled: Boolean = true
 ) {
     val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
     Row(
         Modifier
             .fillMaxWidth()
@@ -447,35 +318,32 @@ fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            icon,
+            imageVector = icon,
             contentDescription = null,
-            tint = if (enabled && checked) cs.primary else cs.onSurfaceVariant,
-            modifier = Modifier.size(22.dp)
+            tint = if (enabled && checked) extra.icon else cs.onSurfaceVariant
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = if (enabled) cs.onBackground else cs.onSurfaceVariant,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = subtitle,
-                color = cs.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall
-            )
+            Text(text = title, color = if (enabled) cs.onBackground else cs.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+            Text(text = subtitle, color = extra.infoText, style = MaterialTheme.typography.bodySmall)
         }
         Switch(
             checked = checked,
             onCheckedChange = if (enabled) onCheckedChange else null,
-            enabled = enabled
+            enabled = enabled,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = extra.toggle,
+                checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
+                uncheckedThumbColor = cs.onSurface,
+                uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+            )
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguageDropdown(
+private fun LanguageDropdown(
     selectedLangCode: String,
     onSelect: (String) -> Unit
 ) {
@@ -489,55 +357,41 @@ fun LanguageDropdown(
     )
     val selectedLabel = options.firstOrNull { it.first == selectedLangCode }?.second ?: options.first().second
 
-    // WICHTIG: Keine eigene Überschrift & kein Label → sonst doppelt
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it }
-    ) {
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = selectedLabel,
-            onValueChange = {},            // read-only
+            onValueChange = {},
             readOnly = true,
-            // KEIN label = {...} -> verhindert “zweites Language”
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth()
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                focusedBorderColor = cs.primary,
+                unfocusedBorderColor = cs.outline
+            )
         )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { (code, label) ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    onClick = {
-                        expanded = false
-                        onSelect(code)
-                    }
-                )
+                DropdownMenuItem(text = { Text(label) }, onClick = {
+                    expanded = false
+                    onSelect(code)
+                })
             }
         }
     }
-    Spacer(Modifier.height(8.dp))
-    ThemeSection()
 }
 
-// ===== Theme (Dropdown + Dynamic Colors) =====
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ThemeSection() {
+private fun ThemeSection() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    val cs = MaterialTheme.colorScheme
 
-    val themeId by SettingsPreferenceHelper.getThemeMode(ctx).collectAsState(initial = "system")
-    val dynamic by SettingsPreferenceHelper.getThemeDynamic(ctx).collectAsState(initial = true)
-
+    val themeId by SettingsPreferenceHelper.getThemeMode(ctx).collectAsState(initial = "light")
     var expanded by remember { mutableStateOf(false) }
-    val themes = remember { com.tigonic.snoozely.ui.theme.ThemeRegistry.themes }
-    val selectedLabel = themes.firstOrNull { it.id == themeId }?.label ?: "System"
+    val themes = remember { ThemeRegistry.themes }
+    val selectedLabel = themes.firstOrNull { it.id == themeId }?.label ?: "Light"
 
-    // Überschrift im selben Stil wie andere Kapitel (primary, bold)
     SectionHeader(text = stringResource(R.string.theme))
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
@@ -545,9 +399,12 @@ fun ThemeSection() {
             value = selectedLabel,
             onValueChange = {},
             readOnly = true,
-            // Label bleibt neutral oder kann entfallen – die Überschrift oben ist die “Section”-Betitelung
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth()
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                focusedBorderColor = cs.primary,
+                unfocusedBorderColor = cs.outline
+            )
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             themes.forEach { spec ->
