@@ -290,14 +290,16 @@ fun SettingsScreen(
 private fun SectionHeader(text: String) {
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
+
+    //HorizontalDivider(color = extra.brand1)
     Text(
         text = text,
         color = extra.heading, // zentral über ThemeSystem steuerbar
         fontWeight = FontWeight.Bold,
         style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 8.dp, bottom = 6.dp)
+        modifier = Modifier.padding(top = 12.dp, bottom = 0.dp)
     )
-    Divider(color = cs.outlineVariant.copy(alpha = 0.35f))
+
 }
 
 @Composable
