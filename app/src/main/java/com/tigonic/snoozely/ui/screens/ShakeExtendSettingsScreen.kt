@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
 
@@ -47,7 +48,9 @@ fun ShakeExtendSettingsScreen(
     val appCtx = LocalContext.current.applicationContext
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+
     val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
 
     val enabled by SettingsPreferenceHelper.getShakeEnabled(appCtx).collectAsState(initial = false)
     val extendMin by SettingsPreferenceHelper.getShakeExtendMinutes(appCtx).collectAsState(initial = 10)
@@ -187,11 +190,11 @@ fun ShakeExtendSettingsScreen(
 
     // Einheitliche, theme-basierte Sliderfarben (keine Punkte sichtbar dank Transparent-Ticks)
     val sliderColors = SliderDefaults.colors(
-        activeTrackColor = cs.primary,
-        inactiveTrackColor = cs.primary.copy(alpha = 0.30f),
-        thumbColor = cs.primary,
-        activeTickColor = Color.Transparent,
-        inactiveTickColor = Color.Transparent
+        activeTrackColor = extra.slider,
+        inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
+        thumbColor = extra.slider,
+        activeTickColor = cs.surface.copy(alpha = 0f),
+        inactiveTickColor = cs.surface.copy(alpha = 0f)
     )
 
     Scaffold(
@@ -206,11 +209,11 @@ fun ShakeExtendSettingsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = cs.primaryContainer,
                     titleContentColor = cs.onPrimaryContainer,
-                    navigationIconContentColor = cs.onPrimaryContainer,
+                    navigationIconContentColor = cs.onPrimaryContainer
                 ),
             )
         },
-        containerColor = cs.background,
+        containerColor = cs.background
     ) { inner ->
         Column(
             Modifier
@@ -219,12 +222,9 @@ fun ShakeExtendSettingsScreen(
                 .padding(inner)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-
             // 1) Master
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
+                Modifier.fillMaxWidth().padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -235,7 +235,13 @@ fun ShakeExtendSettingsScreen(
                 )
                 Switch(
                     checked = enabled,
-                    onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setShakeEnabled(appCtx, v) } }
+                    onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setShakeEnabled(appCtx, v) } },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = extra.toggle,
+                        checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
+                        uncheckedThumbColor = cs.onSurface,
+                        uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+                    )
                 )
             }
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
@@ -249,38 +255,22 @@ fun ShakeExtendSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.shake_strength),
-                        color = cs.onBackground,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = stringResource(R.string.shake_strength_sub),
-                        color = cs.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text(stringResource(R.string.shake_strength), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.shake_strength_sub), color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = cs.onSurfaceVariant
-                )
+                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
             }
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 3) Verlängerungstimer
             Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.extend_by_minutes),
-                color = cs.onBackground,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(stringResource(R.string.timer_plus_x, extendMin), color = cs.onSurfaceVariant)
+            Text(stringResource(R.string.extend_by_minutes), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.timer_plus_x, extendMin), color = extra.infoText)
             Slider(
                 value = extendMin.toFloat(),
                 onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, v.toInt()) } },
                 valueRange = 1f..30f,
-                steps = 29, // diskret, aber Ticks sind ausgeblendet (transparent)
+                steps = 29,
                 colors = sliderColors,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
@@ -295,37 +285,18 @@ fun ShakeExtendSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.notification_sound),
-                        color = cs.onBackground,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Text(stringResource(R.string.notification_sound), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
                     Text(toneTitle, color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = cs.onSurfaceVariant
-                )
+                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
             }
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 5) Vibration
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.vibrate),
-                    color = cs.onBackground,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                val vibrateEnabled = (mode == "vibrate")
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.vibrate), color = cs.onBackground, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Switch(
-                    checked = vibrateEnabled,
+                    checked = (mode == "vibrate"),
                     onCheckedChange = { v ->
                         scope.launch {
                             if (v) {
@@ -338,7 +309,13 @@ fun ShakeExtendSettingsScreen(
                                 SettingsPreferenceHelper.setShakeSoundMode(appCtx, "tone")
                             }
                         }
-                    }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = extra.toggle,
+                        checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
+                        uncheckedThumbColor = cs.onSurface,
+                        uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+                    )
                 )
             }
             Text(
@@ -350,17 +327,8 @@ fun ShakeExtendSettingsScreen(
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 6) Benachrichtigungslautstärke
-            Text(
-                stringResource(R.string.notification_volume),
-                color = cs.onBackground,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            Text(
-                stringResource(R.string.volume_relative_hint),
-                color = cs.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall
-            )
+            Text(stringResource(R.string.notification_volume), color = cs.onBackground, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+            Text(stringResource(R.string.volume_relative_hint), color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
 
             val volumeInteraction = remember { MutableInteractionSource() }
             val pressed by volumeInteraction.collectIsPressedAsState()
@@ -379,10 +347,10 @@ fun ShakeExtendSettingsScreen(
                     audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, newVol, 0)
                     ensureAudioPermission { playPreviewOnce() }
                 },
-                onValueChangeFinished = { /* nicht stoppen – Ton darf ausklingen */ },
+                onValueChangeFinished = { },
                 valueRange = 0f..1f,
-                steps = 0,               // stufenlos
-                colors = sliderColors,   // Ticks trotzdem transparent gesetzt
+                steps = 0,
+                colors = sliderColors,
                 interactionSource = volumeInteraction,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
