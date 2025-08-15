@@ -30,7 +30,8 @@ data class ExtraColors(
 
     // Gradients / Effekte
     val wheelGradient: List<Color>,
-    val shakeGradient: List<Color>
+    val shakeGradient: List<Color>,
+    val wheelTrack: Color
 )
 
 val LocalExtraColors = staticCompositionLocalOf {
@@ -49,7 +50,8 @@ val LocalExtraColors = staticCompositionLocalOf {
         popupBg = Color(0xFF1E1E1E),
         popupContent = Color(0xFFEFEFEF),
         wheelGradient = listOf(Color(0xFFFFE000), Color(0xFF7CD458), Color(0xFF0AB1A4)),
-        shakeGradient = listOf(Color(0xFFFFE000), Color(0xFF7CD458), Color(0xFF0AB1A4))
+        shakeGradient = listOf(Color(0xFFFFE000), Color(0xFF7CD458), Color(0xFF0AB1A4)),
+        wheelTrack    = Color(0xFF2A2F3A) // brauchbarer Default für Dark
     )
 }
 
@@ -101,6 +103,7 @@ private object ThemeColors {
             Color(0xFF0AE7CC)  // Türkis
         )
         val shakeGradient = listOf(primary, secondary, Color(0xFF0EA5E9))
+        val wheelTrack    = Color(0xFF0f0f0f)
     }
 
     // -------- LIGHT (Bild 2) --------
@@ -123,6 +126,7 @@ private object ThemeColors {
             Color(0xFF3B82F6)  // sanftes Blau
         )
         val shakeGradient = listOf(primary, secondary, Color(0xFFC084FC))
+        val wheelTrack    = Color(0xffa3a3a3)
     }
 
     // -------- AMOLED (Bild 3) --------
@@ -145,6 +149,7 @@ private object ThemeColors {
             Color(0xFF7C3AED)  // tiefer Purple-Ton
         )
         val shakeGradient = listOf(primary, Color(0xFFFAFAFA), secondary)
+        val wheelTrack    = Color(0xFF121212)
     }
 }
 
@@ -155,13 +160,13 @@ fun registerDefaultThemes() {
     fun extrasFor(
         brand1: Color, brand2: Color, brand3: Color, brand4: Color, brand5: Color,
         iconOn: Color, popupBg: Color, popupContent: Color,
-        wheel: List<Color>, shake: List<Color>
+        wheel: List<Color>, shake: List<Color>, wheelTrack: Color
     ) = ExtraColors(
         brand1 = brand1, brand2 = brand2, brand3 = brand3, brand4 = brand4, brand5 = brand5,
         toggle = brand1, slider = brand1, heading = brand1,
         icon = iconOn, infoText = iconOn.copy(alpha = 0.65f),
         popupBg = popupBg, popupContent = popupContent,
-        wheelGradient = wheel, shakeGradient = shake
+        wheelGradient = wheel, shakeGradient = shake,  wheelTrack = ThemeColors.Light.wheelTrack
     )
 
     // LIGHT (Bild 2)
@@ -191,13 +196,14 @@ fun registerDefaultThemes() {
                 popupBg = ThemeColors.Light.surface,
                 popupContent = ThemeColors.Light.onSurface,
                 wheel = ThemeColors.Light.wheelGradient,
-                shake = ThemeColors.Light.shakeGradient
+                shake = ThemeColors.Light.shakeGradient,
+                wheelTrack = ThemeColors.Light.wheelTrack
             ),
             extraDark  = extrasFor( // Fallback, falls jemand light+dark kombiniert
                 ThemeColors.Light.primary, ThemeColors.Light.secondary, ThemeColors.Light.success,
                 ThemeColors.Light.warning, ThemeColors.Light.info,
                 iconOn = Color(0xFFE6E6E6), popupBg = Color(0xFF151515), popupContent = Color(0xFFEFEFEF),
-                wheel = ThemeColors.Light.wheelGradient, shake = ThemeColors.Light.shakeGradient
+                wheel = ThemeColors.Light.wheelGradient, shake = ThemeColors.Light.shakeGradient,  wheelTrack = ThemeColors.Dark.wheelTrack
             )
         )
     )
@@ -223,14 +229,14 @@ fun registerDefaultThemes() {
                 ThemeColors.Dark.primary, ThemeColors.Dark.secondary, ThemeColors.Dark.success,
                 ThemeColors.Dark.warning, ThemeColors.Dark.info,
                 iconOn = Color(0xFF101112), popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
-                wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient
+                wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient, wheelTrack = ThemeColors.Light.wheelTrack
             ),
             extraDark  = extrasFor(
                 ThemeColors.Dark.primary, ThemeColors.Dark.secondary, ThemeColors.Dark.success,
                 ThemeColors.Dark.warning, ThemeColors.Dark.info,
                 iconOn = ThemeColors.Dark.onSurface, popupBg = ThemeColors.Dark.surface,
                 popupContent = ThemeColors.Dark.onSurface,
-                wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient
+                wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient, wheelTrack = ThemeColors.Dark.wheelTrack
             )
         )
     )
@@ -256,14 +262,14 @@ fun registerDefaultThemes() {
                 ThemeColors.Amoled.primary, ThemeColors.Amoled.secondary, ThemeColors.Amoled.success,
                 ThemeColors.Amoled.warning, ThemeColors.Amoled.info,
                 iconOn = Color(0xFF101112), popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
-                wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient
+                wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient, wheelTrack = ThemeColors.Light.wheelTrack
             ),
             extraDark  = extrasFor(
                 ThemeColors.Amoled.primary, ThemeColors.Amoled.secondary, ThemeColors.Amoled.success,
                 ThemeColors.Amoled.warning, ThemeColors.Amoled.info,
                 iconOn = ThemeColors.Amoled.onSurface, popupBg = ThemeColors.Amoled.surface,
                 popupContent = ThemeColors.Amoled.onSurface,
-                wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient
+                wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient, wheelTrack = ThemeColors.Dark.wheelTrack
             )
         )
     )

@@ -194,7 +194,7 @@ fun WheelSlider(
         ) {
             // Hintergrundring (theme)
             drawCircle(
-                color = extra.slider.copy(alpha = 0.25f),
+                color = extra.wheelTrack,
                 radius = wheelRadius,
                 center = center,
                 style = Stroke(width = strokePx)
