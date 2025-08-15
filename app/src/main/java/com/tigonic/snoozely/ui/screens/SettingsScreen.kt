@@ -34,6 +34,7 @@ import com.tigonic.snoozely.util.LocaleHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
+import com.tigonic.snoozely.ui.components.VerticalScrollbar
 
 // ---- Helper: Context -> Activity
 private tailrec fun Context.asActivity(): Activity? = when (this) {
@@ -118,177 +119,193 @@ fun SettingsScreen(
         },
         containerColor = cs.background
     ) { inner ->
-        Column(
+        val scrollState = rememberScrollState()
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
 
-            // ===== App / Playback =====
-            SectionHeader(text = stringResource(R.string.app_name))
+                // ===== App / Playback =====
+                SectionHeader(text = stringResource(R.string.app_name))
 
-            SettingsRow(
-                icon = Icons.Default.PlayCircleFilled,
-                title = stringResource(R.string.playback),
-                subtitle = stringResource(R.string.stop_audio_video),
-                checked = stopAudio,
-                onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setStopAudio(app, v) } }
-            )
-
-            // Fade-Out
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(stringResource(R.string.fade_out_duration), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.seconds, fadeOut.toInt()), color = extra.infoText, style = MaterialTheme.typography.bodyMedium)
-                Slider(
-                    value = fadeOut,
-                    onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setFadeOut(app, v) } },
-                    valueRange = 0f..120f,
-                    steps = 11,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                    colors = SliderDefaults.colors(
-                        activeTrackColor = extra.slider,
-                        inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
-                        thumbColor = extra.slider,
-                        activeTickColor = Color.Transparent,
-                        inactiveTickColor = Color.Transparent
-                    )
+                SettingsRow(
+                    icon = Icons.Default.PlayCircleFilled,
+                    title = stringResource(R.string.playback),
+                    subtitle = stringResource(R.string.stop_audio_video),
+                    checked = stopAudio,
+                    onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setStopAudio(app, v) } }
                 )
-            }
 
-            // ===== Screen / Admin =====
-            SettingsRow(
-                icon = Icons.Default.Brightness2,
-                title = stringResource(R.string.screen),
-                subtitle = if (isAdmin) stringResource(R.string.turn_off_screen) else stringResource(R.string.admin_permission_required),
-                checked = screenOff && isAdmin,
-                onCheckedChange = { enabled ->
-                    if (enabled) {
-                        if (!isAdmin && activity != null) {
-                            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-                                putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, app.getString(R.string.device_admin_explanation))
+                // Fade-Out
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(stringResource(R.string.fade_out_duration), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.seconds, fadeOut.toInt()), color = extra.infoText, style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = fadeOut,
+                        onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setFadeOut(app, v) } },
+                        valueRange = 0f..120f,
+                        steps = 11,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = extra.slider,
+                            inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
+                            thumbColor = extra.slider,
+                            activeTickColor = Color.Transparent,
+                            inactiveTickColor = Color.Transparent
+                        )
+                    )
+                }
+
+                // ===== Screen / Admin =====
+                SettingsRow(
+                    icon = Icons.Default.Brightness2,
+                    title = stringResource(R.string.screen),
+                    subtitle = if (isAdmin) stringResource(R.string.turn_off_screen) else stringResource(R.string.admin_permission_required),
+                    checked = screenOff && isAdmin,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            if (!isAdmin && activity != null) {
+                                val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                    putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                                    putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, app.getString(R.string.device_admin_explanation))
+                                }
+                                adminLauncher.launch(intent)
+                            } else {
+                                scope.launch { SettingsPreferenceHelper.setScreenOff(app, true) }
+                                Toast.makeText(app, app.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
                             }
-                            adminLauncher.launch(intent)
                         } else {
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(app, true) }
-                            Toast.makeText(app, app.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        if (isAdmin && activity != null) {
-                            showRemoveAdminDialog = true
-                        } else {
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
-                            Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                            if (isAdmin && activity != null) {
+                                showRemoveAdminDialog = true
+                            } else {
+                                scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
+                                Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
-                }
-            )
-
-            if (showRemoveAdminDialog) {
-                AlertDialog(
-                    onDismissRequest = { showRemoveAdminDialog = false },
-                    title = { Text(stringResource(R.string.remove_admin_title)) },
-                    text = { Text(stringResource(R.string.remove_admin_message)) },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showRemoveAdminDialog = false
-                            runCatching { dpm.removeActiveAdmin(admin) }
-                            isAdmin = false
-                            scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
-                            Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
-                        }) { Text(stringResource(R.string.remove_admin_confirm_button)) }
-                    },
-                    dismissButton = { TextButton(onClick = { showRemoveAdminDialog = false }) { Text(stringResource(R.string.cancel)) } }
                 )
-            }
 
-            // ===== Radios =====
-            SettingsRow(
-                icon = Icons.Default.BluetoothDisabled,
-                title = stringResource(R.string.bluetooth),
-                subtitle = if (supportsBtToggle) stringResource(R.string.bluetooth_turn_off) else stringResource(R.string.bluetooth_android_13_removed),
-                checked = if (supportsBtToggle) bluetoothDisableRequested else false,
-                onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setBluetoothDisableRequested(app, v) } },
-                enabled = supportsBtToggle
-            )
-
-            SettingsRow(
-                icon = Icons.Default.WifiOff,
-                title = stringResource(R.string.wifi),
-                subtitle = if (supportsWifiToggle) stringResource(R.string.wifi_turn_off) else stringResource(R.string.wifi_android_10_removed),
-                checked = if (supportsWifiToggle) wifiDisableRequested else false,
-                onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setWifiDisableRequested(app, v) } },
-                enabled = supportsWifiToggle
-            )
-
-            // ===== Notifications =====
-            SectionHeader(text = stringResource(R.string.notification))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigateNotificationSettings() }
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = null,
-                    tint = iconTint(active = notificationEnabled)
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(text = stringResource(R.string.notification), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = if (notificationEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
-                        color = extra.infoText,
-                        style = MaterialTheme.typography.bodySmall
+                if (showRemoveAdminDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showRemoveAdminDialog = false },
+                        title = { Text(stringResource(R.string.remove_admin_title)) },
+                        text = { Text(stringResource(R.string.remove_admin_message)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showRemoveAdminDialog = false
+                                runCatching { dpm.removeActiveAdmin(admin) }
+                                isAdmin = false
+                                scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
+                                Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                            }) { Text(stringResource(R.string.remove_admin_confirm_button)) }
+                        },
+                        dismissButton = { TextButton(onClick = { showRemoveAdminDialog = false }) { Text(stringResource(R.string.cancel)) } }
                     )
                 }
-                Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
-            }
 
-            // ===== Shake to extend =====
-            SectionHeader(text = stringResource(R.string.shake_to_extend))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigateShakeSettings() }
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Vibration,
-                    contentDescription = null,
-                    tint = iconTint(active = shakedEnabled)
+                // ===== Radios =====
+                SettingsRow(
+                    icon = Icons.Default.BluetoothDisabled,
+                    title = stringResource(R.string.bluetooth),
+                    subtitle = if (supportsBtToggle) stringResource(R.string.bluetooth_turn_off) else stringResource(R.string.bluetooth_android_13_removed),
+                    checked = if (supportsBtToggle) bluetoothDisableRequested else false,
+                    onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setBluetoothDisableRequested(app, v) } },
+                    enabled = supportsBtToggle
                 )
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(text = stringResource(R.string.shake_to_extend), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = if (shakedEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
-                        color = extra.infoText,
-                        style = MaterialTheme.typography.bodySmall)
+
+                SettingsRow(
+                    icon = Icons.Default.WifiOff,
+                    title = stringResource(R.string.wifi),
+                    subtitle = if (supportsWifiToggle) stringResource(R.string.wifi_turn_off) else stringResource(R.string.wifi_android_10_removed),
+                    checked = if (supportsWifiToggle) wifiDisableRequested else false,
+                    onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setWifiDisableRequested(app, v) } },
+                    enabled = supportsWifiToggle
+                )
+
+                // ===== Notifications =====
+                SectionHeader(text = stringResource(R.string.notification))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateNotificationSettings() }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = iconTint(active = notificationEnabled)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(text = stringResource(R.string.notification), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = if (notificationEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
+                            color = extra.infoText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
                 }
-                Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
+
+                // ===== Shake to extend =====
+                SectionHeader(text = stringResource(R.string.shake_to_extend))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateShakeSettings() }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Vibration,
+                        contentDescription = null,
+                        tint = iconTint(active = shakedEnabled)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(text = stringResource(R.string.shake_to_extend), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = if (shakedEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
+                            color = extra.infoText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
+                }
+
+                // ===== Sprache / Theme =====
+                SectionHeader(text = stringResource(R.string.display_and_language))
+                LanguageDropdown(
+                    selectedLangCode = language,
+                    onSelect = { code ->
+                        activity?.let {
+                            LocaleHelper.setAppLocaleAndRestart(it, code)
+                            scope.launch { SettingsPreferenceHelper.setLanguage(app, code) }
+                        }
+                    }
+                )
+
+                ThemeSection()
+                Spacer(Modifier.height(12.dp))
             }
 
-            // ===== Sprache / Theme =====
-            SectionHeader(text = stringResource(R.string.display_and_language))
-            LanguageDropdown(
-                selectedLangCode = language,
-                onSelect = { code ->
-                    activity?.let {
-                        LocaleHelper.setAppLocaleAndRestart(it, code)
-                        scope.launch { SettingsPreferenceHelper.setLanguage(app, code) }
-                    }
-                }
+            // <- Scrollbar MUSS innerhalb der Box liegen, damit align() funktioniert
+            VerticalScrollbar(
+                scrollState = scrollState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(end = 2.dp)
             )
-
-            ThemeSection()
-            Spacer(Modifier.height(12.dp))
         }
     }
 }
@@ -297,10 +314,7 @@ fun SettingsScreen(
 
 @Composable
 private fun SectionHeader(text: String) {
-    val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
-
-    //HorizontalDivider(color = extra.brand1)
     Text(
         text = text,
         color = extra.heading, // zentral über ThemeSystem steuerbar
@@ -308,7 +322,6 @@ private fun SectionHeader(text: String) {
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 12.dp, bottom = 0.dp)
     )
-
 }
 
 @Composable

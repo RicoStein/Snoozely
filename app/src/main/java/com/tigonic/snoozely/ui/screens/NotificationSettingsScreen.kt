@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.ui.components.VerticalScrollbar
 import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
@@ -139,152 +140,167 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
         },
         containerColor = cs.background
     ) { inner ->
-        Column(
+        val scrollState = rememberScrollState()
+
+        Box(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // 1) Master-Schalter
-            Row(
+            Column(
                 Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = stringResource(R.string.notifications_master),
-                    color = cs.onBackground,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                Switch(
-                    checked = notificationEnabled,
-                    onCheckedChange = { v ->
-                        if (v) requestOrExplain()
-                        else scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, false) }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = extra.toggle,
-                        checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
-                        uncheckedThumbColor = cs.onSurface,
-                        uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+                // 1) Master-Schalter
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.notifications_master),
+                        color = cs.onBackground,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
                     )
-                )
-            }
-            HorizontalDivider(color = extra.divider)
+                    Switch(
+                        checked = notificationEnabled,
+                        onCheckedChange = { v ->
+                            if (v) requestOrExplain()
+                            else scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, false) }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = extra.toggle,
+                            checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
+                            uncheckedThumbColor = cs.onSurface,
+                            uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+                        )
+                    )
+                }
+                HorizontalDivider(color = extra.divider)
 
-            // 2) Verlängerungs-Timer (gedimmt + deaktiviert wenn Master off)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.notifications_extend_title),
-                color = cs.onBackground,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.alpha(sectionAlpha)
-            )
-            Text(
-                text = stringResource(R.string.notifications_extend_minutes, extendMinutes),
-                color = extra.infoText,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.alpha(sectionAlpha)
-            )
-            Slider(
-                enabled = notificationEnabled,
-                value = extendMinutes.toFloat(),
-                onValueChange = { v -> if (notificationEnabled) scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(ctx, v.toInt()) } },
-                valueRange = 1f..30f,
-                steps = 29,
-                colors = sliderColors,
-                modifier = Modifier
-                    .padding(horizontal = 8.dp)
-                    .alpha(sectionAlpha)
-            )
-            HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = extra.divider)
-
-
-            // 3) Fortschritt in Statusleiste (gedimmt + deaktivierter Switch bei Master off)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-                    .alpha(sectionAlpha),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                // 2) Verlängerungs-Timer (gedimmt + deaktiviert wenn Master off)
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    text = stringResource(R.string.notifications_progress_show),
+                    text = stringResource(R.string.notifications_extend_title),
                     color = cs.onBackground,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.alpha(sectionAlpha)
                 )
-                Switch(
+                Text(
+                    text = stringResource(R.string.notifications_extend_minutes, extendMinutes),
+                    color = extra.infoText,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.alpha(sectionAlpha)
+                )
+                Slider(
                     enabled = notificationEnabled,
-                    checked = showProgress,
-                    onCheckedChange = { v -> if (notificationEnabled) scope.launch { SettingsPreferenceHelper.setShowProgressNotification(ctx, v) } },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = extra.toggle,
-                        checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
-                        uncheckedThumbColor = cs.onSurface,
-                        uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
-                    )
+                    value = extendMinutes.toFloat(),
+                    onValueChange = { v -> if (notificationEnabled) scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(ctx, v.toInt()) } },
+                    valueRange = 1f..30f,
+                    steps = 29,
+                    colors = sliderColors,
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .alpha(sectionAlpha)
                 )
-            }
-            Text(
-                text = stringResource(R.string.notifications_progress_hint),
-                color = extra.infoText,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier
-                    .padding(top = 2.dp, bottom = 8.dp)
-                    .alpha(sectionAlpha)
-            )
-            HorizontalDivider(color = extra.divider)
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = extra.divider)
 
-            // 4) Reminder (OHNE Header „Erinnerung“; gedimmt + deaktiviert bei Master off)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-                    .alpha(sectionAlpha),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                // 3) Fortschritt in Statusleiste (gedimmt + deaktivierter Switch bei Master off)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp)
+                        .alpha(sectionAlpha),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.notifications_progress_show),
+                        color = cs.onBackground,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        enabled = notificationEnabled,
+                        checked = showProgress,
+                        onCheckedChange = { v -> if (notificationEnabled) scope.launch { SettingsPreferenceHelper.setShowProgressNotification(ctx, v) } },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = extra.toggle,
+                            checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
+                            uncheckedThumbColor = cs.onSurface,
+                            uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+                        )
+                    )
+                }
                 Text(
-                    text = stringResource(R.string.notifications_reminder_show),
-                    color = cs.onBackground,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
+                    text = stringResource(R.string.notifications_progress_hint),
+                    color = extra.infoText,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .padding(top = 2.dp, bottom = 8.dp)
+                        .alpha(sectionAlpha)
                 )
-                Switch(
-                    enabled = notificationEnabled,
-                    checked = showReminder,
-                    onCheckedChange = { v -> if (notificationEnabled) scope.launch { SettingsPreferenceHelper.setShowReminderPopup(ctx, v) } },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = extra.toggle,
-                        checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
-                        uncheckedThumbColor = cs.onSurface,
-                        uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+                HorizontalDivider(color = extra.divider)
+
+                // 4) Reminder (OHNE Header „Erinnerung“; gedimmt + deaktiviert bei Master off)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp)
+                        .alpha(sectionAlpha),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.notifications_reminder_show),
+                        color = cs.onBackground,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
                     )
+                    Switch(
+                        enabled = notificationEnabled,
+                        checked = showReminder,
+                        onCheckedChange = { v -> if (notificationEnabled) scope.launch { SettingsPreferenceHelper.setShowReminderPopup(ctx, v) } },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = extra.toggle,
+                            checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
+                            uncheckedThumbColor = cs.onSurface,
+                            uncheckedTrackColor = cs.onSurface.copy(alpha = 0.20f)
+                        )
+                    )
+                }
+
+                Text(
+                    text = stringResource(R.string.notifications_reminder_minutes, reminderMinutes),
+                    color = extra.infoText,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.alpha(sectionAlpha)
                 )
+                Slider(
+                    enabled = notificationEnabled && showReminder,
+                    value = reminderMinutes.toFloat(),
+                    onValueChange = { v -> if (notificationEnabled && showReminder) scope.launch { SettingsPreferenceHelper.setReminderMinutes(ctx, v.toInt()) } },
+                    valueRange = 1f..10f,
+                    steps = 9,
+                    colors = sliderColors,
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .alpha(sectionAlpha)
+                )
+
+                Spacer(Modifier.height(24.dp))
             }
 
-            Text(
-                text = stringResource(R.string.notifications_reminder_minutes, reminderMinutes),
-                color = extra.infoText,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.alpha(sectionAlpha)
-            )
-            Slider(
-                enabled = notificationEnabled && showReminder,
-                value = reminderMinutes.toFloat(),
-                onValueChange = { v -> if (notificationEnabled && showReminder) scope.launch { SettingsPreferenceHelper.setReminderMinutes(ctx, v.toInt()) } },
-                valueRange = 1f..10f,
-                steps = 9,
-                colors = sliderColors,
+            // Rechte, dezente Scrollbar
+            VerticalScrollbar(
+                scrollState = scrollState,
                 modifier = Modifier
-                    .padding(horizontal = 8.dp)
-                    .alpha(sectionAlpha)
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(end = 2.dp)
             )
-
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
