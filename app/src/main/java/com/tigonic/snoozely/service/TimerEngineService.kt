@@ -416,39 +416,43 @@ class TimerEngineService : Service() {
 
     // Einmaliges akustisches oder haptisches Feedback
     private fun playShakeFeedback(mode: String, ringtoneUri: String) {
-        if (mode == "vibrate") {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val vm = getSystemService(VibratorManager::class.java)
-                    vm?.defaultVibrator?.vibrate(
-                        VibrationEffect.createOneShot(600L, VibrationEffect.DEFAULT_AMPLITUDE)
-                    )
-                } else {
-                    @Suppress("DEPRECATION")
-                    getSystemService(Vibrator::class.java)?.vibrate(600L)
-                }
-            } catch (_: Throwable) { /* ignore */ }
-            return
-        }
-
-        // Ton
-        try {
-            shakeRingtone?.stop()
-            val uri = if (ringtoneUri.isEmpty())
-                Settings.System.DEFAULT_NOTIFICATION_URI
-            else
-                Uri.parse(ringtoneUri)
-
-            val r = RingtoneManager.getRingtone(this, uri)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                r.audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
+        when (mode) {
+            "vibrate" -> {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vm = getSystemService(VibratorManager::class.java)
+                        vm?.defaultVibrator?.vibrate(
+                            VibrationEffect.createOneShot(600L, VibrationEffect.DEFAULT_AMPLITUDE)
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        getSystemService(Vibrator::class.java)?.vibrate(600L)
+                    }
+                } catch (_: Throwable) { }
             }
-            shakeRingtone = r
-            r.play()
-        } catch (_: Throwable) { /* best-effort */ }
+
+            "silent" -> {
+                // Nichts tun – weder Ton noch Vibration
+            }
+
+            else -> {
+                try {
+                    shakeRingtone?.stop()
+                    if (ringtoneUri.isBlank()) return // kein Ton
+
+                    val uri = Uri.parse(ringtoneUri)
+                    val r = RingtoneManager.getRingtone(this, uri)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        r.audioAttributes = AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    }
+                    shakeRingtone = r
+                    r.play()
+                } catch (_: Throwable) { }
+            }
+        }
     }
 
     // Aufräumen
