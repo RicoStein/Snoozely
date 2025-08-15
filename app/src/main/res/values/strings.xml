@@ -82,7 +82,7 @@
 
     <string name="notifications_section_reminder">Erinnerung</string>
     <string name="notifications_reminder_show">Reminder vor Ablauf</string>
-    <string name="notifications_reminder_minutes">Minuten vorher: %1$d</string>
+    <string name="notifications_reminder_minutes">%1$d Minuten vorher</string>
     <string name="notifications_reminder_extend_btn">Verlängerung im Reminder anzeigen</string>
 
     <string name="notifications_extend_minutes">Verlängerungsschritt: %1$d Minuten</string>
@@ -113,6 +113,7 @@
     <string name="notif_perm_needed">Benachrichtigungs-Berechtigung erforderlich, um den Ton abzuspielen.</string>
     <string name="none">Kein Ton</string>
     <string name="unknown_tone">Unbekannter Ton</string>
+    <string name="shake_extend_minutes_hint">Verlängerungsschritt: %1$d Minuten</string>
 
     <!-- Shake Detail -->
     <string name="runtime">Laufzeit</string>
@@ -137,6 +138,8 @@
     <string name="wifi_android_10_removed">Diese Funktion wurde in Android 10 entfernt</string>
     <string name="tap_for_details">Für Details klicken</string>
     <string name="display_and_language">Darstellung &amp; Sprache</string>
+    <string name="notifications_extend_title">Verlängerung</string>
+    <string name="notifications_progress_hint">Zeigt den Fortschritt in der Statusbar</string>
 
 
 </resources>

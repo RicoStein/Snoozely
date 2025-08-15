@@ -264,8 +264,12 @@ fun ShakeExtendSettingsScreen(
 
             // 3) Verlängerungstimer
             Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.extend_by_minutes), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.timer_plus_x, extendMin), color = extra.infoText)
+            //text = stringResource(R.string.notifications_extend_title),
+            Text(stringResource(R.string.notifications_extend_title), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.shake_extend_minutes_hint, extendMin),
+                color = extra.infoText,
+                style = MaterialTheme.typography.bodySmall
+            )
             Slider(
                 value = extendMin.toFloat(),
                 onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, v.toInt()) } },

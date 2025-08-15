@@ -67,6 +67,7 @@ fun SettingsScreen(
     val fadeOut by SettingsPreferenceHelper.getFadeOut(app).collectAsState(initial = 30f)
     val language by SettingsPreferenceHelper.getLanguage(app).collectAsState(initial = "de")
     val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(app).collectAsState(initial = false)
+    val shakedEnabled by SettingsPreferenceHelper.getShakeEnabled(app).collectAsState(initial = false)
     val wifiDisableRequested by SettingsPreferenceHelper.getWifiDisableRequested(app).collectAsState(initial = false)
     val bluetoothDisableRequested by SettingsPreferenceHelper.getBluetoothDisableRequested(app).collectAsState(initial = false)
 
@@ -257,11 +258,18 @@ fun SettingsScreen(
                     .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(imageVector = Icons.Default.Vibration, contentDescription = null, tint = extra.icon)
+                Icon(
+                    imageVector = Icons.Default.Vibration,
+                    contentDescription = null,
+                    tint = if (shakedEnabled) extra.icon else cs.onSurfaceVariant
+                )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(text = stringResource(R.string.shake_to_extend), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-                    Text(text = stringResource(R.string.tap_for_details), color = extra.infoText, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = if (shakedEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
+                        color = extra.infoText,
+                        style = MaterialTheme.typography.bodySmall)
                 }
                 Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
             }

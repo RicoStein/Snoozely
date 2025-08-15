@@ -34,20 +34,24 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     val act = ctx as? Activity
     val scope = rememberCoroutineScope()
 
-    // Theme-Objekte
+    // Theme
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
 
-    // State aus DataStore
-    val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(ctx).collectAsState(initial = false)
-    val showProgress by SettingsPreferenceHelper.getShowProgressNotification(ctx).collectAsState(initial = false)
-    val extendMinutes by SettingsPreferenceHelper.getProgressExtendMinutes(ctx).collectAsState(initial = 5)
-    val showReminder by SettingsPreferenceHelper.getShowReminderPopup(ctx).collectAsState(initial = false)
-    val reminderMinutes by SettingsPreferenceHelper.getReminderMinutes(ctx).collectAsState(initial = 5)
+    // States aus DataStore
+    val notificationEnabled by SettingsPreferenceHelper
+        .getNotificationEnabled(ctx).collectAsState(initial = false)
+    val showProgress by SettingsPreferenceHelper
+        .getShowProgressNotification(ctx).collectAsState(initial = false)
+    val extendMinutes by SettingsPreferenceHelper
+        .getProgressExtendMinutes(ctx).collectAsState(initial = 5)
+    val showReminder by SettingsPreferenceHelper
+        .getShowReminderPopup(ctx).collectAsState(initial = false)
+    val reminderMinutes by SettingsPreferenceHelper
+        .getReminderMinutes(ctx).collectAsState(initial = 5)
 
+    // Permission Dialog
     var showGoToSettings by remember { mutableStateOf(false) }
-
-    // Runtime-Permission Launcher
     val notifPermissionLauncher =
         if (Build.VERSION.SDK_INT >= 33)
             rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -57,7 +61,9 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     } else {
                         SettingsPreferenceHelper.setNotificationEnabled(ctx, false)
                         val rational = act?.let {
-                            ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.POST_NOTIFICATIONS)
+                            ActivityCompat.shouldShowRequestPermissionRationale(
+                                it, Manifest.permission.POST_NOTIFICATIONS
+                            )
                         } ?: false
                         if (!rational) showGoToSettings = true
                     }
@@ -70,16 +76,18 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
             scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, true) }
             return
         }
-        val granted = ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val granted = ContextCompat.checkSelfPermission(
+            ctx, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
         if (granted) {
             scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, true) }
             return
         }
         if (act == null) { showGoToSettings = true; return }
-        notifPermissionLauncher?.launch(Manifest.permission.POST_NOTIFICATIONS) ?: run { showGoToSettings = true }
+        notifPermissionLauncher?.launch(Manifest.permission.POST_NOTIFICATIONS)
+            ?: run { showGoToSettings = true }
     }
 
-    // Dialog: App-Einstellungen öffnen
     if (showGoToSettings) {
         AlertDialog(
             onDismissRequest = { showGoToSettings = false },
@@ -88,24 +96,37 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     showGoToSettings = false
-                    try {
+                    runCatching {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            act?.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName))
+                            act?.startActivity(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                            )
                         } else {
-                            act?.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                .setData(android.net.Uri.parse("package:${ctx.packageName}")))
+                            act?.startActivity(
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                    .setData(android.net.Uri.parse("package:${ctx.packageName}"))
+                            )
                         }
-                    } catch (_: Throwable) { }
-                }) { Text(stringResource(R.string.open_settings), color = cs.primary) }
+                    }
+                }) { Text(stringResource(R.string.open_settings)) }
             },
             dismissButton = {
                 TextButton(onClick = { showGoToSettings = false }) {
-                    Text(stringResource(R.string.cancel), color = cs.primary)
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
     }
+
+    // Einheitliche Slider-Farben wie im Shake-Screen
+    val sliderColors = SliderDefaults.colors(
+        activeTrackColor = extra.slider,
+        inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
+        thumbColor = extra.slider,
+        activeTickColor = cs.surface.copy(alpha = 0f),
+        inactiveTickColor = cs.surface.copy(alpha = 0f)
+    )
 
     Scaffold(
         topBar = {
@@ -120,25 +141,37 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     containerColor = cs.primaryContainer,
                     titleContentColor = cs.onPrimaryContainer,
                     navigationIconContentColor = cs.onPrimaryContainer
-                )
+                ),
             )
         },
         containerColor = cs.background
     ) { inner ->
         Column(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // Master-Toggle
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.notifications_master), color = cs.onBackground, modifier = Modifier.weight(1f))
+            // 1) Master-Schalter
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.notifications_master),
+                    color = cs.onBackground,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
                 Switch(
                     checked = notificationEnabled,
-                    onCheckedChange = { v -> if (v) requestOrExplain() else scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, false) } },
+                    onCheckedChange = { v ->
+                        if (v) requestOrExplain()
+                        else scope.launch { SettingsPreferenceHelper.setNotificationEnabled(ctx, false) }
+                    },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = extra.toggle,
                         checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
@@ -147,34 +180,52 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     )
                 )
             }
-
-            // Verlängerungs-Slider
-            Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 4.dp, end = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.notifications_extend_minutes, extendMinutes), color = extra.infoText, style = MaterialTheme.typography.bodyMedium)
-                Slider(
-                    enabled = notificationEnabled,
-                    value = extendMinutes.toFloat(),
-                    valueRange = 1f..30f,
-                    onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(ctx, v.toInt()) } },
-                    colors = SliderDefaults.colors(
-                        activeTrackColor = extra.slider,
-                        inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
-                        thumbColor = extra.slider,
-                        activeTickColor = cs.surface.copy(alpha = 0f),
-                        inactiveTickColor = cs.surface.copy(alpha = 0f)
-                    )
-                )
-            }
-
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
-            // Fortschritt in Statusleiste
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.notifications_progress_show), color = cs.onBackground, modifier = Modifier.weight(1f))
+            // 2) Verlängerungstimer (wie „Verlängerungstimer“ im Shake-Screen)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.notifications_extend_title),
+                color = cs.onBackground,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = stringResource(R.string.notifications_extend_minutes, extendMinutes),
+                color = LocalExtraColors.current.infoText,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Slider(
+                enabled = notificationEnabled,
+                value = extendMinutes.toFloat(),
+                onValueChange = { v ->
+                    scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(ctx, v.toInt()) }
+                },
+                valueRange = 1f..30f,
+                steps = 29,
+                colors = sliderColors,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+            Divider(color = cs.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
+
+            // 3) Fortschritt in Statusleiste
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.notifications_progress_show),
+                    color = cs.onBackground,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
                 Switch(
                     enabled = notificationEnabled,
                     checked = showProgress,
-                    onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setShowProgressNotification(ctx, v) } },
+                    onCheckedChange = { v ->
+                        scope.launch { SettingsPreferenceHelper.setShowProgressNotification(ctx, v) }
+                    },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = extra.toggle,
                         checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
@@ -184,17 +235,41 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 )
             }
 
+            // Hinweistext unterhalb
+            Text(
+                text = stringResource(R.string.notifications_progress_hint),
+                color = cs.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+            )
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
-            // Reminder-Überschrift
-            Text(stringResource(R.string.notifications_section_reminder), color = extra.heading, style = MaterialTheme.typography.titleMedium)
+            // 4) Reminder-Abschnitt (Layout wie andere Sektionen)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.notifications_section_reminder),
+                color = LocalExtraColors.current.heading,
+                style = MaterialTheme.typography.titleMedium
+            )
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.notifications_reminder_show), color = cs.onBackground, modifier = Modifier.weight(1f))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.notifications_reminder_show),
+                    color = cs.onBackground,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
                 Switch(
                     enabled = notificationEnabled,
                     checked = showReminder,
-                    onCheckedChange = { v -> scope.launch { SettingsPreferenceHelper.setShowReminderPopup(ctx, v) } },
+                    onCheckedChange = { v ->
+                        scope.launch { SettingsPreferenceHelper.setShowReminderPopup(ctx, v) }
+                    },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = extra.toggle,
                         checkedTrackColor = extra.toggle.copy(alpha = 0.35f),
@@ -204,22 +279,22 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 )
             }
 
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.notifications_reminder_minutes, reminderMinutes), color = extra.infoText, style = MaterialTheme.typography.bodyMedium)
-                Slider(
-                    enabled = notificationEnabled && showReminder,
-                    value = reminderMinutes.toFloat(),
-                    valueRange = 1f..10f,
-                    onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setReminderMinutes(ctx, v.toInt()) } },
-                    colors = SliderDefaults.colors(
-                        activeTrackColor = extra.slider,
-                        inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
-                        thumbColor = extra.slider,
-                        activeTickColor = cs.surface.copy(alpha = 0f),
-                        inactiveTickColor = cs.surface.copy(alpha = 0f)
-                    )
-                )
-            }
+            Text(
+                text = stringResource(R.string.notifications_reminder_minutes, reminderMinutes),
+                color = LocalExtraColors.current.infoText,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Slider(
+                enabled = notificationEnabled && showReminder,
+                value = reminderMinutes.toFloat(),
+                onValueChange = { v ->
+                    scope.launch { SettingsPreferenceHelper.setReminderMinutes(ctx, v.toInt()) }
+                },
+                valueRange = 1f..10f,
+                steps = 9,
+                colors = sliderColors,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
 
             Spacer(Modifier.height(24.dp))
         }
