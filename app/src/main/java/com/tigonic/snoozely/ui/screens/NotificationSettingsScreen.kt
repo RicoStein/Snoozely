@@ -231,7 +231,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
             }
             Text(
                 text = stringResource(R.string.notifications_progress_hint),
-                color = cs.onSurfaceVariant,
+                color = extra.infoText,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier
                     .padding(top = 2.dp, bottom = 8.dp)

@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.tigonic.snoozely.ui.theme.ThemeColors.Amoled.infoText
 
 // --------------------------- TYPOGRAPHY --------------------------------------
 val Typography = Typography()
@@ -92,8 +93,9 @@ private object ThemeColors {
         val success    = Color(0xFF22C55E)
         val warning    = Color(0xFFF59E0B)
         val info       = Color(0xFF60A5FA)
+        val icon = Color(0xFF6A6CFF)
 
-        val background = Color(0xFF0F1115)
+        val background = Color(0xaa403838)
         val surface    = Color(0xFF151824)
         val onSurface  = Color(0xFFE6E8EF)
 
@@ -105,8 +107,9 @@ private object ThemeColors {
             Color(0xFF0AE7CC)  // Türkis
         )
         val shakeGradient = listOf(primary, secondary, Color(0xFF0EA5E9))
-        val wheelTrack    = Color(0xFF0f0f0f)
+        val wheelTrack    = Color(0xFF2E2E38)
         val divider = Color(0xFF2E2E38)
+        val infoText = Color(0xFFB0B0B0)
     }
 
     // -------- LIGHT (Bild 2) --------
@@ -116,6 +119,7 @@ private object ThemeColors {
         val success    = Color(0xFF16A34A)
         val warning    = Color(0xFFF59E0B)
         val info       = Color(0xFF0EA5E9)
+        val icon = primary
 
         val background = Color(0xFFF6F6FC)
         val surface    = Color(0xFFFFFFFF)
@@ -129,8 +133,9 @@ private object ThemeColors {
             Color(0xFF3B82F6)  // sanftes Blau
         )
         val shakeGradient = listOf(primary, secondary, Color(0xFFC084FC))
-        val wheelTrack    = Color(0xffa3a3a3)
+        val wheelTrack    = Color(0xFFCCCCCC)
         val divider = Color(0xFFDDDDDD)
+        val infoText = Color(0xFF666666)
     }
 
     // -------- AMOLED (Bild 3) --------
@@ -140,6 +145,7 @@ private object ThemeColors {
         val success    = Color(0xFF22C55E)
         val warning    = Color(0xFFF97316)
         val info       = Color(0xFF67E8F9)
+        val icon = primary
 
         val background = Color(0xFF000000)
         val surface    = Color(0xFF000000)
@@ -153,8 +159,9 @@ private object ThemeColors {
             Color(0xFF7C3AED)  // tiefer Purple-Ton
         )
         val shakeGradient = listOf(primary, Color(0xFFFAFAFA), secondary)
-        val wheelTrack    = Color(0xFF121212)
+        val wheelTrack    = Color(0xFF3A3A3A)
         val divider = Color(0xFF3A3A3A)
+        val infoText = Color(0xFFB8B8B8)
     }
 }
 
@@ -166,13 +173,13 @@ fun registerDefaultThemes() {
         brand1: Color, brand2: Color, brand3: Color, brand4: Color, brand5: Color,
         iconOn: Color, popupBg: Color, popupContent: Color,
         wheel: List<Color>, shake: List<Color>, wheelTrack: Color,
-        divider: Color,
+        divider: Color, infoText: Color
     ) = ExtraColors(
         brand1 = brand1, brand2 = brand2, brand3 = brand3, brand4 = brand4, brand5 = brand5,
         toggle = brand1, slider = brand1, heading = brand1,
-        icon = iconOn, infoText = iconOn.copy(alpha = 0.65f),
+        icon = iconOn, infoText = infoText,
         popupBg = popupBg, popupContent = popupContent,
-        wheelGradient = wheel, shakeGradient = shake, wheelTrack = ThemeColors.Light.wheelTrack,
+        wheelGradient = wheel, shakeGradient = shake, wheelTrack = wheelTrack,
         divider = divider
     )
 
@@ -199,20 +206,22 @@ fun registerDefaultThemes() {
                 ThemeColors.Light.success,
                 ThemeColors.Light.warning,
                 ThemeColors.Light.info,
-                iconOn = ThemeColors.Light.onSurface,
+                iconOn = ThemeColors.Light.icon,
                 popupBg = ThemeColors.Light.surface,
                 popupContent = ThemeColors.Light.onSurface,
                 wheel = ThemeColors.Light.wheelGradient,
                 shake = ThemeColors.Light.shakeGradient,
                 wheelTrack = ThemeColors.Light.wheelTrack,
-                divider = ThemeColors.Light.divider
+                divider = ThemeColors.Light.divider,
+                infoText = ThemeColors.Light.infoText
             ),
             extraDark  = extrasFor( // Fallback, falls jemand light+dark kombiniert
                 ThemeColors.Light.primary, ThemeColors.Light.secondary, ThemeColors.Light.success,
                 ThemeColors.Light.warning, ThemeColors.Light.info,
-                iconOn = Color(0xFFE6E6E6), popupBg = Color(0xFF151515), popupContent = Color(0xFFEFEFEF),
+                iconOn = ThemeColors.Light.icon, popupBg = Color(0xFF151515), popupContent = Color(0xFFEFEFEF),
                 wheel = ThemeColors.Light.wheelGradient, shake = ThemeColors.Light.shakeGradient,  wheelTrack = ThemeColors.Light.wheelTrack,
-                divider = ThemeColors.Light.divider
+                divider = ThemeColors.Light.divider,
+                infoText = ThemeColors.Light.infoText
             )
         )
     )
@@ -237,17 +246,19 @@ fun registerDefaultThemes() {
             extraLight = extrasFor( // Fallback (z. B. in Dialogen)
                 ThemeColors.Dark.primary, ThemeColors.Dark.secondary, ThemeColors.Dark.success,
                 ThemeColors.Dark.warning, ThemeColors.Dark.info,
-                iconOn = Color(0xFF101112), popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
+                iconOn = ThemeColors.Dark.icon, popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
                 wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient, wheelTrack = ThemeColors.Dark.wheelTrack,
-                divider = ThemeColors.Dark.divider
+                divider = ThemeColors.Dark.divider,
+                infoText = ThemeColors.Dark.infoText
             ),
             extraDark  = extrasFor(
                 ThemeColors.Dark.primary, ThemeColors.Dark.secondary, ThemeColors.Dark.success,
                 ThemeColors.Dark.warning, ThemeColors.Dark.info,
-                iconOn = ThemeColors.Dark.onSurface, popupBg = ThemeColors.Dark.surface,
+                iconOn = ThemeColors.Dark.icon, popupBg = ThemeColors.Dark.surface,
                 popupContent = ThemeColors.Dark.onSurface,
                 wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient, wheelTrack = ThemeColors.Dark.wheelTrack,
-                divider = ThemeColors.Dark.divider
+                divider = ThemeColors.Dark.divider,
+                infoText = ThemeColors.Dark.infoText
             )
         )
     )
@@ -272,17 +283,19 @@ fun registerDefaultThemes() {
             extraLight = extrasFor( // nur als Fallback
                 ThemeColors.Amoled.primary, ThemeColors.Amoled.secondary, ThemeColors.Amoled.success,
                 ThemeColors.Amoled.warning, ThemeColors.Amoled.info,
-                iconOn = Color(0xFF101112), popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
+                iconOn = ThemeColors.Amoled.icon, popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
                 wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient, wheelTrack = ThemeColors.Light.wheelTrack,
-                divider = ThemeColors.Amoled.divider
+                divider = ThemeColors.Amoled.divider,
+                infoText = ThemeColors.Amoled.infoText
             ),
             extraDark  = extrasFor(
                 ThemeColors.Amoled.primary, ThemeColors.Amoled.secondary, ThemeColors.Amoled.success,
                 ThemeColors.Amoled.warning, ThemeColors.Amoled.info,
-                iconOn = ThemeColors.Amoled.onSurface, popupBg = ThemeColors.Amoled.surface,
+                iconOn = ThemeColors.Amoled.icon, popupBg = ThemeColors.Amoled.surface,
                 popupContent = ThemeColors.Amoled.onSurface,
                 wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient, wheelTrack = ThemeColors.Amoled.wheelTrack,
-                divider = ThemeColors.Amoled.divider
+                divider = ThemeColors.Amoled.divider,
+                infoText = ThemeColors.Amoled.infoText
             )
         )
     )

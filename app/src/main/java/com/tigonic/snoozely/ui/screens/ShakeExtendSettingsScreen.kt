@@ -274,7 +274,7 @@ fun ShakeExtendSettingsScreen(
                     )
                     Text(
                         text = stringResource(R.string.shake_strength_sub),
-                        color = cs.onSurfaceVariant,
+                        color = extra.infoText,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -331,7 +331,7 @@ fun ShakeExtendSettingsScreen(
                         color = cs.onBackground,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Text(toneTitle, color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text(toneTitle, color = extra.infoText, style = MaterialTheme.typography.bodySmall)
                 }
                 Icon(
                     imageVector = Icons.Filled.ChevronRight,
@@ -382,7 +382,7 @@ fun ShakeExtendSettingsScreen(
             }
             Text(
                 text = stringResource(R.string.shake_vibration_hint),
-                color = cs.onSurfaceVariant,
+                color = extra.infoText,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier
                     .padding(top = 2.dp, bottom = 8.dp)
@@ -401,7 +401,7 @@ fun ShakeExtendSettingsScreen(
             )
             Text(
                 stringResource(R.string.volume_relative_hint),
-                color = cs.onSurfaceVariant,
+                color = extra.infoText,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.alpha(sectionAlpha)
             )

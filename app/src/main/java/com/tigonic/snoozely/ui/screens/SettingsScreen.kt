@@ -10,6 +10,7 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -235,7 +236,7 @@ fun SettingsScreen(
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = null,
-                    tint = if (notificationEnabled) extra.icon else cs.onSurfaceVariant
+                    tint = iconTint(active = notificationEnabled)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -261,7 +262,7 @@ fun SettingsScreen(
                 Icon(
                     imageVector = Icons.Default.Vibration,
                     contentDescription = null,
-                    tint = if (shakedEnabled) extra.icon else cs.onSurfaceVariant
+                    tint = iconTint(active = shakedEnabled)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -428,4 +429,17 @@ private fun ThemeSection() {
             }
         }
     }
+}
+
+@Composable
+private fun iconTint(active: Boolean, enabled: Boolean = true): Color {
+    val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    val target = when {
+        !enabled -> cs.onSurfaceVariant.copy(alpha = 0.5f)
+        active   -> extra.icon
+        else     -> cs.onSurfaceVariant
+    }
+    val animated by animateColorAsState(targetValue = target, label = "iconTint")
+    return animated
 }
