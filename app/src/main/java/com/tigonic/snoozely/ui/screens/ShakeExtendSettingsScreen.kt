@@ -28,6 +28,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -118,6 +119,7 @@ fun ShakeExtendSettingsScreen(
         }
     }
     fun openRingtonePicker() {
+        if (!enabled) return
         ensureAudioPermission {
             val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
                 putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
@@ -139,6 +141,7 @@ fun ShakeExtendSettingsScreen(
         if (ringtoneUriStr.isNotEmpty()) Uri.parse(ringtoneUriStr) else Settings.System.DEFAULT_NOTIFICATION_URI
 
     fun playPreviewOnce() {
+        if (!enabled) return
         if (mode != "tone") return
         if (!audioPermGranted) return
         val uri = chosenOrDefaultTone() ?: return
@@ -157,6 +160,7 @@ fun ShakeExtendSettingsScreen(
     }
 
     fun pulseVibrate() {
+        if (!enabled) return
         try {
             val hasVibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = ctx.getSystemService(VibratorManager::class.java)
@@ -188,7 +192,7 @@ fun ShakeExtendSettingsScreen(
         sysVol = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION).toFloat() / maxVol
     }
 
-    // Einheitliche, theme-basierte Sliderfarben (keine Punkte sichtbar dank Transparent-Ticks)
+    // Einheitliche, theme-basierte Sliderfarben
     val sliderColors = SliderDefaults.colors(
         activeTrackColor = extra.slider,
         inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
@@ -196,6 +200,9 @@ fun ShakeExtendSettingsScreen(
         activeTickColor = cs.surface.copy(alpha = 0f),
         inactiveTickColor = cs.surface.copy(alpha = 0f)
     )
+
+    // Helper für deaktivierte Optik
+    val sectionAlpha = if (enabled) 1f else 0.5f
 
     Scaffold(
         topBar = {
@@ -222,9 +229,12 @@ fun ShakeExtendSettingsScreen(
                 .padding(inner)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+
             // 1) Master
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -246,62 +256,107 @@ fun ShakeExtendSettingsScreen(
             }
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
-            // 2) Schüttelkraft
+            // **ALLES AB HIER AN 'enabled' BINDEN**
+            // 2) Schüttelkraft (nur klickbar wenn enabled), optisch gedimmt wenn disabled
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onNavigateShakeStrength() }
-                    .padding(vertical = 10.dp),
+                    .then(if (enabled) Modifier.clickable { onNavigateShakeStrength() } else Modifier)
+                    .padding(vertical = 10.dp)
+                    .alpha(sectionAlpha),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.shake_strength), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.shake_strength_sub), color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = stringResource(R.string.shake_strength),
+                        color = cs.onBackground,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = stringResource(R.string.shake_strength_sub),
+                        color = cs.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
-                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = cs.onSurfaceVariant
+                )
             }
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
             // 3) Verlängerungstimer
             Spacer(Modifier.height(6.dp))
-            //text = stringResource(R.string.notifications_extend_title),
-            Text(stringResource(R.string.notifications_extend_title), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.shake_extend_minutes_hint, extendMin),
+            Text(
+                stringResource(R.string.notifications_extend_title),
+                color = cs.onBackground,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.alpha(sectionAlpha)
+            )
+            Text(
+                stringResource(R.string.shake_extend_minutes_hint, extendMin),
                 color = extra.infoText,
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.alpha(sectionAlpha)
             )
             Slider(
+                enabled = enabled,
                 value = extendMin.toFloat(),
-                onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, v.toInt()) } },
+                onValueChange = { v -> if (enabled) scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, v.toInt()) } },
                 valueRange = 1f..30f,
                 steps = 29,
                 colors = sliderColors,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .alpha(sectionAlpha)
             )
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
 
-            // 4) Benachrichtigungston
+            // 4) Benachrichtigungston (nur klickbar wenn enabled)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { openRingtonePicker() }
-                    .padding(vertical = 10.dp),
+                    .then(if (enabled) Modifier.clickable { openRingtonePicker() } else Modifier)
+                    .padding(vertical = 10.dp)
+                    .alpha(sectionAlpha),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.notification_sound), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = stringResource(R.string.notification_sound),
+                        color = cs.onBackground,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     Text(toneTitle, color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
-                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = cs.onSurfaceVariant
+                )
             }
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
-            // 5) Vibration
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.vibrate), color = cs.onBackground, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            // 5) Vibration (Switch deaktiviert + gedimmt)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .alpha(sectionAlpha),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.vibrate),
+                    color = cs.onBackground,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
                 Switch(
+                    enabled = enabled,
                     checked = (mode == "vibrate"),
                     onCheckedChange = { v ->
+                        if (!enabled) return@Switch
                         scope.launch {
                             if (v) {
                                 SettingsPreferenceHelper.setShakeSoundMode(appCtx, "vibrate")
@@ -326,37 +381,55 @@ fun ShakeExtendSettingsScreen(
                 text = stringResource(R.string.shake_vibration_hint),
                 color = cs.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                modifier = Modifier
+                    .padding(top = 2.dp, bottom = 8.dp)
+                    .alpha(sectionAlpha)
             )
             Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
 
-            // 6) Benachrichtigungslautstärke
-            Text(stringResource(R.string.notification_volume), color = cs.onBackground, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
-            Text(stringResource(R.string.volume_relative_hint), color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            // 6) Benachrichtigungslautstärke (Slider deaktiviert + gedimmt)
+            Text(
+                stringResource(R.string.notification_volume),
+                color = cs.onBackground,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .alpha(sectionAlpha)
+            )
+            Text(
+                stringResource(R.string.volume_relative_hint),
+                color = cs.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.alpha(sectionAlpha)
+            )
 
             val volumeInteraction = remember { MutableInteractionSource() }
             val pressed by volumeInteraction.collectIsPressedAsState()
 
-            LaunchedEffect(pressed) {
-                if (pressed) {
+            LaunchedEffect(pressed, enabled) {
+                if (enabled && pressed) {
                     ensureAudioPermission { playPreviewOnce() }
                 }
             }
 
             Slider(
+                enabled = enabled,
                 value = sysVol,
                 onValueChange = { v ->
+                    if (!enabled) return@Slider
                     sysVol = v
                     val newVol = (v * maxVol).coerceIn(0f, maxVol.toFloat()).toInt()
                     audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, newVol, 0)
                     ensureAudioPermission { playPreviewOnce() }
                 },
-                onValueChangeFinished = { },
+                onValueChangeFinished = { /* Ton darf ausklingen */ },
                 valueRange = 0f..1f,
                 steps = 0,
                 colors = sliderColors,
                 interactionSource = volumeInteraction,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .alpha(sectionAlpha)
             )
 
             Spacer(Modifier.height(24.dp))
