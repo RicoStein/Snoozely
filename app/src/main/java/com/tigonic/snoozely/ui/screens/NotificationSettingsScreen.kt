@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -128,11 +129,11 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 title = { Text(stringResource(R.string.settings_notifications), color = cs.onPrimaryContainer) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = cs.primaryContainer,
+                    containerColor = cs.background,
                     titleContentColor = cs.onPrimaryContainer,
                     navigationIconContentColor = cs.onPrimaryContainer
                 ),

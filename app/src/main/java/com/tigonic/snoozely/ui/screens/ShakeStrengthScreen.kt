@@ -21,6 +21,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -189,11 +190,11 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                 title = { Text(stringResource(R.string.shake_strength), color = cs.onPrimaryContainer) },
                 navigationIcon = {
                     IconButton(onClick = { runCatching { preview?.stop() }; onBack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = cs.primaryContainer,
+                    containerColor = cs.background,
                     titleContentColor = cs.onPrimaryContainer,
                     navigationIconContentColor = cs.onPrimaryContainer
                 )

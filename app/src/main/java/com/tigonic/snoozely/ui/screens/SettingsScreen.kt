@@ -102,7 +102,7 @@ fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = cs.primaryContainer,
+                    containerColor = cs.background,
                     titleContentColor = cs.onPrimaryContainer,
                     navigationIconContentColor = cs.onPrimaryContainer
                 )
