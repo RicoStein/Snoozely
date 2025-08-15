@@ -28,9 +28,9 @@ import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.service.TimerContracts
 import com.tigonic.snoozely.service.TimerEngineService
-import com.tigonic.snoozely.service.TimerNotificationService
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
+import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -46,7 +46,10 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
+
+    // Theme-System
     val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
 
     // Live-States aus DataStore
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 5)
@@ -106,7 +109,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(cs.background) // statt Color.Black
+            .background(cs.background) // Theme-Fläche
     ) {
         Column(
             modifier = Modifier
@@ -125,14 +128,14 @@ fun HomeScreen(
                 Text(
                     text = stringResource(R.string.app_name),
                     fontSize = MaterialTheme.typography.headlineLarge.fontSize,
-                    color = cs.onBackground, // statt Color.White
+                    color = extra.heading, // markenprägnante Überschrift-Farbe aus Theme
                     fontWeight = FontWeight.Bold
                 )
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Filled.Settings,
                         contentDescription = stringResource(R.string.settings),
-                        tint = cs.onBackground // statt Color.White
+                        tint = extra.icon // Icons folgen ExtraColors
                     )
                 }
             }
@@ -169,11 +172,13 @@ fun HomeScreen(
                     showCenterText = !timerRunning,
                     wheelAlpha = wheelAlpha,
                     wheelScale = wheelScale
+                    // Farben/Grafik bezieht WheelSlider intern über Theme (cs/extra)
                 )
 
                 TimerCenterText(
                     minutes = remainingMinutes,
                     seconds = remainingSeconds
+                    // Textfarben zieht sich die Komponente aus dem Theme
                 )
             }
 
@@ -182,41 +187,33 @@ fun HomeScreen(
             IconButton(
                 onClick = {
                     scope.launch {
-
                         if (!timerRunning && sliderMinutes > 0) {
-                            // User-Auswahl persistent halten (optional – schadet nicht)
                             if (timerMinutes != sliderMinutes) {
                                 TimerPreferenceHelper.setTimer(context, sliderMinutes)
                             }
-
-                            // Engine direkt starten und MINUTEN ALS EXTRA mitsenden
                             val startIntent = Intent(
                                 context,
-                                com.tigonic.snoozely.service.TimerEngineService::class.java
-                            ).setAction(com.tigonic.snoozely.service.TimerContracts.ACTION_START)
-                                .putExtra(com.tigonic.snoozely.service.TimerContracts.EXTRA_MINUTES, sliderMinutes)
+                                TimerEngineService::class.java
+                            ).setAction(TimerContracts.ACTION_START)
+                                .putExtra(TimerContracts.EXTRA_MINUTES, sliderMinutes)
 
                             context.startForegroundServiceCompat(startIntent)
-
-                            // DataStore „Start“ direkt auch setzen
                             TimerPreferenceHelper.startTimer(context, sliderMinutes)
-
                         } else if (timerRunning) {
-                            val stopIntent = Intent(context, com.tigonic.snoozely.service.TimerEngineService::class.java)
-                                .setAction(com.tigonic.snoozely.service.TimerContracts.ACTION_STOP)
+                            val stopIntent = Intent(context, TimerEngineService::class.java)
+                                .setAction(TimerContracts.ACTION_STOP)
                             context.startForegroundServiceCompat(stopIntent)
                         }
-
                     }
                 },
                 modifier = Modifier
                     .size(72.dp)
-                    .background(cs.primary, shape = MaterialTheme.shapes.extraLarge) // statt Color.White
+                    .background(cs.primary, shape = MaterialTheme.shapes.extraLarge)
             ) {
                 Icon(
                     imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (timerRunning) stringResource(R.string.pause) else stringResource(R.string.play),
-                    tint = cs.onPrimary, // statt Color.Black
+                    tint = cs.onPrimary,
                     modifier = Modifier.size(44.dp)
                 )
             }
@@ -224,7 +221,6 @@ fun HomeScreen(
     }
 }
 
-/** Startet nur für ACTION_START als Foreground-Service (O+), sonst normal. */
 /** Startet nur als Foreground-Service, wenn Progress-Notifications erlaubt sind. */
 fun Context.startForegroundServiceCompat(intent: Intent) {
     val action = intent.action
@@ -239,18 +235,19 @@ fun Context.startForegroundServiceCompat(intent: Intent) {
         return
     }
 
-    // Settings synchron (kurz) lesen
     val notificationsEnabled = kotlinx.coroutines.runBlocking {
-        com.tigonic.snoozely.util.SettingsPreferenceHelper.getNotificationEnabled(this@startForegroundServiceCompat).first()
+        com.tigonic.snoozely.util.SettingsPreferenceHelper
+            .getNotificationEnabled(this@startForegroundServiceCompat).first()
     }
     val showProgress = kotlinx.coroutines.runBlocking {
-        com.tigonic.snoozely.util.SettingsPreferenceHelper.getShowProgressNotification(this@startForegroundServiceCompat).first()
+        com.tigonic.snoozely.util.SettingsPreferenceHelper
+            .getShowProgressNotification(this@startForegroundServiceCompat).first()
     }
 
     if (notificationsEnabled && showProgress) {
-        startForegroundService(intent)  // zeigt laufende Statusbar-Notification
+        startForegroundService(intent)
     } else {
-        startService(intent)            // KEIN Foreground → keine Statusbar-Notification
+        startService(intent)
     }
 }
 
