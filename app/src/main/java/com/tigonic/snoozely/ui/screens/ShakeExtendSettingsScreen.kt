@@ -254,7 +254,7 @@ fun ShakeExtendSettingsScreen(
                     )
                 )
             }
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = extra.divider)
 
             // **ALLES AB HIER AN 'enabled' BINDEN**
             // 2) Schüttelkraft (nur klickbar wenn enabled), optisch gedimmt wenn disabled
@@ -284,7 +284,7 @@ fun ShakeExtendSettingsScreen(
                     tint = cs.onSurfaceVariant
                 )
             }
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = extra.divider)
 
             // 3) Verlängerungstimer
             Spacer(Modifier.height(6.dp))
@@ -311,7 +311,10 @@ fun ShakeExtendSettingsScreen(
                     .padding(horizontal = 8.dp)
                     .alpha(sectionAlpha)
             )
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 8.dp),
+                color = extra.divider
+            )
 
             // 4) Benachrichtigungston (nur klickbar wenn enabled)
             Row(
@@ -336,7 +339,7 @@ fun ShakeExtendSettingsScreen(
                     tint = cs.onSurfaceVariant
                 )
             }
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = extra.divider)
 
             // 5) Vibration (Switch deaktiviert + gedimmt)
             Row(
@@ -385,7 +388,7 @@ fun ShakeExtendSettingsScreen(
                     .padding(top = 2.dp, bottom = 8.dp)
                     .alpha(sectionAlpha)
             )
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = extra.divider)
 
             // 6) Benachrichtigungslautstärke (Slider deaktiviert + gedimmt)
             Text(

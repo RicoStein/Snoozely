@@ -173,7 +173,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     )
                 )
             }
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = extra.divider)
 
             // 2) Verlängerungs-Timer (gedimmt + deaktiviert wenn Master off)
             Spacer(Modifier.height(6.dp))
@@ -200,7 +200,8 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     .padding(horizontal = 8.dp)
                     .alpha(sectionAlpha)
             )
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = extra.divider)
+
 
             // 3) Fortschritt in Statusleiste (gedimmt + deaktivierter Switch bei Master off)
             Row(
@@ -236,7 +237,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     .padding(top = 2.dp, bottom = 8.dp)
                     .alpha(sectionAlpha)
             )
-            Divider(color = cs.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = extra.divider)
 
             // 4) Reminder (OHNE Header „Erinnerung“; gedimmt + deaktiviert bei Master off)
             Row(
