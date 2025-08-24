@@ -19,7 +19,7 @@ import kotlinx.coroutines.runBlocking
  * Reagiert auf Events der TimerEngine:
  * - ACTION_NOTIFY_UPDATE    → laufende Statusbar-Notification mit Fortschritt
  * - ACTION_NOTIFY_REMINDER  → Heads-up Reminder kurz vor Ablauf
- * - ACTION_EXTEND / ACTION_STOP (Buttons) → leitet an Engine weiter
+ * - ACTION_EXTEND / ACTION_REDUCE / ACTION_STOP (Buttons) → leitet an Engine weiter
  */
 class TimerNotificationService : Service() {
 
@@ -57,8 +57,6 @@ class TimerNotificationService : Service() {
 
                 if (remainingMs < 0 || totalMs < 0) {
                     runBlocking {
-                        val minutes = SettingsPreferenceHelper
-                            .getProgressExtendMinutes(applicationContext).first() // nicht zwingend, nur Beispiel
                         val m = TimerPreferenceHelper.getTimer(applicationContext).first()
                         val s = TimerPreferenceHelper.getTimerStartTime(applicationContext).first()
                         if (m > 0 && s > 0L) {
@@ -99,6 +97,11 @@ class TimerNotificationService : Service() {
                 startService(Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_EXTEND))
             }
 
+            // NEU: Reduzieren
+            TimerContracts.ACTION_REDUCE -> {
+                startService(Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_REDUCE))
+            }
+
             TimerContracts.ACTION_STOP -> {
                 startService(Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_STOP))
                 val nm = getSystemService(NotificationManager::class.java)
@@ -113,9 +116,6 @@ class TimerNotificationService : Service() {
         return START_NOT_STICKY
     }
 
-
-
-
     // --- Laufende Timer-Notification (Statusleiste) ---
 
     private fun showRunningNotification(remainingMs: Long, totalMs: Long) {
@@ -127,32 +127,37 @@ class TimerNotificationService : Service() {
             (((totalMs - remainingMs) * 100 / totalMs).toInt()).coerceIn(0, 100)
         else 0
 
-        val extendStep = runBlocking {
+        val step = runBlocking {
             SettingsPreferenceHelper.getProgressExtendMinutes(this@TimerNotificationService).first()
         }
 
+        // Reihenfolge: - x | Stop | + x
         val notif = NotificationCompat.Builder(this, TimerContracts.CHANNEL_RUNNING)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(getString(R.string.notification_timer_running))
             .setContentText(getString(R.string.notification_remaining_time, timeText))
             .setOngoing(true)
             .setProgress(100, progress, false)
-            .setContentIntent(pendingOpenApp())           // <— NEU
+            .setContentIntent(pendingOpenApp())
             .addAction(
-                android.R.drawable.ic_input_add,
-                getString(R.string.timer_plus_x, extendStep),
-                pendingExtend()                           // <— NEU (statt inline)
+                android.R.drawable.ic_media_previous,
+                getString(R.string.timer_minus_x, step),
+                pendingReduce()
             )
             .addAction(
                 android.R.drawable.ic_lock_idle_alarm,
                 getString(R.string.timer_stop),
-                pendingStop()                             // <— NEU (statt inline)
+                pendingStop()
+            )
+            .addAction(
+                android.R.drawable.ic_input_add,
+                getString(R.string.timer_plus_x, step),
+                pendingExtend()
             )
             .build()
 
         notify(NOTIFICATION_ID_RUNNING, notif)
     }
-
 
     // --- Heads-up Reminder kurz vor Ablauf ---
 
@@ -163,6 +168,7 @@ class TimerNotificationService : Service() {
 
         val body = getString(R.string.reminder_popup_message)
 
+        // Reihenfolge: - x | Stop | + x
         val notif = NotificationCompat.Builder(this, TimerContracts.CHANNEL_REMINDER)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(getString(R.string.reminder_popup_title))
@@ -174,23 +180,27 @@ class TimerNotificationService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
-            .setContentIntent(pendingOpenApp())           // <— NEU
+            .setContentIntent(pendingOpenApp())
             .addAction(
-                android.R.drawable.ic_input_add,
-                getString(R.string.timer_plus_x, extendMinutes),
-                pendingExtendReminder()
+                android.R.drawable.ic_media_previous,
+                getString(R.string.timer_minus_x, extendMinutes),
+                pendingReduceReminder()
             )
             .addAction(
                 android.R.drawable.ic_lock_idle_alarm,
                 getString(R.string.timer_stop),
                 pendingStopReminder()
             )
+            .addAction(
+                android.R.drawable.ic_input_add,
+                getString(R.string.timer_plus_x, extendMinutes),
+                pendingExtendReminder()
+            )
             .setTimeoutAfter(10_000)
             .build()
 
         notify(NOTIFICATION_ID_REMINDER, notif)
     }
-
 
     // --- Channels / Utils ---
 
@@ -236,8 +246,6 @@ class TimerNotificationService : Service() {
         }
     }
 
-
-
     private fun notify(id: Int, notification: Notification) {
         android.util.Log.d("TimerNotif", "notify: id=$id")
         val nm = getSystemService(NotificationManager::class.java)
@@ -250,12 +258,14 @@ class TimerNotificationService : Service() {
     companion object {
         private const val REQ_EXTEND = 2002
         private const val REQ_STOP   = 2003
+        private const val REQ_REDUCE = 2004
         const val NOTIFICATION_ID_RUNNING = 42
         const val NOTIFICATION_ID_REMINDER = 43
 
-        // NEU: eigene RequestCodes für das Reminder-Popup
+        // eigene RequestCodes für das Reminder-Popup
         private const val REQ_EXTEND_REMINDER = 2102
         private const val REQ_STOP_REMINDER   = 2103
+        private const val REQ_REDUCE_REMINDER = 2104
     }
 
     private fun pendingStop(): PendingIntent {
@@ -264,9 +274,9 @@ class TimerNotificationService : Service() {
                 PendingIntent.FLAG_CANCEL_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            PendingIntent.getForegroundService(this, 2003, i, flags)
+            PendingIntent.getForegroundService(this, REQ_STOP, i, flags)
         else
-            PendingIntent.getService(this, 2003, i, flags)
+            PendingIntent.getService(this, REQ_STOP, i, flags)
     }
 
     private fun pendingExtend(): PendingIntent {
@@ -275,9 +285,21 @@ class TimerNotificationService : Service() {
                 PendingIntent.FLAG_CANCEL_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            PendingIntent.getForegroundService(this, 2002, i, flags)
+            PendingIntent.getForegroundService(this, REQ_EXTEND, i, flags)
         else
-            PendingIntent.getService(this, 2002, i, flags)
+            PendingIntent.getService(this, REQ_EXTEND, i, flags)
+    }
+
+    // NEU: Minus für laufende Notification
+    private fun pendingReduce(): PendingIntent {
+        val i = Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_REDUCE)
+        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+                PendingIntent.FLAG_CANCEL_CURRENT
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            PendingIntent.getForegroundService(this, REQ_REDUCE, i, flags)
+        else
+            PendingIntent.getService(this, REQ_REDUCE, i, flags)
     }
 
     private fun pendingOpenApp(): PendingIntent {
@@ -293,10 +315,10 @@ class TimerNotificationService : Service() {
     private fun pendingExtendReminder(): PendingIntent {
         val i = Intent(this, TimerEngineService::class.java)
             .setAction(TimerContracts.ACTION_EXTEND)
-            .setPackage(packageName) // <— wichtig auf einigen OEMs
+            .setPackage(packageName)
 
         val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
-                PendingIntent.FLAG_UPDATE_CURRENT  // <— statt CANCEL_CURRENT
+                PendingIntent.FLAG_UPDATE_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             PendingIntent.getForegroundService(this, REQ_EXTEND_REMINDER, i, flags)
@@ -318,5 +340,18 @@ class TimerNotificationService : Service() {
             PendingIntent.getService(this, REQ_STOP_REMINDER, i, flags)
     }
 
+    // NEU: Minus für Reminder
+    private fun pendingReduceReminder(): PendingIntent {
+        val i = Intent(this, TimerEngineService::class.java)
+            .setAction(TimerContracts.ACTION_REDUCE)
+            .setPackage(packageName)
 
+        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+                PendingIntent.FLAG_UPDATE_CURRENT
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            PendingIntent.getForegroundService(this, REQ_REDUCE_REMINDER, i, flags)
+        else
+            PendingIntent.getService(this, REQ_REDUCE_REMINDER, i, flags)
+    }
 }

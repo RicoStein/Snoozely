@@ -23,6 +23,12 @@
     <string name="fade_out_running">Audio wird ausgefaded</string>
     <string name="seconds">%1$d Sekunden</string>
 
+    <string name="timer_minus_x">- %1$d min</string>
+    <string name="notification_timer_runningnotification_timer_running">Timer läuft</string>
+    <string name="notification_remaining_timenotification_remaining_time">Verbleibend: %1$s</string>
+    <string name="reminder_popup_titlereminder_popup_title">Erinnerung</string>
+    <string name="reminder_popup_messagereminder_popup_message">Der Timer läuft bald ab.</string>
+
     <!-- Playback -->
     <string name="playback">Wiedergabe</string>
     <string name="stop_audio_video">Audio und Video stoppen</string>
@@ -95,6 +101,11 @@
     <string name="reminder_popup_message">Timer läuft gleich ab.</string>
     <string name="reminder_popup_hint">Popup erscheint %1$d Minuten vor Timer-Ende</string>
     <string name="reminder_popup_hint_short">Zeigt ein Heads-Up-Popup kurz vor Ablauf</string>
+
+
+
+
+
 
     <!-- Shake to Extend -->
     <string name="shake_to_extend">Schütteln zum Verlängern</string>
