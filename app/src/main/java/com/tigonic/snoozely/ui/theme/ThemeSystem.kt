@@ -134,7 +134,7 @@ private object ThemeColors {
         val secondary = Color(0xFF03DAC6)
         val tertiary = Color(0xFF81C784)
 
-        val background = Color(0xFF171717)
+        val background = Color(0xFF000000)
         val surface = Color(0xFF222222)
         val outline = Color(0xFF3A3A3A)
 
