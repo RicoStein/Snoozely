@@ -95,7 +95,7 @@ private object ThemeColors {
         val info       = Color(0xFF60A5FA)
         val icon = Color(0xFF6A6CFF)
 
-        val background = Color(0xaa403838)
+        val background = Color(0xFF333333)
         val surface    = Color(0xFF151824)
         val onSurface  = Color(0xFFE6E8EF)
 

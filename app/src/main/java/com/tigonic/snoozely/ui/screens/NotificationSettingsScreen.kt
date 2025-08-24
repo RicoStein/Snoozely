@@ -134,9 +134,10 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = cs.background,
-                    titleContentColor = cs.onPrimaryContainer,
-                    navigationIconContentColor = cs.onPrimaryContainer
-                ),
+                    scrolledContainerColor = cs.background,
+                    titleContentColor = cs.onBackground,
+                    navigationIconContentColor = cs.onBackground
+                )
             )
         },
         containerColor = cs.background

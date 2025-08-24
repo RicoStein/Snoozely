@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -98,13 +99,14 @@ fun SettingsScreen(
                 title = { Text(stringResource(R.string.settings), color = cs.onPrimaryContainer) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = cs.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = cs.onPrimaryContainer)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = cs.background,
-                    titleContentColor = cs.onPrimaryContainer,
-                    navigationIconContentColor = cs.onPrimaryContainer
+                    scrolledContainerColor = cs.background,
+                    titleContentColor = cs.onBackground,
+                    navigationIconContentColor = cs.onBackground
                 )
             )
         },
