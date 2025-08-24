@@ -128,14 +128,14 @@ fun HomeScreen(
                 Text(
                     text = stringResource(R.string.app_name),
                     fontSize = MaterialTheme.typography.headlineLarge.fontSize,
-                    color = extra.heading, // markenprägnante Überschrift-Farbe aus Theme
+                    color = extra.menu, // markenprägnante Überschrift-Farbe aus Theme
                     fontWeight = FontWeight.Bold
                 )
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Filled.Settings,
                         contentDescription = stringResource(R.string.settings),
-                        tint = extra.icon // Icons folgen ExtraColors
+                        tint = extra.menu // Icons folgen ExtraColors
                     )
                 }
             }

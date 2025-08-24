@@ -1,70 +1,75 @@
 package com.tigonic.snoozely.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import com.tigonic.snoozely.ui.theme.ThemeColors.Amoled.infoText
 
-// --------------------------- TYPOGRAPHY --------------------------------------
-val Typography = Typography()
+// --------------------------- TYPO --------------------------------------------
+val Typography = androidx.compose.material3.Typography()
 
 // --------------------------- EXTRA COLORS ------------------------------------
+// Deutlich unterscheidbare aktive/inaktive Farben
 data class ExtraColors(
-    // Basis-„Brand“-Farben
-    val brand1: Color,   // Primär / Akzent
-    val brand2: Color,   // Sekundär
-    val brand3: Color,   // Tertiär / Erfolg
-    val brand4: Color,   // Warnung
-    val brand5: Color,   // Info
+    // Neue, kontrastreiche Felder
+    val toggleActive: Color,
+    val toggleInactive: Color,
+    val sliderActive: Color,
+    val sliderInactiveTrack: Color,
 
-    // Rollen für die UI
-    val toggle: Color,
-    val slider: Color,
+    val iconActive: Color,
+    val iconInactive: Color,
     val heading: Color,
-    val icon: Color,
     val infoText: Color,
+
     val popupBg: Color,
     val popupContent: Color,
 
-    // Gradients / Effekte
     val wheelGradient: List<Color>,
     val shakeGradient: List<Color>,
     val wheelTrack: Color,
-    val divider: Color
-)
+    val divider: Color,
+
+    // NEU: Menüfarbe (Light = schwarz, Dark = weiß)
+    val menu: Color
+) {
+    // Rückwärtskompatible Aliase (alte Bezeichner weiter verwendbar)
+    val toggle: Color get() = toggleActive
+    val slider: Color get() = sliderActive
+    val icon: Color get() = iconActive
+}
 
 val LocalExtraColors = staticCompositionLocalOf {
-    // Fallback – wird durch SnoozelyTheme überschrieben
     ExtraColors(
-        brand1 = Color(0xFF7F7FFF),
-        brand2 = Color(0xFF0AB1A4),
-        brand3 = Color(0xFF7CD458),
-        brand4 = Color(0xFFFFC857),
-        brand5 = Color(0xFF88C0D0),
-        toggle = Color(0xFF7F7FFF),
-        slider = Color(0xFF7F7FFF),
-        heading = Color(0xFF7F7FFF),
-        icon = Color(0xFFE6E6E6),
-        infoText = Color(0xFFBDBDBD),
-        popupBg = Color(0xFF1E1E1E),
-        popupContent = Color(0xFFEFEFEF),
-        wheelGradient = listOf(Color(0xFFFFE000), Color(0xFF7CD458), Color(0xFF0AB1A4)),
-        shakeGradient = listOf(Color(0xFFFFE000), Color(0xFF7CD458), Color(0xFF0AB1A4)),
-        wheelTrack    = Color(0xFF2A2F3A), // brauchbarer Default für Dark
-        divider = Color(0xFF6A6CFF)
+        toggleActive = Color(0xFF1565C0),
+        toggleInactive = Color(0xFFBDBDBD),
+        sliderActive = Color(0xFF1565C0),
+        sliderInactiveTrack = Color(0xFFE0E0E0),
+        iconActive = Color(0xFF0D47A1),
+        iconInactive = Color(0xFF9E9E9E),
+        heading = Color(0xFF0D47A1),
+        infoText = Color(0xFF616161),
+        popupBg = Color.White,
+        popupContent = Color(0xFF111111),
+        wheelGradient = listOf(Color(0xFF90CAF9), Color(0xFF1565C0), Color(0xFF42A5F5)),
+        shakeGradient = listOf(Color(0xFF1565C0), Color(0xFF4FC3F7), Color(0xFF03DAC6)),
+        wheelTrack = Color(0xFFE0E0E0),
+        divider = Color(0xFFE6E6E6),
+        menu = Color.Black // Default (wird im Theme überschrieben)
     )
 }
 
 // ------------------------- THEME SPECS / REGISTRY ----------------------------
 data class ThemeSpec(
-    val id: String,            // "light" | "dark" | "amoled"
-    val label: String,         // Anzeigename
-    val prefersDark: Boolean,  // steuert Fallbacks
-    val light: ColorScheme?,   // optional vorgegebenes Light-Schema
-    val dark: ColorScheme?,    // optional vorgegebenes Dark-Schema
+    val id: String, // "light" | "dark"
+    val label: String,
+    val prefersDark: Boolean,
+    val light: androidx.compose.material3.ColorScheme?,
+    val dark: androidx.compose.material3.ColorScheme?,
     val extraLight: ExtraColors,
     val extraDark: ExtraColors
 )
@@ -77,156 +82,180 @@ object ThemeRegistry {
     fun clear() = _themes.clear()
 }
 
-/**
- * Farbsets je Theme, angelehnt an die drei Referenzbilder:
- *
- *  - DARK   (Bild 1): tiefe Flächen, „electric blue“ & cyanische Akzente
- *  - LIGHT  (Bild 2): helle Flächen, violett-indigofarbene Akzente
- *  - AMOLED (Bild 3): echtes Schwarz, neon-magenta Akzente
- */
+// --------------------------- COLOR PRESETS -----------------------------------
 private object ThemeColors {
 
-    // -------- DARK (Bild 1) --------
-    object Dark {
-        val primary    = Color(0xFF6A6CFF) // electric blue
-        val secondary  = Color(0xFF00B3FF) // cyan
-        val success    = Color(0xFF22C55E)
-        val warning    = Color(0xFFF59E0B)
-        val info       = Color(0xFF60A5FA)
-        val icon = Color(0xFF6A6CFF)
-
-        val background = Color(0xFF333333)
-        val surface    = Color(0xFF151824)
-        val onSurface  = Color(0xFFE6E8EF)
-
-        // Verlauf: Electric Blue → Cyan → leichtes Türkis
-        val wheelGradient = listOf(
-            Color(0xFF1E3A8A), // tiefes Blau
-            primary,           // Electric Blue
-            secondary,         // Cyan
-            Color(0xFF0AE7CC)  // Türkis
-        )
-        val shakeGradient = listOf(primary, secondary, Color(0xFF0EA5E9))
-        val wheelTrack    = Color(0xFF2E2E38)
-        val divider = Color(0xFF2E2E38)
-        val infoText = Color(0xFFB0B0B0)
-    }
-
-    // -------- LIGHT (Bild 2) --------
+    // LIGHT (klassisch, hohe Unterscheidbarkeit aktiv/inaktiv)
     object Light {
-        val primary    = Color(0xFF8B5CF6) // violet
-        val secondary  = Color(0xFF6366F1) // indigo
-        val success    = Color(0xFF16A34A)
-        val warning    = Color(0xFFF59E0B)
-        val info       = Color(0xFF0EA5E9)
-        val icon = primary
+        // Einheitlicher Akzent – kräftiges Android-Blau
+        val primary = Color(0xFF1565C0)
+        val secondary = Color(0xFF03DAC6)
+        val tertiary = Color(0xFF2E7D32)
 
-        val background = Color(0xFFF6F6FC)
-        val surface    = Color(0xFFFFFFFF)
-        val onSurface  = Color(0xFF101112)
+        // Flächen
+        val background = Color(0xFFF7F7F7) // sehr helles Grau
+        val surface = Color(0xFFFFFFFF) // weiß
+        val outline = Color(0xFFBDBDBD)
 
-        // Verlauf: helles Violett → Primary → Indigo → sanftes Blau
+        // Texte/Icons
+        val onPrimary = Color.White
+        val onBg = Color(0xFF111111)
+        val onSurf = Color(0xFF111111)
+        val infoText = Color(0xFF5F6368)
+
+        // Komponentenfarben (starke Kontraste)
+        val toggleActive = primary
+        val toggleInactive = Color(0xFF9E9E9E) // deutlich grauer
+        val sliderActive = primary
+        val sliderInactiveTrack = Color(0xFFDDDDDD)
+
+        val iconActive = Color(0xFF0D47A1) // dunkleres Blau
+        val iconInactive = Color(0xFF9E9E9E)
+
+        val heading = Color(0xFF0D47A1)
+
         val wheelGradient = listOf(
-            Color(0xFFE9D5FF), // sehr helles Violett
-            primary,           // Violett
-            secondary,         // Indigo
-            Color(0xFF3B82F6)  // sanftes Blau
+            Color(0xFFB3D9FF), // heller Start
+            Color(0xFF4A90E2), // leuchtendes Blau
+            Color(0xFF1565C0)  // Primärblau
         )
-        val shakeGradient = listOf(primary, secondary, Color(0xFFC084FC))
-        val wheelTrack    = Color(0xFFCCCCCC)
-        val divider = Color(0xFFDDDDDD)
-        val infoText = Color(0xFF666666)
+        val shakeGradient = listOf(primary, Color(0xFF4FC3F7), secondary)
+        val wheelTrack = Color(0xFFEBEEF3) // heller als zuvor
+        val divider = Color(0xFFDFE1E5) // deutlich sichtbar
+
+        // NEU: Menü-Farbe
+        val menu = Color.Black
     }
 
-    // -------- AMOLED (Bild 3) --------
-    object Amoled {
-        val primary    = Color(0xFFD946EF) // neon magenta
-        val secondary  = Color(0xFF9333EA) // purple
-        val success    = Color(0xFF22C55E)
-        val warning    = Color(0xFFF97316)
-        val info       = Color(0xFF67E8F9)
-        val icon = primary
+    // DARK (dunkelgrau, weiße Schrift, aktive in exakt dem gleichen Blau wie Light)
+    object Dark {
+        // Gleicher aktiver Blauton wie Light
+        val primary = Color(0xFF1565C0)
+        val secondary = Color(0xFF03DAC6)
+        val tertiary = Color(0xFF81C784)
 
-        val background = Color(0xFF000000)
-        val surface    = Color(0xFF000000)
-        val onSurface  = Color(0xFFEDEDED)
+        val background = Color(0xFF171717)
+        val surface = Color(0xFF222222)
+        val outline = Color(0xFF3A3A3A)
 
-        // Verlauf: Neon Magenta → Primary → Purple → Neon Pink
+        val onPrimary = Color.White
+        val onBg = Color(0xFFF2F2F2)
+        val onSurf = Color(0xFFF2F2F2)
+        val infoText = Color(0xFFBDBDBD)
+
+        val toggleActive = primary
+        val toggleInactive = Color(0xFF616161)
+        val sliderActive = primary
+        val sliderInactiveTrack = Color(0xFF2C2C2C)
+
+        val iconActive = primary
+        val iconInactive = Color(0xFF777777)
+
+        val heading = Color(0xFFFFFFFF)
+
+        // Wheel: heller und leuchtender
         val wheelGradient = listOf(
-            Color(0xFFFF00FF), // neon pink
-            primary,           // neon magenta
-            secondary,         // purple
-            Color(0xFF7C3AED)  // tiefer Purple-Ton
+            Color(0xFF445166), // heller Start, bläulicher
+            Color(0xFF5BA8FF), // helleres Blau
+            Color(0xFF2778D1)  // kräftiges Mittelblau
         )
-        val shakeGradient = listOf(primary, Color(0xFFFAFAFA), secondary)
-        val wheelTrack    = Color(0xFF3A3A3A)
-        val divider = Color(0xFF3A3A3A)
-        val infoText = Color(0xFFB8B8B8)
+        val wheelTrack = Color(0xFF3A3F46) // etwas heller
+
+        val shakeGradient = listOf(primary, Color(0xFF4DD0E1), secondary)
+        val divider = Color(0xFF2A2A2A)
+
+        // NEU: Menü-Farbe
+        val menu = Color.White
     }
 }
 
-/** Einmalig beim App-Start aufrufen (z. B. in MainActivity.onCreate). */
+// --------------------------- REGISTER THEMES ----------------------------------
 fun registerDefaultThemes() {
     ThemeRegistry.clear()
 
-    fun extrasFor(
-        brand1: Color, brand2: Color, brand3: Color, brand4: Color, brand5: Color,
-        iconOn: Color, popupBg: Color, popupContent: Color,
-        wheel: List<Color>, shake: List<Color>, wheelTrack: Color,
-        divider: Color, infoText: Color
+    fun extrasOf(
+        toggleActive: Color, toggleInactive: Color,
+        sliderActive: Color, sliderInactiveTrack: Color,
+        iconActive: Color, iconInactive: Color,
+        heading: Color, infoText: Color,
+        popupBg: Color, popupContent: Color,
+        wheel: List<Color>, shake: List<Color>,
+        wheelTrack: Color, divider: Color,
+        menu: Color
     ) = ExtraColors(
-        brand1 = brand1, brand2 = brand2, brand3 = brand3, brand4 = brand4, brand5 = brand5,
-        toggle = brand1, slider = brand1, heading = brand1,
-        icon = iconOn, infoText = infoText,
-        popupBg = popupBg, popupContent = popupContent,
-        wheelGradient = wheel, shakeGradient = shake, wheelTrack = wheelTrack,
-        divider = divider
+        toggleActive = toggleActive,
+        toggleInactive = toggleInactive,
+        sliderActive = sliderActive,
+        sliderInactiveTrack = sliderInactiveTrack,
+        iconActive = iconActive,
+        iconInactive = iconInactive,
+        heading = heading,
+        infoText = infoText,
+        popupBg = popupBg,
+        popupContent = popupContent,
+        wheelGradient = wheel,
+        shakeGradient = shake,
+        wheelTrack = wheelTrack,
+        divider = divider,
+        menu = menu
     )
 
-    // LIGHT (Bild 2)
+    // LIGHT
     ThemeRegistry.register(
         ThemeSpec(
             id = "light",
             label = "Light",
             prefersDark = false,
             light = lightColorScheme(
-                primary     = ThemeColors.Light.primary,
-                secondary   = ThemeColors.Light.secondary,
-                tertiary    = ThemeColors.Light.success,   // „Erfolg“ als Tertiär
-                background  = ThemeColors.Light.background,
-                surface     = ThemeColors.Light.surface,
-                onPrimary   = Color.White,
-                onBackground= ThemeColors.Light.onSurface,
-                onSurface   = ThemeColors.Light.onSurface,
+                primary      = ThemeColors.Light.primary,
+                secondary    = ThemeColors.Light.secondary,
+                tertiary     = ThemeColors.Light.tertiary,
+                background   = ThemeColors.Light.background,
+                surface      = ThemeColors.Light.surface,
+                outline      = ThemeColors.Light.outline,
+                onPrimary    = ThemeColors.Light.onPrimary,
+                onBackground = ThemeColors.Light.onBg,
+                onSurface    = ThemeColors.Light.onSurf
             ),
             dark = null,
-            extraLight = extrasFor(
-                ThemeColors.Light.primary,
-                ThemeColors.Light.secondary,
-                ThemeColors.Light.success,
-                ThemeColors.Light.warning,
-                ThemeColors.Light.info,
-                iconOn = ThemeColors.Light.icon,
+            extraLight = extrasOf(
+                toggleActive = ThemeColors.Light.toggleActive,
+                toggleInactive = ThemeColors.Light.toggleInactive,
+                sliderActive = ThemeColors.Light.sliderActive,
+                sliderInactiveTrack = ThemeColors.Light.sliderInactiveTrack,
+                iconActive = ThemeColors.Light.iconActive,
+                iconInactive = ThemeColors.Light.iconInactive,
+                heading = ThemeColors.Light.heading,
+                infoText = ThemeColors.Light.infoText,
                 popupBg = ThemeColors.Light.surface,
-                popupContent = ThemeColors.Light.onSurface,
+                popupContent = ThemeColors.Light.onSurf,
                 wheel = ThemeColors.Light.wheelGradient,
                 shake = ThemeColors.Light.shakeGradient,
                 wheelTrack = ThemeColors.Light.wheelTrack,
                 divider = ThemeColors.Light.divider,
-                infoText = ThemeColors.Light.infoText
+                menu = ThemeColors.Light.menu
             ),
-            extraDark  = extrasFor( // Fallback, falls jemand light+dark kombiniert
-                ThemeColors.Light.primary, ThemeColors.Light.secondary, ThemeColors.Light.success,
-                ThemeColors.Light.warning, ThemeColors.Light.info,
-                iconOn = ThemeColors.Light.icon, popupBg = Color(0xFF151515), popupContent = Color(0xFFEFEFEF),
-                wheel = ThemeColors.Light.wheelGradient, shake = ThemeColors.Light.shakeGradient,  wheelTrack = ThemeColors.Light.wheelTrack,
+            extraDark = extrasOf( // Fallback
+                toggleActive = ThemeColors.Light.toggleActive,
+                toggleInactive = ThemeColors.Light.toggleInactive,
+                sliderActive = ThemeColors.Light.sliderActive,
+                sliderInactiveTrack = ThemeColors.Light.sliderInactiveTrack,
+                iconActive = ThemeColors.Light.iconActive,
+                iconInactive = ThemeColors.Light.iconInactive,
+                heading = ThemeColors.Light.heading,
+                infoText = ThemeColors.Light.infoText,
+                popupBg = Color.White,
+                popupContent = Color(0xFF111111),
+                wheel = ThemeColors.Light.wheelGradient,
+                shake = ThemeColors.Light.shakeGradient,
+                wheelTrack = ThemeColors.Light.wheelTrack,
                 divider = ThemeColors.Light.divider,
-                infoText = ThemeColors.Light.infoText
+                menu = ThemeColors.Light.menu
             )
         )
     )
 
-    // DARK (Bild 1)
+    // DARK (gleiche aktive/inaktive Logik wie Light)
     ThemeRegistry.register(
         ThemeSpec(
             id = "dark",
@@ -234,68 +263,49 @@ fun registerDefaultThemes() {
             prefersDark = true,
             light = null,
             dark = darkColorScheme(
-                primary     = ThemeColors.Dark.primary,
-                secondary   = ThemeColors.Dark.secondary,
-                tertiary    = ThemeColors.Dark.success,
-                background  = ThemeColors.Dark.background,
-                surface     = ThemeColors.Dark.surface,
-                onPrimary   = Color.White,
-                onBackground= ThemeColors.Dark.onSurface,
-                onSurface   = ThemeColors.Dark.onSurface,
+                primary      = ThemeColors.Dark.primary,
+                secondary    = ThemeColors.Dark.secondary,
+                tertiary     = ThemeColors.Dark.tertiary,
+                background   = ThemeColors.Dark.background,
+                surface      = ThemeColors.Dark.surface,
+                outline      = ThemeColors.Dark.outline,
+                onPrimary    = ThemeColors.Dark.onPrimary,
+                onBackground = ThemeColors.Dark.onBg,
+                onSurface    = ThemeColors.Dark.onSurf
             ),
-            extraLight = extrasFor( // Fallback (z. B. in Dialogen)
-                ThemeColors.Dark.primary, ThemeColors.Dark.secondary, ThemeColors.Dark.success,
-                ThemeColors.Dark.warning, ThemeColors.Dark.info,
-                iconOn = ThemeColors.Dark.icon, popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
-                wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient, wheelTrack = ThemeColors.Dark.wheelTrack,
+            extraLight = extrasOf( // Fallback
+                toggleActive = ThemeColors.Dark.toggleActive,
+                toggleInactive = ThemeColors.Dark.toggleInactive,
+                sliderActive = ThemeColors.Dark.sliderActive,
+                sliderInactiveTrack = ThemeColors.Dark.sliderInactiveTrack,
+                iconActive = ThemeColors.Dark.iconActive,
+                iconInactive = ThemeColors.Dark.iconInactive,
+                heading = ThemeColors.Dark.heading,
+                infoText = ThemeColors.Dark.infoText,
+                popupBg = Color.White,
+                popupContent = Color(0xFF111111),
+                wheel = ThemeColors.Dark.wheelGradient,
+                shake = ThemeColors.Dark.shakeGradient,
+                wheelTrack = ThemeColors.Dark.wheelTrack,
                 divider = ThemeColors.Dark.divider,
-                infoText = ThemeColors.Dark.infoText
+                menu = ThemeColors.Dark.menu
             ),
-            extraDark  = extrasFor(
-                ThemeColors.Dark.primary, ThemeColors.Dark.secondary, ThemeColors.Dark.success,
-                ThemeColors.Dark.warning, ThemeColors.Dark.info,
-                iconOn = ThemeColors.Dark.icon, popupBg = ThemeColors.Dark.surface,
-                popupContent = ThemeColors.Dark.onSurface,
-                wheel = ThemeColors.Dark.wheelGradient, shake = ThemeColors.Dark.shakeGradient, wheelTrack = ThemeColors.Dark.wheelTrack,
+            extraDark = extrasOf(
+                toggleActive = ThemeColors.Dark.toggleActive,
+                toggleInactive = ThemeColors.Dark.toggleInactive,
+                sliderActive = ThemeColors.Dark.sliderActive,
+                sliderInactiveTrack = ThemeColors.Dark.sliderInactiveTrack,
+                iconActive = ThemeColors.Dark.iconActive,
+                iconInactive = ThemeColors.Dark.iconInactive,
+                heading = ThemeColors.Dark.heading,
+                infoText = ThemeColors.Dark.infoText,
+                popupBg = ThemeColors.Dark.surface,
+                popupContent = ThemeColors.Dark.onSurf,
+                wheel = ThemeColors.Dark.wheelGradient,
+                shake = ThemeColors.Dark.shakeGradient,
+                wheelTrack = ThemeColors.Dark.wheelTrack,
                 divider = ThemeColors.Dark.divider,
-                infoText = ThemeColors.Dark.infoText
-            )
-        )
-    )
-
-    // AMOLED (Bild 3)
-    ThemeRegistry.register(
-        ThemeSpec(
-            id = "amoled",
-            label = "AMOLED",
-            prefersDark = true,
-            light = null,
-            dark = darkColorScheme(
-                primary     = ThemeColors.Amoled.primary,
-                secondary   = ThemeColors.Amoled.secondary,
-                tertiary    = ThemeColors.Amoled.success,
-                background  = ThemeColors.Amoled.background,
-                surface     = ThemeColors.Amoled.surface,
-                onPrimary   = Color.White,
-                onBackground= ThemeColors.Amoled.onSurface,
-                onSurface   = ThemeColors.Amoled.onSurface,
-            ),
-            extraLight = extrasFor( // nur als Fallback
-                ThemeColors.Amoled.primary, ThemeColors.Amoled.secondary, ThemeColors.Amoled.success,
-                ThemeColors.Amoled.warning, ThemeColors.Amoled.info,
-                iconOn = ThemeColors.Amoled.icon, popupBg = Color(0xFFFFFFFF), popupContent = Color(0xFF101112),
-                wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient, wheelTrack = ThemeColors.Light.wheelTrack,
-                divider = ThemeColors.Amoled.divider,
-                infoText = ThemeColors.Amoled.infoText
-            ),
-            extraDark  = extrasFor(
-                ThemeColors.Amoled.primary, ThemeColors.Amoled.secondary, ThemeColors.Amoled.success,
-                ThemeColors.Amoled.warning, ThemeColors.Amoled.info,
-                iconOn = ThemeColors.Amoled.icon, popupBg = ThemeColors.Amoled.surface,
-                popupContent = ThemeColors.Amoled.onSurface,
-                wheel = ThemeColors.Amoled.wheelGradient, shake = ThemeColors.Amoled.shakeGradient, wheelTrack = ThemeColors.Amoled.wheelTrack,
-                divider = ThemeColors.Amoled.divider,
-                infoText = ThemeColors.Amoled.infoText
+                menu = ThemeColors.Dark.menu
             )
         )
     )
@@ -312,14 +322,10 @@ fun SnoozelyTheme(
         "system" -> if (isSystemInDarkTheme()) "dark" else "light"
         else -> themeId
     }
-
     val spec = ThemeRegistry.byId(resolvedId) ?: ThemeRegistry.byId("light")!!
 
-    val useDark = spec.id == "dark" || spec.id == "amoled"
-    val colorScheme = when {
-        useDark -> spec.dark ?: darkColorScheme()
-        else    -> spec.light ?: lightColorScheme()
-    }
+    val useDark = spec.id == "dark"
+    val colorScheme = if (useDark) (spec.dark ?: darkColorScheme()) else (spec.light ?: lightColorScheme())
     val extras = if (useDark) spec.extraDark else spec.extraLight
 
     CompositionLocalProvider(LocalExtraColors provides extras) {

@@ -96,10 +96,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings), color = cs.onPrimaryContainer) },
+                title = { Text(stringResource(R.string.settings), color = extra.menu) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = cs.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = extra.menu)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -111,12 +111,11 @@ fun SettingsScreen(
             )
         },
         bottomBar = {
-            // dezente Fläche, greift Theme-Farben
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .background(cs.surface)
+                    .background(cs.background)
             )
         },
         containerColor = cs.background

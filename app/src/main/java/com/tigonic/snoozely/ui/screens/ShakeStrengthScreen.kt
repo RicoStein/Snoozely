@@ -187,10 +187,10 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.shake_strength), color = cs.onPrimaryContainer) },
+                title = { Text(stringResource(R.string.shake_strength), color = extra.menu) },
                 navigationIcon = {
                     IconButton(onClick = { runCatching { preview?.stop() }; onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = extra.menu)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

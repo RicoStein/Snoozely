@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -192,8 +193,8 @@ fun ShakeExtendSettingsScreen(
         activeTrackColor = extra.slider,
         inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
         thumbColor = extra.slider,
-        activeTickColor = cs.surface.copy(alpha = 0f),
-        inactiveTickColor = cs.surface.copy(alpha = 0f)
+        activeTickColor = Color.Transparent,
+        inactiveTickColor = Color.Transparent
     )
 
     val sectionAlpha = if (enabled) 1f else 0.5f
@@ -201,10 +202,10 @@ fun ShakeExtendSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.shake_to_extend), color = cs.onPrimaryContainer) },
+                title = { Text(stringResource(R.string.shake_to_extend), color = extra.menu) },
                 navigationIcon = {
                     IconButton(onClick = { runCatching { preview?.stop() }; onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = extra.menu)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -298,9 +299,14 @@ fun ShakeExtendSettingsScreen(
                 Slider(
                     enabled = enabled,
                     value = extendMin.toFloat(),
-                    onValueChange = { v -> if (enabled) scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, v.toInt()) } },
+                    onValueChange = { v ->
+                        if (enabled) {
+                            val rounded = v.coerceIn(1f, 30f).toInt() // auf ganze Minuten runden
+                            scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, rounded) }
+                        }
+                    },
                     valueRange = 1f..30f,
-                    steps = 29,
+                    steps = 0, // keine Tick-Punkte
                     colors = sliderColors,
                     modifier = Modifier
                         .padding(horizontal = 8.dp)

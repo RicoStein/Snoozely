@@ -126,10 +126,10 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings_notifications), color = cs.onPrimaryContainer) },
+                title = { Text(stringResource(R.string.settings_notifications), color = extra.menu) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = cs.onPrimaryContainer)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = extra.menu)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -201,9 +201,14 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 Slider(
                     enabled = notificationEnabled,
                     value = extendMinutes.toFloat(),
-                    onValueChange = { v -> if (notificationEnabled) scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(ctx, v.toInt()) } },
+                    onValueChange = { v ->
+                        if (notificationEnabled) {
+                            val rounded = v.coerceIn(1f, 30f).toInt() // ganze Minuten
+                            scope.launch { SettingsPreferenceHelper.setProgressExtendMinutes(ctx, rounded) }
+                        }
+                    },
                     valueRange = 1f..30f,
-                    steps = 29,
+                    steps = 0, // keine Tick-Punkte
                     colors = sliderColors,
                     modifier = Modifier
                         .padding(horizontal = 8.dp)
@@ -283,9 +288,14 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 Slider(
                     enabled = notificationEnabled && showReminder,
                     value = reminderMinutes.toFloat(),
-                    onValueChange = { v -> if (notificationEnabled && showReminder) scope.launch { SettingsPreferenceHelper.setReminderMinutes(ctx, v.toInt()) } },
+                    onValueChange = { v ->
+                        if (notificationEnabled && showReminder) {
+                            val rounded = v.coerceIn(1f, 10f).toInt()
+                            scope.launch { SettingsPreferenceHelper.setReminderMinutes(ctx, rounded) }
+                        }
+                    },
                     valueRange = 1f..10f,
-                    steps = 9,
+                    steps = 0, // keine Tick-Punkte
                     colors = sliderColors,
                     modifier = Modifier
                         .padding(horizontal = 8.dp)
