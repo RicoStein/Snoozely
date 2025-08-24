@@ -15,16 +15,19 @@ import android.os.VibratorManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,6 +60,9 @@ fun ShakeExtendSettingsScreen(
 
     val enabled by SettingsPreferenceHelper.getShakeEnabled(appCtx).collectAsState(initial = false)
     val extendMin by SettingsPreferenceHelper.getShakeExtendMinutes(appCtx).collectAsState(initial = 10)
+    val activationMode by SettingsPreferenceHelper.getShakeActivationMode(appCtx).collectAsState(initial = "immediate")
+    val activationDelay by SettingsPreferenceHelper.getShakeActivationDelayMinutes(appCtx).collectAsState(initial = 3)
+
     val mode by SettingsPreferenceHelper.getShakeSoundMode(appCtx).collectAsState(initial = "tone")
     val ringtoneUriStr by SettingsPreferenceHelper.getShakeRingtone(appCtx).collectAsState(initial = "")
 
@@ -199,6 +205,20 @@ fun ShakeExtendSettingsScreen(
 
     val sectionAlpha = if (enabled) 1f else 0.5f
 
+    // Dialog-UI State
+    var showActivationDialog by remember { mutableStateOf(false) }
+    var draftMode by remember(activationMode) { mutableStateOf(activationMode) } // "immediate" | "after_start"
+    var draftDelay by remember(activationDelay) { mutableStateOf(activationDelay.coerceIn(1,30)) }
+
+    // Label für aktuelle Auswahl
+    val activationLabel = remember(activationMode, activationDelay) {
+        if (activationMode == "after_start") {
+            ctx.getString(R.string.shake_activation_after_start, activationDelay)
+        } else {
+            ctx.getString(R.string.shake_activation_immediate)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -257,7 +277,46 @@ fun ShakeExtendSettingsScreen(
                 }
                 HorizontalDivider(color = extra.divider)
 
+                // NEU) Aktivierungsfenster
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .alpha(if (enabled) 1f else 0.5f)
+                        .clickable(enabled = enabled) { showActivationDialog = true }
+                        .padding(vertical = 10.dp), // gleiche vertikale Padding wie bei den anderen Items
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.shake_activation_title),
+                            color = cs.onBackground,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = activationLabel, // z. B. „Sofort“ oder „3 min nach Start“
+                            color = cs.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    // Rechts das Icon, gleiche Farbe und vertikal mittig wie die Pfeile
+                    IconButton(
+                        enabled = enabled,
+                        onClick = { showActivationDialog = true },
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = cs.onSurfaceVariant)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Tune,
+                            contentDescription = stringResource(R.string.configure),
+                            tint = cs.onSurfaceVariant
+                        )
+                    }
+                }
+                HorizontalDivider(color = extra.divider)
+
+
                 // 2) Schüttelkraft
+                Spacer(Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -274,8 +333,8 @@ fun ShakeExtendSettingsScreen(
                         )
                         Text(
                             text = stringResource(R.string.shake_strength_sub),
-                            color = extra.infoText,
-                            style = MaterialTheme.typography.bodySmall
+                            color = cs.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                     Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
@@ -292,8 +351,8 @@ fun ShakeExtendSettingsScreen(
                 )
                 Text(
                     stringResource(R.string.shake_extend_minutes_hint, extendMin),
-                    color = extra.infoText,
-                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.alpha(sectionAlpha)
                 )
                 Slider(
@@ -301,12 +360,12 @@ fun ShakeExtendSettingsScreen(
                     value = extendMin.toFloat(),
                     onValueChange = { v ->
                         if (enabled) {
-                            val rounded = v.coerceIn(1f, 30f).toInt() // auf ganze Minuten runden
+                            val rounded = v.coerceIn(1f, 30f).toInt()
                             scope.launch { SettingsPreferenceHelper.setShakeExtendMinutes(appCtx, rounded) }
                         }
                     },
                     valueRange = 1f..30f,
-                    steps = 0, // keine Tick-Punkte
+                    steps = 0,
                     colors = sliderColors,
                     modifier = Modifier
                         .padding(horizontal = 8.dp)
@@ -329,7 +388,7 @@ fun ShakeExtendSettingsScreen(
                             color = cs.onBackground,
                             style = MaterialTheme.typography.titleMedium
                         )
-                        Text(toneTitle, color = extra.infoText, style = MaterialTheme.typography.bodySmall)
+                        Text(toneTitle, color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                     }
                     Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
                 }
@@ -376,8 +435,8 @@ fun ShakeExtendSettingsScreen(
                 }
                 Text(
                     text = stringResource(R.string.shake_vibration_hint),
-                    color = extra.infoText,
-                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .padding(top = 2.dp, bottom = 8.dp)
                         .alpha(sectionAlpha)
@@ -395,8 +454,8 @@ fun ShakeExtendSettingsScreen(
                 )
                 Text(
                     stringResource(R.string.volume_relative_hint),
-                    color = extra.infoText,
-                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.alpha(sectionAlpha)
                 )
 
@@ -439,6 +498,123 @@ fun ShakeExtendSettingsScreen(
                     .fillMaxHeight()
                     .padding(end = 2.dp)
             )
+
+            // MODAL: Aktivierungsfenster
+            if (showActivationDialog) {
+                // Hintergrund abdunkeln
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) { /* consume */ }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        color = cs.surface,
+                        contentColor = cs.onSurface,
+                        shape = RoundedCornerShape(16.dp),
+                        tonalElevation = 8.dp,
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column(
+                            Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.shake_activation_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = cs.onSurface
+                            )
+                            Spacer(Modifier.height(8.dp))
+
+                            // Radio: Sofort
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { draftMode = "immediate" }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                RadioButton(
+                                    selected = draftMode == "immediate",
+                                    onClick = { draftMode = "immediate" }
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.shake_activation_immediate), style = MaterialTheme.typography.bodyMedium)
+                            }
+
+                            // Radio: Nach X Minuten
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { draftMode = "after_start" }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                RadioButton(
+                                    selected = draftMode == "after_start",
+                                    onClick = { draftMode = "after_start" }
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.shake_activation_after_start_label), style = MaterialTheme.typography.bodyMedium)
+                            }
+
+                            if (draftMode == "after_start") {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = stringResource(R.string.shake_activation_after_start_value, draftDelay),
+                                    color = cs.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Slider(
+                                    value = draftDelay.toFloat(),
+                                    onValueChange = { v ->
+                                        draftDelay = v.coerceIn(1f, 30f).toInt()
+                                    },
+                                    valueRange = 1f..30f,
+                                    steps = 0,
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = extra.slider,
+                                        inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
+                                        thumbColor = extra.slider,
+                                        activeTickColor = Color.Transparent,
+                                        inactiveTickColor = Color.Transparent
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Button(onClick = {
+                                    scope.launch {
+                                        SettingsPreferenceHelper.setShakeActivationMode(appCtx, draftMode)
+                                        if (draftMode == "after_start") {
+                                            SettingsPreferenceHelper.setShakeActivationDelayMinutes(appCtx, draftDelay)
+                                        }
+                                    }
+                                    showActivationDialog = false
+                                }) {
+                                    Text(stringResource(R.string.close))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

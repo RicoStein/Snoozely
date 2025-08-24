@@ -133,6 +133,17 @@
     <string name="dynamic_colors">Dynamische Farben</string>
     <string name="theme">Theme</string>
 
+    <!-- Shake Active -->
+    <string name="shake_activation_title">Shake aktivieren nach</string>
+    <string name="shake_activation_immediate">Sofort</string>
+    <string name="shake_activation_after_start_label">Nach X Minuten ab Start</string>
+    <string name="shake_activation_after_start">%1$d min nach Start</string>
+    <string name="shake_activation_after_start_value">Aktiv nach: %1$d min</string>
+    <string name="configure">Einstellen</string>
+    <string name="close">Schließen</string>
+    <string name="apply">Übernehmen</string>
+
+
     <!-- Bluetooth -->
     <string name="bluetooth_disable_supported_sub">Bluetooth kann von der App ausgeschaltet werden (Android 11 und älter)</string>
     <string name="bluetooth_turn_off">Bluetooth am Timer-Ende deaktivieren</string>

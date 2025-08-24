@@ -375,24 +375,43 @@ class TimerEngineService : Service() {
         }
     }
 
+    // ... imports & class header unverändert ...
+
     private suspend fun onShakeTriggered() {
         val ctx = applicationContext
         val now = System.currentTimeMillis()
         if (now < shakeCooldownUntil) return  // Service-Sperrzeit
 
-        val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
-        val enabled = SettingsPreferenceHelper.getShakeEnabled(ctx).first()
+        val running = com.tigonic.snoozely.util.TimerPreferenceHelper.getTimerRunning(ctx).first()
+        val enabled = com.tigonic.snoozely.util.SettingsPreferenceHelper.getShakeEnabled(ctx).first()
         if (!running || !enabled) return
 
-        val extendBy = SettingsPreferenceHelper.getShakeExtendMinutes(ctx).first().coerceAtLeast(1)
+        // Aktivierungsfenster prüfen
+        val mode = com.tigonic.snoozely.util.SettingsPreferenceHelper.getShakeActivationMode(ctx).first()
+        val delayMin = com.tigonic.snoozely.util.SettingsPreferenceHelper.getShakeActivationDelayMinutes(ctx).first().coerceIn(1, 30)
+
+        val start = com.tigonic.snoozely.util.TimerPreferenceHelper.getTimerStartTime(ctx).first()
+        val totalMin = com.tigonic.snoozely.util.TimerPreferenceHelper.getTimer(ctx).first()
+        val elapsedMs = (now - start).coerceAtLeast(0)
+        val elapsedMin = (elapsedMs / 60_000L).toInt()
+        val remainingMin = (totalMin - elapsedMin).coerceAtLeast(0)
+
+        val isActive = when (mode) {
+            "after_start" -> elapsedMin >= delayMin
+            else -> true // "immediate"
+        }
+        if (!isActive) return
+
+        val extendBy = com.tigonic.snoozely.util.SettingsPreferenceHelper.getShakeExtendMinutes(ctx).first().coerceAtLeast(1)
         extendTimerBy(extendBy)
 
-        val mode = SettingsPreferenceHelper.getShakeSoundMode(ctx).first() // "tone" | "vibrate"
-        val uri  = SettingsPreferenceHelper.getShakeRingtone(ctx).first()  // leer => Default
-        playShakeFeedback(mode, uri)
+        val soundMode = com.tigonic.snoozely.util.SettingsPreferenceHelper.getShakeSoundMode(ctx).first()  // "tone" | "vibrate"
+        val uri  = com.tigonic.snoozely.util.SettingsPreferenceHelper.getShakeRingtone(ctx).first()
+        playShakeFeedback(soundMode, uri)
 
         shakeCooldownUntil = now + SHAKE_COOLDOWN_MS
     }
+
 
     private suspend fun extendTimerBy(extendMin: Int) {
         val ctx = applicationContext

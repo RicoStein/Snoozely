@@ -27,11 +27,15 @@ object SettingsPreferenceHelper {
 
     // Shake-Keys
     private val KEY_SHAKE_ENABLED = booleanPreferencesKey("shake_extend_enabled")
-    private val KEY_SHAKE_STRENGTH = intPreferencesKey("shake_strength")              // 0..100
-    private val KEY_SHAKE_EXTEND_MIN = intPreferencesKey("shake_extend_minutes")      // 1..30
-    private val KEY_SHAKE_SOUND_MODE = stringPreferencesKey("shake_sound_mode")       // "tone" | "vibrate"
-    private val KEY_SHAKE_RINGTONE = stringPreferencesKey("shake_ringtone_uri")       // optional URI
-    private val KEY_SHAKE_VOLUME = floatPreferencesKey("shake_volume")                // 0f..1f
+    private val KEY_SHAKE_STRENGTH = intPreferencesKey("shake_strength") // 0..100
+    private val KEY_SHAKE_EXTEND_MIN = intPreferencesKey("shake_extend_minutes") // 1..30
+    private val KEY_SHAKE_SOUND_MODE = stringPreferencesKey("shake_sound_mode") // "tone" | "vibrate"
+    private val KEY_SHAKE_RINGTONE = stringPreferencesKey("shake_ringtone_uri") // optional URI
+    private val KEY_SHAKE_VOLUME = floatPreferencesKey("shake_volume") // 0f..1f
+
+    // NEU: Shake Aktivierungsfenster
+    private val KEY_SHAKE_ACTIVATION_MODE = stringPreferencesKey("shake_activation_mode") // "immediate" | "after_start"
+    private val KEY_SHAKE_ACTIVATION_DELAY_MIN = intPreferencesKey("shake_activation_delay_min") // 1..30
 
     // NEU: Unabhängige Toggles & Werte für Notification-Buttons
     private val PROGRESS_EXTEND_ENABLED = booleanPreferencesKey("progress_extend_enabled")
@@ -39,8 +43,8 @@ object SettingsPreferenceHelper {
     private val REMINDER_EXTEND_MINUTES = intPreferencesKey("reminder_extend_minutes")
 
     // --- THEME ---
-    private val THEME_MODE = stringPreferencesKey("theme_mode")            // z.B. "system"|"light"|"dark"|...
-    private val THEME_DYNAMIC = booleanPreferencesKey("theme_dynamic")     // true/false
+    private val THEME_MODE = stringPreferencesKey("theme_mode")
+    private val THEME_DYNAMIC = booleanPreferencesKey("theme_dynamic")
 
     // --- Bluetooth ---
     private val KEY_BLUETOOTH_DISABLE_REQUESTED = booleanPreferencesKey("bluetooth_disable_requested")
@@ -88,6 +92,14 @@ object SettingsPreferenceHelper {
     fun getShakeSoundMode(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_SOUND_MODE] ?: "tone" }
     fun getShakeRingtone(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_RINGTONE] ?: "" }
     fun getShakeVolume(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_VOLUME] ?: 1f }
+
+    // NEU: Aktivierungsfenster
+    fun getShakeActivationMode(ctx: Context) = ctx.dataStore.data.map { prefs ->
+        prefs[KEY_SHAKE_ACTIVATION_MODE] ?: "immediate"
+    }
+    fun getShakeActivationDelayMinutes(ctx: Context) = ctx.dataStore.data.map { prefs ->
+        prefs[KEY_SHAKE_ACTIVATION_DELAY_MIN] ?: 3
+    }
 
     // NEU
     fun getProgressExtendEnabled(ctx: Context) =
@@ -175,14 +187,18 @@ object SettingsPreferenceHelper {
     suspend fun setReminderExtendMinutes(ctx: Context, m: Int) =
         ctx.dataStore.edit { it[REMINDER_EXTEND_MINUTES] = m.coerceIn(1, 30) }
 
+    // NEU: Aktivierungsfenster
+    suspend fun setShakeActivationMode(ctx: Context, mode: String) =
+        ctx.dataStore.edit { it[KEY_SHAKE_ACTIVATION_MODE] = if (mode == "after_start") "after_start" else "immediate" }
+
+    suspend fun setShakeActivationDelayMinutes(ctx: Context, minutes: Int) =
+        ctx.dataStore.edit { it[KEY_SHAKE_ACTIVATION_DELAY_MIN] = minutes.coerceIn(1, 30) }
 
     fun getThemeMode(ctx: Context) = ctx.dataStore.data.map { prefs ->
-        // Default: "system"
         prefs[THEME_MODE] ?: "dark"
     }
 
     suspend fun setThemeMode(ctx: Context, id: String) {
-        // Optional absichern: nur erlaubte IDs – hier akzeptieren wir alles (Registry prüft bei Verwendung)
         ctx.dataStore.edit { it[THEME_MODE] = id }
     }
 
