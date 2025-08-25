@@ -31,6 +31,8 @@ import android.os.VibratorManager
 import android.provider.Settings
 import android.util.Log
 import com.tigonic.snoozely.shake.ShakeDetector
+import com.tigonic.snoozely.widget.TimerQuickStartWidgetProvider
+
 
 class TimerEngineService : Service() {
 
@@ -124,6 +126,10 @@ class TimerEngineService : Service() {
 
                     // Erste Notification aktualisieren (nur wenn erlaubt, wird inside geprüft)
                     sendRunningUpdateNow()
+
+                    // Widgets sofort aktualisieren
+                    kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+
                 }
 
                 return START_STICKY
@@ -313,6 +319,11 @@ class TimerEngineService : Service() {
                 } else {
                     runCatching { nm.cancel(NOTIF_ID_RUNNING) }
                     stopForegroundCompat()
+                }
+
+                // --- Widget live updaten (jede Sekunde, nur wenn läuft) ---
+                kotlin.runCatching {
+                    TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext)
                 }
 
                 // --- Reminder EINMALIG kurz vor Ablauf ---
@@ -596,6 +607,8 @@ class TimerEngineService : Service() {
             val newTotal   = remaining + extend * 60_000L
             val newMinutes = (((newTotal) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
             TimerPreferenceHelper.setTimer(ctx, newMinutes)
+            kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+
         }
     }
 
@@ -620,6 +633,7 @@ class TimerEngineService : Service() {
             val newMinutes = (((newTotalMs) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
 
             TimerPreferenceHelper.setTimer(ctx, newMinutes)
+            kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
         }
     }
 
@@ -631,6 +645,7 @@ class TimerEngineService : Service() {
 
             startServiceSafe(Intent(ctx, AudioFadeService::class.java).setAction(ACTION_FADE_FINALIZE))
             stopEverything(timerFinished = true)
+            kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
         }
     }
 
@@ -673,6 +688,7 @@ class TimerEngineService : Service() {
         disableBluetooth()
         disableWifi()
         stopShakeDetectorAndSound()
+        kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
         stopForegroundCompat()
         stopSelf()
     }

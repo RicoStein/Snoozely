@@ -46,15 +46,12 @@ class TimerWidgetConfigActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     val v = SettingsPreferenceHelper.getPremiumActive(applicationContext).first()
                     if (!v) {
-                        val intent = Intent(
-                            this@TimerWidgetConfigActivity,
-                            com.tigonic.snoozely.MainActivity::class.java
-                        ).apply {
+                        val i = Intent(this@TimerWidgetConfigActivity, com.tigonic.snoozely.MainActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                             putExtra("showPaywall", true)
                             putExtra("source", "widget_config")
                         }
-                        startActivity(intent)
+                        startActivity(i)
                         setResult(Activity.RESULT_CANCELED)
                         finish()
                     } else {
@@ -65,14 +62,11 @@ class TimerWidgetConfigActivity : ComponentActivity() {
 
                 if (loaded && isPremium) {
                     ConfigContent(
+                        initial = getWidgetDuration(applicationContext, appWidgetId, 15),
                         onConfirm = { minutes ->
                             saveWidgetDuration(applicationContext, appWidgetId, minutes)
-                            val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
-                            TimerQuickStartWidgetProvider.updateAppWidget(
-                                applicationContext,
-                                appWidgetManager,
-                                appWidgetId
-                            )
+                            val mgr = AppWidgetManager.getInstance(applicationContext)
+                            TimerQuickStartWidgetProvider.updateAppWidget(applicationContext, mgr, appWidgetId)
                             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                             setResult(Activity.RESULT_OK, result)
                             finish()
@@ -89,13 +83,11 @@ class TimerWidgetConfigActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ConfigContent(onConfirm: (Int) -> Unit, onCancel: () -> Unit) {
-    var minutes by remember { mutableStateOf(15f) }
+private fun ConfigContent(initial: Int, onConfirm: (Int) -> Unit, onCancel: () -> Unit) {
+    var minutes by remember { mutableStateOf(initial.toFloat()) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
+        modifier = Modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

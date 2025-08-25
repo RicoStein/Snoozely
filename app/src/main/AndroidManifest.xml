@@ -85,7 +85,7 @@
             </intent-filter>
         </service>
 
-        <!-- Widget-Provider: sichtbar im Picker -->
+        <!-- Widget-Provider -->
         <receiver
             android:name=".widget.TimerQuickStartWidgetProvider"
             android:exported="true"
@@ -98,7 +98,7 @@
                 android:resource="@xml/timer_quick_start_widget_info" />
         </receiver>
 
-        <!-- Konfigurations-Activity (Premium-Gate) -->
+        <!-- Konfigurations-Activity (für Long-Press “Einstellungen”) -->
         <activity
             android:name=".widget.TimerWidgetConfigActivity"
             android:exported="true"
@@ -121,6 +121,11 @@
                 <action android:name="com.tigonic.snoozely.DEBUG_PREMIUM_TOGGLE" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".widget.WidgetCommandReceiver"
+            android:exported="false" />
+
 
         <activity
             android:name=".MainActivity"
