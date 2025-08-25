@@ -17,10 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
-import com.tigonic.snoozely.ui.components.PremiumPaywallDialog
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 class TimerWidgetConfigActivity : ComponentActivity() {
 
@@ -42,23 +40,30 @@ class TimerWidgetConfigActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                val scope = rememberCoroutineScope()
                 var isPremium by remember { mutableStateOf(false) }
                 var loaded by remember { mutableStateOf(false) }
-                var showPaywall by remember { mutableStateOf(false) }
 
                 LaunchedEffect(Unit) {
                     val v = SettingsPreferenceHelper.getPremiumActive(applicationContext).first()
-                    isPremium = v
-                    loaded = true
-                    if (!v) showPaywall = true
+                    if (!v) {
+                        val intent = Intent(
+                            this@TimerWidgetConfigActivity,
+                            com.tigonic.snoozely.MainActivity::class.java
+                        ).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            putExtra("showPaywall", true)
+                            putExtra("source", "widget_config")
+                        }
+                        startActivity(intent)
+                        setResult(Activity.RESULT_CANCELED)
+                        finish()
+                    } else {
+                        isPremium = true
+                        loaded = true
+                    }
                 }
 
-                if (!loaded) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = stringResource(R.string.appLoading))
-                    }
-                } else if (isPremium) {
+                if (loaded && isPremium) {
                     ConfigContent(
                         onConfirm = { minutes ->
                             saveWidgetDuration(applicationContext, appWidgetId, minutes)
@@ -78,22 +83,6 @@ class TimerWidgetConfigActivity : ComponentActivity() {
                         }
                     )
                 }
-
-                if (showPaywall) {
-                    PremiumPaywallDialog(
-                        onClose = {
-                            setResult(Activity.RESULT_CANCELED)
-                            finish()
-                        },
-                        onPurchase = {
-                            scope.launch {
-                                SettingsPreferenceHelper.setPremiumActive(applicationContext, true)
-                                isPremium = true
-                                showPaywall = false
-                            }
-                        }
-                    )
-                }
             }
         }
     }
@@ -104,7 +93,9 @@ private fun ConfigContent(onConfirm: (Int) -> Unit, onCancel: () -> Unit) {
     var minutes by remember { mutableStateOf(15f) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
