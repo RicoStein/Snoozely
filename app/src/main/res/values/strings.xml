@@ -177,6 +177,7 @@
     <!-- Optional: um die aapt-Warnung zu beseitigen -->
     <string name="sleep_timer">Schlaftimer</string>
 
+
     <!-- WIDGET -->
     <string name="widget_quick_start_title">Schnellstart</string>
     <string name="widget_quick_start_subtitle">Startet mit deinen aktuellen Einstellungen</string>
@@ -185,6 +186,7 @@
     <string name="widget_add">Hinzufügen</string>
     <string name="premium_required">Premium erforderlich</string>
     <string name="widget_quick_start_description">widget beschreibung hier</string>
-
+    <string name="save">Speichern</string>
+    <string name="loading">Lade…</string>
 
 </resources>
