@@ -36,7 +36,6 @@ import kotlinx.coroutines.runBlocking
 class TimerWidgetConfigActivity : ComponentActivity() {
 
     private var appWidgetId: Int = AppWidgetManager.INVALID_APPWIDGET_ID
-    private var finishedOnce = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,6 +77,19 @@ class TimerWidgetConfigActivity : ComponentActivity() {
                     loading = false
                 }
 
+                // Helper-Funktion, um zum Home-Screen zu navigieren und die Activity samt Task zu beenden
+                val navigateHomeAndFinishTask: () -> Unit = {
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                    // NEU: finishAndRemoveTask() statt finish()
+                    // Dies entfernt die Aufgabe aus der "Zuletzt geöffnet"-Liste und signalisiert
+                    // Android, dass der Prozess aufgeräumt werden kann.
+                    finishAndRemoveTask()
+                }
+
                 when {
                     loading -> {
                         Box(
@@ -99,13 +111,11 @@ class TimerWidgetConfigActivity : ComponentActivity() {
                                 TimerQuickStartWidgetProvider.updateAppWidget(applicationContext, mgr, appWidgetId)
                                 val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                                 setResult(Activity.RESULT_OK, result)
-                                finishedOnce = true
-                                finish()
+                                navigateHomeAndFinishTask()
                             },
                             onCancel = {
                                 setResult(Activity.RESULT_CANCELED)
-                                finishedOnce = true
-                                finish()
+                                navigateHomeAndFinishTask()
                             }
                         )
                     }
@@ -122,8 +132,7 @@ class TimerWidgetConfigActivity : ComponentActivity() {
                             },
                             onClose = {
                                 setResult(Activity.RESULT_CANCELED)
-                                finishedOnce = true
-                                finish()
+                                navigateHomeAndFinishTask()
                             }
                         )
                     }
@@ -163,6 +172,8 @@ class TimerWidgetConfigActivity : ComponentActivity() {
     }
 }
 
+// Die @Composable Funktionen (ConfigTheme, WidgetWheelConfigScreen, PremiumRequiredScreen)
+// bleiben exakt wie in der vorherigen Antwort.
 @Composable
 private fun ConfigTheme(
     prefersDark: Boolean?,
