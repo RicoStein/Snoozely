@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,15 +38,23 @@ import com.tigonic.snoozely.ui.screens.startForegroundServiceCompat
 
 class MainActivity : ComponentActivity() {
 
+    // NEU: Den MainViewModel für die Activity instanziieren
+    private val viewModel: MainViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Splash-Screen installieren VOR super.onCreate()
+        installSplashScreen().apply {
+            // Halte den Splash-Screen so lange sichtbar, bis isLoading im ViewModel false ist.
+            setKeepOnScreenCondition {
+                viewModel.isLoading.value
+            }
+        }
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Theme-Presets registrieren (einmalig)
         registerDefaultThemes()
-
         lifecycleScope.launch { maybeStartEngineIfTimerRunning() }
-
         val initialShowPaywall = intent?.getBooleanExtra("showPaywall", false) == true
 
         setContent {
@@ -52,7 +62,6 @@ class MainActivity : ComponentActivity() {
             val dynamic by SettingsPreferenceHelper.getThemeDynamic(this).collectAsState(initial = true)
 
             SnoozelyTheme(themeId = themeId, dynamicColor = dynamic) {
-
                 var showPaywall by remember { mutableStateOf(initialShowPaywall) }
 
                 Box(
@@ -65,30 +74,10 @@ class MainActivity : ComponentActivity() {
                     NavHost(
                         navController = navController,
                         startDestination = "home",
-                        enterTransition = {
-                            slideInHorizontally(
-                                initialOffsetX = { fullWidth -> fullWidth },
-                                animationSpec = tween(300)
-                            )
-                        },
-                        exitTransition = {
-                            slideOutHorizontally(
-                                targetOffsetX = { fullWidth -> -fullWidth },
-                                animationSpec = tween(200)
-                            )
-                        },
-                        popEnterTransition = {
-                            slideInHorizontally(
-                                initialOffsetX = { fullWidth -> -fullWidth },
-                                animationSpec = tween(300)
-                            )
-                        },
-                        popExitTransition = {
-                            slideOutHorizontally(
-                                targetOffsetX = { fullWidth -> fullWidth },
-                                animationSpec = tween(200)
-                            )
-                        }
+                        enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(300)) },
+                        exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(200)) },
+                        popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
+                        popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
                     ) {
                         composable("home") {
                             HomeScreen(onSettingsClick = { navController.navigate("settings") })
@@ -117,10 +106,7 @@ class MainActivity : ComponentActivity() {
 
                     if (showPaywall) {
                         PremiumPaywallDialog(
-                            onClose = {
-                                showPaywall = false
-                                // Nutzer bleibt in der App; Home -> Homescreen
-                            },
+                            onClose = { showPaywall = false },
                             onPurchase = {
                                 lifecycleScope.launch {
                                     SettingsPreferenceHelper.setPremiumActive(applicationContext, true)

@@ -16,12 +16,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -55,34 +50,28 @@ fun HomeScreen(
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
-    // Theme-System
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
 
-    // Premium Dialog State
     var showPremiumDialog by remember { mutableStateOf(false) }
     var overflowOpen by remember { mutableStateOf(false) }
 
-    // Live-States aus DataStore
+    // Die initial-Werte können jetzt wieder sicher sein, da der Splash-Screen wartet.
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 5)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
 
-    // Eigener UI-State für Slider + Debounce-Job
     var sliderMinutes by rememberSaveable { mutableStateOf(timerMinutes.coerceAtLeast(1)) }
     var persistJob by remember { mutableStateOf<Job?>(null) }
 
-    // Slider nur synchronisieren, wenn kein Timer läuft
     LaunchedEffect(timerMinutes, timerRunning) {
         if (!timerRunning) {
             sliderMinutes = timerMinutes.coerceAtLeast(1)
         }
     }
 
-    // Sekundenticker nur für die UI-Anzeige
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
-        Log.d(TAG, "UI tick start: running=$timerRunning, startTime=$timerStartTime")
         if (timerRunning && timerStartTime > 0L) {
             while (isActive) {
                 now = System.currentTimeMillis()
@@ -107,32 +96,24 @@ fun HomeScreen(
 
     val wheelAlpha by animateFloatAsState(
         targetValue = if (timerRunning) 0f else 1f,
-        animationSpec = tween(durationMillis = 0),
+        animationSpec = tween(durationMillis = 300),
         label = "wheelAlpha"
     )
     val wheelScale by animateFloatAsState(
         targetValue = if (timerRunning) 0.93f else 1f,
-        animationSpec = tween(durationMillis = 0),
+        animationSpec = tween(durationMillis = 300),
         label = "wheelScale"
     )
 
-    // --- UI ---
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(cs.background)
+        modifier = Modifier.fillMaxSize().background(cs.background)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(top = 24.dp),
+            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -144,7 +125,6 @@ fun HomeScreen(
                     modifier = Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = {
-                            // Toggle Premium schnell
                             scope.launch {
                                 val current = SettingsPreferenceHelper.getPremiumActive(context).first()
                                 SettingsPreferenceHelper.setPremiumActive(context, !current)
@@ -188,9 +168,7 @@ fun HomeScreen(
         }
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 0.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 0.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -218,7 +196,6 @@ fun HomeScreen(
                     wheelAlpha = wheelAlpha,
                     wheelScale = wheelScale
                 )
-
                 TimerCenterText(
                     minutes = remainingMinutes,
                     seconds = remainingSeconds
@@ -234,12 +211,9 @@ fun HomeScreen(
                             if (timerMinutes != sliderMinutes) {
                                 TimerPreferenceHelper.setTimer(context, sliderMinutes)
                             }
-                            val startIntent = Intent(
-                                context,
-                                TimerEngineService::class.java
-                            ).setAction(TimerContracts.ACTION_START)
+                            val startIntent = Intent(context, TimerEngineService::class.java)
+                                .setAction(TimerContracts.ACTION_START)
                                 .putExtra(TimerContracts.EXTRA_MINUTES, sliderMinutes)
-
                             context.startForegroundServiceCompat(startIntent)
                             TimerPreferenceHelper.startTimer(context, sliderMinutes)
                         } else if (timerRunning) {
@@ -249,9 +223,7 @@ fun HomeScreen(
                         }
                     }
                 },
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(cs.primary, shape = MaterialTheme.shapes.extraLarge)
+                modifier = Modifier.size(72.dp).background(cs.primary, shape = MaterialTheme.shapes.extraLarge)
             ) {
                 Icon(
                     imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -262,13 +234,10 @@ fun HomeScreen(
             }
         }
 
-        // Premium Paywall Dialog
         if (showPremiumDialog) {
             PremiumPaywallDialog(
                 onClose = { showPremiumDialog = false },
                 onPurchase = {
-                    // TODO: replace with Billing-Flow
-                    // Platzhalter: Premium lokal setzen
                     scope.launch {
                         SettingsPreferenceHelper.setPremiumActive(context, true)
                     }
@@ -278,6 +247,8 @@ fun HomeScreen(
         }
     }
 }
+
+
 
 /** Startet nur als Foreground-Service, wenn Progress-Notifications erlaubt sind. */
 fun Context.startForegroundServiceCompat(intent: Intent) {
