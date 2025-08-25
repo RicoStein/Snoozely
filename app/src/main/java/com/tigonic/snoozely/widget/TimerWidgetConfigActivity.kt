@@ -13,11 +13,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
@@ -37,9 +41,6 @@ class TimerWidgetConfigActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Wichtig: Sicherstellen, dass die Themes registriert sind.
-        // In der MainActivity passiert das bereits. Hier als Fallback, falls die
-        // Activity "kalt" gestartet wird, ohne dass die App je lief.
         if (ThemeRegistry.themes.isEmpty()) {
             registerDefaultThemes()
         }
@@ -59,10 +60,11 @@ class TimerWidgetConfigActivity : ComponentActivity() {
             return
         }
 
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         val (prefersDarkOrNull, _) = readThemeSettings()
 
         setContent {
-            // Das neue, robuste ConfigTheme verwenden, das auch ExtraColors korrekt setzt.
             ConfigTheme(prefersDark = prefersDarkOrNull) {
                 var loading by remember { mutableStateOf(true) }
                 var isPremium by remember { mutableStateOf(false) }
@@ -79,9 +81,7 @@ class TimerWidgetConfigActivity : ComponentActivity() {
                 when {
                     loading -> {
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.background),
+                            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -143,7 +143,6 @@ class TimerWidgetConfigActivity : ComponentActivity() {
         val rawDynamic: Any? = runBlocking {
             try { SettingsPreferenceHelper.getThemeDynamic(applicationContext).first() } catch (_: Throwable) { null }
         }
-
         val prefersDark: Boolean? = when (rawMode) {
             is Int -> when (rawMode) { 2 -> true; 1 -> false; else -> null }
             is String -> when (rawMode.lowercase()) {
@@ -164,52 +163,147 @@ class TimerWidgetConfigActivity : ComponentActivity() {
     }
 }
 
-/**
- * Ein robustes, lokales Theme, das sowohl MaterialTheme.colorScheme als auch
- * die custom LocalExtraColors korrekt für den Dark/Light-Mode bereitstellt.
- * Es liest die Theme-Spezifikationen aus der ThemeRegistry.
- */
 @Composable
 private fun ConfigTheme(
-    prefersDark: Boolean?, // true = dark, false = light, null = system
+    prefersDark: Boolean?,
     content: @Composable () -> Unit
 ) {
-    // 1. Bestimme, ob Dark Mode aktiv ist (System-Einstellung als Fallback)
     val useDark = prefersDark ?: isSystemInDarkTheme()
     val themeId = if (useDark) "dark" else "light"
-
-    // 2. Lade die passende Theme-Spezifikation aus der Registry
     val spec = ThemeRegistry.byId(themeId)
 
-    // 3. Wähle das korrekte ColorScheme und die ExtraColors aus der Spezifikation
-    // Fallback auf Standard M3-Themes, falls die Registry leer sein sollte.
     val colorScheme = when {
         spec != null && useDark -> spec.dark ?: darkColorScheme()
         spec != null && !useDark -> spec.light ?: lightColorScheme()
         useDark -> darkColorScheme()
         else -> lightColorScheme()
     }
-
     val extras = when {
         spec != null && useDark -> spec.extraDark
         spec != null && !useDark -> spec.extraLight
-        // Absoluter Notfall-Fallback, falls Registry leer ist -> nimm die Default-Werte
         else -> LocalExtraColors.current
     }
 
-    // 4. Stelle beide Farb-Sets für den Content bereit
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = Color.Transparent.toArgb()
+            window.navigationBarColor = Color.Transparent.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDark
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !useDark
+        }
+    }
+
     CompositionLocalProvider(LocalExtraColors provides extras) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography, // Dein Typography-Objekt aus ThemeSystem.kt
+            typography = Typography,
             content = content
         )
     }
 }
 
+@Composable
+private fun WidgetWheelConfigScreen(
+    appWidgetId: Int,
+    onSave: (Int) -> Unit,
+    onCancel: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val extra = LocalExtraColors.current
+    val ctx = LocalContext.current.applicationContext
+    val scope = rememberCoroutineScope()
 
-// Die folgenden Composables bleiben unverändert, da sie ihre Farben nun
-// korrekt aus dem bereitgestellten LocalExtraColors.current und MaterialTheme.colorScheme beziehen.
+    var minutesState by remember { mutableStateOf<Int>(getWidgetDuration(ctx, appWidgetId, 15)) }
+    var sliderMinutes by remember { mutableStateOf<Int>(minutesState.coerceAtLeast(1)) }
+    var persistJob by remember { mutableStateOf<Job?>(null) }
+
+    LaunchedEffect(minutesState) {
+        sliderMinutes = minutesState.coerceAtLeast(1)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(cs.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.SpaceAround,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 1. Header Section
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineLarge,
+                color = extra.menu,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.widget_config_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = cs.onBackground.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // 2. Wheel Slider Section
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .height(320.dp)
+                .fillMaxWidth()
+        ) {
+            WheelSlider(
+                value = sliderMinutes,
+                onValueChange = { value ->
+                    val coerced = value.coerceAtLeast(1)
+                    sliderMinutes = coerced
+                    persistJob?.cancel()
+                    persistJob = scope.launch {
+                        delay(150)
+                        minutesState = coerced
+                    }
+                },
+                minValue = 1,
+                showCenterText = true,
+                wheelAlpha = 1f,
+                wheelScale = 1f,
+                enabled = true
+            )
+            TimerCenterText(
+                minutes = sliderMinutes,
+                seconds = 0,
+                showLabel = true
+            )
+        }
+
+        // 3. Action Buttons Section
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilledTonalButton(
+                onClick = onCancel,
+                modifier = Modifier.weight(1f).height(52.dp),
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                Text(text = stringResource(R.string.cancel), color = cs.onSurface)
+            }
+            Button(
+                onClick = { onSave(sliderMinutes.coerceAtLeast(1)) },
+                modifier = Modifier.weight(1f).height(52.dp),
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                Text(text = stringResource(R.string.save), fontWeight = FontWeight.Bold, color = cs.onPrimary)
+            }
+        }
+    }
+}
 
 @Composable
 private fun PremiumRequiredScreen(
@@ -258,108 +352,6 @@ private fun PremiumRequiredScreen(
                     shape = MaterialTheme.shapes.extraLarge
                 ) {
                     Text(text = stringResource(R.string.premium_title), fontWeight = FontWeight.Bold, color = cs.onPrimary)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WidgetWheelConfigScreen(
-    appWidgetId: Int,
-    onSave: (Int) -> Unit,
-    onCancel: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    val extra = LocalExtraColors.current
-    val ctx = LocalContext.current.applicationContext
-    val scope = rememberCoroutineScope()
-
-    var minutesState by remember { mutableStateOf<Int>(getWidgetDuration(ctx, appWidgetId, 15)) }
-    var sliderMinutes by remember { mutableStateOf<Int>(minutesState.coerceAtLeast(1)) }
-    var persistJob by remember { mutableStateOf<Job?>(null) }
-
-    LaunchedEffect(minutesState) {
-        sliderMinutes = minutesState.coerceAtLeast(1)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(cs.background)
-            .padding(horizontal = 20.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = stringResource(R.string.app_name),
-                fontSize = MaterialTheme.typography.headlineLarge.fontSize,
-                color = extra.menu,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = stringResource(R.string.widget_config_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = cs.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 6.dp),
-                textAlign = TextAlign.Center
-            )
-        }
-
-        Column(
-            modifier = Modifier.fillMaxSize().padding(top = 100.dp, bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.height(340.dp).fillMaxWidth()
-            ) {
-                // WheelSlider und TimerCenterText nutzen jetzt die korrekten Farben aus dem Theme
-                WheelSlider(
-                    value = sliderMinutes,
-                    onValueChange = { value ->
-                        val coerced = value.coerceAtLeast(1)
-                        sliderMinutes = coerced
-                        persistJob?.cancel()
-                        persistJob = scope.launch {
-                            delay(150)
-                            minutesState = coerced
-                        }
-                    },
-                    minValue = 1,
-                    showCenterText = true,
-                    wheelAlpha = 1f,
-                    wheelScale = 1f,
-                    enabled = true
-                )
-                TimerCenterText(
-                    minutes = sliderMinutes,
-                    seconds = 0,
-                    showLabel = true
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilledTonalButton(
-                    onClick = onCancel,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = MaterialTheme.shapes.extraLarge
-                ) {
-                    Text(text = stringResource(R.string.cancel), color = cs.onSurface)
-                }
-                Button(
-                    onClick = { onSave(sliderMinutes.coerceAtLeast(1)) },
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = MaterialTheme.shapes.extraLarge
-                ) {
-                    Text(text = stringResource(R.string.save), fontWeight = FontWeight.Bold, color = cs.onPrimary)
                 }
             }
         }

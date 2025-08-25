@@ -1,13 +1,18 @@
 package com.tigonic.snoozely.ui.theme
 
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 // --------------------------- TYPO --------------------------------------------
 val Typography = androidx.compose.material3.Typography()
@@ -163,7 +168,6 @@ private object ThemeColors {
 
         val shakeGradient = listOf(primary, Color(0xFF4DD0E1), secondary)
         val divider = Color(0xFF2A2A2A)
-
         // NEU: Menü-Farbe
         val menu = Color.White
     }
@@ -315,7 +319,7 @@ fun registerDefaultThemes() {
 @Composable
 fun SnoozelyTheme(
     themeId: String = "system",
-    dynamicColor: Boolean = false,
+    dynamicColor: Boolean = false, // Dieser Parameter wird aktuell nicht verwendet, bleibt für Zukunft
     content: @Composable () -> Unit
 ) {
     val resolvedId = when (themeId) {
@@ -327,6 +331,23 @@ fun SnoozelyTheme(
     val useDark = spec.id == "dark"
     val colorScheme = if (useDark) (spec.dark ?: darkColorScheme()) else (spec.light ?: lightColorScheme())
     val extras = if (useDark) spec.extraDark else spec.extraLight
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+
+            // 1. Systemleisten transparent machen für Edge-to-Edge
+            window.statusBarColor = Color.Transparent.toArgb()
+            window.navigationBarColor = Color.Transparent.toArgb()
+
+            // 2. Icons der Systemleisten (Status, Navigation) an das App-Theme anpassen
+            //    isAppearanceLightStatusBars = true -> Icons werden dunkel (für helles App-Theme)
+            //    isAppearanceLightStatusBars = false -> Icons werden hell (für dunkles App-Theme)
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDark
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !useDark
+        }
+    }
 
     CompositionLocalProvider(LocalExtraColors provides extras) {
         MaterialTheme(
