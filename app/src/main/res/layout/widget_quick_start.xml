@@ -34,6 +34,4 @@
         android:textStyle="bold"
         tools:text="15" />
 
-    <!-- Ein separater Klick-Bereich ist nicht mehr nötig -->
-
 </FrameLayout>

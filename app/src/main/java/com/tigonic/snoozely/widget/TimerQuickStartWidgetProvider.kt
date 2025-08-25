@@ -6,21 +6,16 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.service.TimerContracts
-import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import com.tigonic.snoozely.widget.getWidgetDuration
-import com.tigonic.snoozely.widget.deleteWidget
 
 private const val TAG = "WidgetProvider"
 
@@ -32,7 +27,6 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray
     ) {
         Log.d(TAG, "onUpdate called for widget IDs: ${appWidgetIds.joinToString()}")
-        // goAsync() ist die empfohlene Methode für Hintergrundarbeit in einem BroadcastReceiver
         val pendingResult = goAsync()
         val scope = CoroutineScope(Dispatchers.IO)
 
@@ -44,7 +38,7 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
                     Log.e(TAG, "Failed to update widget $appWidgetId in onUpdate", e)
                 }
             }
-            pendingResult.finish() // System mitteilen, dass die Arbeit erledigt ist
+            pendingResult.finish()
         }
     }
 
@@ -52,7 +46,6 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
         super.onDeleted(context, appWidgetIds)
         Log.d(TAG, "onDeleted called for widget IDs: ${appWidgetIds.joinToString()}")
         for (appWidgetId in appWidgetIds) {
-            // Korrekt aus den SharedPreferences löschen
             deleteWidget(context, appWidgetId)
         }
     }

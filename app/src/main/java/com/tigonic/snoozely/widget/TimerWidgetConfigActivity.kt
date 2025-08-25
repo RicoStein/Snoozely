@@ -28,11 +28,7 @@ import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.ui.theme.*
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import com.tigonic.snoozely.widget.saveWidgetDuration
 
 private const val TAG = "WidgetConfig"
 
@@ -48,6 +44,7 @@ class TimerWidgetConfigActivity : ComponentActivity() {
             registerDefaultThemes()
         }
 
+        // Standardmäßig auf "Abgebrochen" setzen
         setResult(Activity.RESULT_CANCELED)
 
         appWidgetId = intent?.extras?.getInt(
@@ -66,8 +63,6 @@ class TimerWidgetConfigActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            // Lese die Theme-Einstellungen direkt und asynchron hier.
-            // Kein runBlocking mehr!
             val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
             val useDarkFromSettings = when(themeId) {
                 "dark" -> true
@@ -78,38 +73,33 @@ class TimerWidgetConfigActivity : ComponentActivity() {
             ConfigTheme(useDark = useDarkFromSettings) {
                 val scope = rememberCoroutineScope()
 
-                val navigateHomeAndFinishTask: () -> Unit = {
-                    val intent = Intent(Intent.ACTION_MAIN).apply {
-                        addCategory(Intent.CATEGORY_HOME)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    startActivity(intent)
-                    finishAndRemoveTask()
-                }
-
                 WidgetWheelConfigScreen(
                     appWidgetId = appWidgetId,
                     onSave = { minutes ->
                         Log.d(TAG, "onSave: User clicked Save for widget $appWidgetId with $minutes minutes.")
 
-                        // ALLES in der scope.launch ersetzen durch folgendes:
                         scope.launch {
                             // 1. Dauer in die synchronen SharedPreferences speichern
                             saveWidgetDuration(applicationContext, appWidgetId, minutes)
                             Log.d(TAG, "onSave: Duration saved successfully via SharedPreferences.")
 
-                            // 2. Das Ergebnis-Intent für den Launcher vorbereiten
-                            val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                            // 2. Manuelles Update des Widgets anstoßen, um die neue Zeit sofort anzuzeigen
+                            val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
+                            TimerQuickStartWidgetProvider.updateAppWidget(applicationContext, appWidgetManager, appWidgetId)
 
-                            // 3. Das Ergebnis setzen und die Activity KORREKT beenden
+                            // 3. Das Ergebnis-Intent für den Launcher vorbereiten
+                            val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                             setResult(Activity.RESULT_OK, resultValue)
-                            finish()
+
+                            // 4. Activity vollständig beenden und aus den letzten Tasks entfernen
+                            finishAndRemoveTask()
                         }
                     },
                     onCancel = {
                         Log.d(TAG, "onCancel: User clicked Cancel for widget $appWidgetId.")
                         setResult(Activity.RESULT_CANCELED)
-                        navigateHomeAndFinishTask()
+                        // Activity vollständig beenden und aus den letzten Tasks entfernen
+                        finishAndRemoveTask()
                     }
                 )
             }
@@ -167,23 +157,10 @@ private fun WidgetWheelConfigScreen(
     val extra = LocalExtraColors.current
     val ctx = LocalContext.current.applicationContext
 
-    val initialMinutes by SettingsPreferenceHelper.getWidgetDuration(ctx, appWidgetId)
-        .collectAsState(initial = null)
+    // Lese den zuletzt gespeicherten Wert für dieses Widget als Startwert
+    val initialMinutes = remember { getWidgetDuration(ctx, appWidgetId, 15) }
+    var sliderMinutes by remember { mutableStateOf(initialMinutes) }
 
-    var sliderMinutes by remember { mutableStateOf<Int?>(null) }
-
-    LaunchedEffect(initialMinutes) {
-        if (sliderMinutes == null) {
-            sliderMinutes = initialMinutes ?: 15
-        }
-    }
-
-    if (sliderMinutes == null) {
-        Box(modifier = Modifier.fillMaxSize().background(cs.background), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = cs.primary)
-        }
-        return
-    }
 
     Column(
         modifier = Modifier
@@ -216,14 +193,14 @@ private fun WidgetWheelConfigScreen(
             modifier = Modifier.height(320.dp).fillMaxWidth()
         ) {
             WheelSlider(
-                value = sliderMinutes!!,
+                value = sliderMinutes,
                 onValueChange = { value ->
                     sliderMinutes = value.coerceAtLeast(1)
                 },
                 minValue = 1
             )
             TimerCenterText(
-                minutes = sliderMinutes!!,
+                minutes = sliderMinutes,
                 seconds = 0,
                 showLabel = true
             )
@@ -242,7 +219,7 @@ private fun WidgetWheelConfigScreen(
                 Text(text = stringResource(R.string.cancel), color = cs.onSurface)
             }
             Button(
-                onClick = { onSave(sliderMinutes!!) },
+                onClick = { onSave(sliderMinutes) },
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = MaterialTheme.shapes.extraLarge
             ) {

@@ -1,5 +1,3 @@
-// Kompletter Inhalt für TimerStartReceiver.kt
-
 package com.tigonic.snoozely.widget
 
 import android.appwidget.AppWidgetManager
@@ -17,7 +15,6 @@ import kotlinx.coroutines.runBlocking
 
 class TimerStartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        // Unterscheide zwischen den Aktionen, die vom Widget kommen können
         when (intent.action) {
             TimerContracts.ACTION_START -> handleStart(context, intent)
             TimerContracts.ACTION_STOP -> handleStop(context)
@@ -28,14 +25,12 @@ class TimerStartReceiver : BroadcastReceiver() {
         val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
 
-        // Dein Premium-Check
         val isPremium = runBlocking { SettingsPreferenceHelper.getPremiumActive(context).first() }
         if (!isPremium) {
             Toast.makeText(context, "Premium erforderlich – bitte freischalten.", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Dauer aus den synchronen SharedPreferences lesen
         val minutes = getWidgetDuration(context, appWidgetId, 15)
 
         val startIntent = Intent(context, TimerEngineService::class.java)
