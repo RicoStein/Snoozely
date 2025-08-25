@@ -4,6 +4,7 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -27,11 +28,13 @@ import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.ui.theme.*
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import com.tigonic.snoozely.widget.saveWidgetDuration
+
+private const val TAG = "WidgetConfig"
 
 class TimerWidgetConfigActivity : ComponentActivity() {
 
@@ -39,6 +42,7 @@ class TimerWidgetConfigActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate: Activity started.")
 
         if (ThemeRegistry.themes.isEmpty()) {
             registerDefaultThemes()
@@ -51,135 +55,73 @@ class TimerWidgetConfigActivity : ComponentActivity() {
             AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
+        Log.d(TAG, "onCreate: Received appWidgetId: $appWidgetId")
+
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            startActivity(Intent(this, com.tigonic.snoozely.MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            })
+            Log.e(TAG, "onCreate: Invalid appWidgetId. Finishing activity.")
             finish()
             return
         }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        val (prefersDarkOrNull, _) = readThemeSettings()
-
         setContent {
-            ConfigTheme(prefersDark = prefersDarkOrNull) {
-                var loading by remember { mutableStateOf(true) }
-                var isPremium by remember { mutableStateOf(false) }
+            // Lese die Theme-Einstellungen direkt und asynchron hier.
+            // Kein runBlocking mehr!
+            val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
+            val useDarkFromSettings = when(themeId) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
 
-                LaunchedEffect(Unit) {
-                    isPremium = try {
-                        SettingsPreferenceHelper.getPremiumActive(applicationContext).first()
-                    } catch (_: Throwable) {
-                        false
-                    }
-                    loading = false
-                }
+            ConfigTheme(useDark = useDarkFromSettings) {
+                val scope = rememberCoroutineScope()
 
-                // Helper-Funktion, um zum Home-Screen zu navigieren und die Activity samt Task zu beenden
                 val navigateHomeAndFinishTask: () -> Unit = {
                     val intent = Intent(Intent.ACTION_MAIN).apply {
                         addCategory(Intent.CATEGORY_HOME)
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     }
                     startActivity(intent)
-                    // NEU: finishAndRemoveTask() statt finish()
-                    // Dies entfernt die Aufgabe aus der "Zuletzt geöffnet"-Liste und signalisiert
-                    // Android, dass der Prozess aufgeräumt werden kann.
                     finishAndRemoveTask()
                 }
 
-                when {
-                    loading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = stringResource(R.string.loading),
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
+                WidgetWheelConfigScreen(
+                    appWidgetId = appWidgetId,
+                    onSave = { minutes ->
+                        Log.d(TAG, "onSave: User clicked Save for widget $appWidgetId with $minutes minutes.")
+
+                        // ALLES in der scope.launch ersetzen durch folgendes:
+                        scope.launch {
+                            // 1. Dauer in die synchronen SharedPreferences speichern
+                            saveWidgetDuration(applicationContext, appWidgetId, minutes)
+                            Log.d(TAG, "onSave: Duration saved successfully via SharedPreferences.")
+
+                            // 2. Das Ergebnis-Intent für den Launcher vorbereiten
+                            val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+
+                            // 3. Das Ergebnis setzen und die Activity KORREKT beenden
+                            setResult(Activity.RESULT_OK, resultValue)
+                            finish()
                         }
+                    },
+                    onCancel = {
+                        Log.d(TAG, "onCancel: User clicked Cancel for widget $appWidgetId.")
+                        setResult(Activity.RESULT_CANCELED)
+                        navigateHomeAndFinishTask()
                     }
-                    isPremium -> {
-                        WidgetWheelConfigScreen(
-                            appWidgetId = appWidgetId,
-                            onSave = { minutes ->
-                                saveWidgetDuration(applicationContext, appWidgetId, minutes)
-                                val mgr = AppWidgetManager.getInstance(applicationContext)
-                                TimerQuickStartWidgetProvider.updateAppWidget(applicationContext, mgr, appWidgetId)
-                                val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                                setResult(Activity.RESULT_OK, result)
-                                navigateHomeAndFinishTask()
-                            },
-                            onCancel = {
-                                setResult(Activity.RESULT_CANCELED)
-                                navigateHomeAndFinishTask()
-                            }
-                        )
-                    }
-                    else -> {
-                        PremiumRequiredScreen(
-                            onOpenApp = {
-                                startActivity(
-                                    Intent(this@TimerWidgetConfigActivity, com.tigonic.snoozely.MainActivity::class.java).apply {
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                        putExtra("showPaywall", true)
-                                        putExtra("source", "widget_config")
-                                    }
-                                )
-                            },
-                            onClose = {
-                                setResult(Activity.RESULT_CANCELED)
-                                navigateHomeAndFinishTask()
-                            }
-                        )
-                    }
-                }
+                )
             }
         }
-    }
-
-    override fun onPause() {
-        super.onPause()
-    }
-
-    private fun readThemeSettings(): Pair<Boolean?, Boolean> {
-        val rawMode: Any? = runBlocking {
-            try { SettingsPreferenceHelper.getThemeMode(applicationContext).first() } catch (_: Throwable) { null }
-        }
-        val rawDynamic: Any? = runBlocking {
-            try { SettingsPreferenceHelper.getThemeDynamic(applicationContext).first() } catch (_: Throwable) { null }
-        }
-        val prefersDark: Boolean? = when (rawMode) {
-            is Int -> when (rawMode) { 2 -> true; 1 -> false; else -> null }
-            is String -> when (rawMode.lowercase()) {
-                "2", "dark", "dunkel" -> true
-                "1", "light", "hell" -> false
-                "0", "system", "auto" -> null
-                else -> null
-            }
-            else -> null
-        }
-        val dynamic = when (rawDynamic) {
-            is Boolean -> rawDynamic
-            is Int -> rawDynamic != 0
-            is String -> rawDynamic.equals("true", ignoreCase = true) || rawDynamic == "1"
-            else -> false
-        }
-        return prefersDark to dynamic
     }
 }
 
-// Die @Composable Funktionen (ConfigTheme, WidgetWheelConfigScreen, PremiumRequiredScreen)
-// bleiben exakt wie in der vorherigen Antwort.
 @Composable
 private fun ConfigTheme(
-    prefersDark: Boolean?,
+    useDark: Boolean,
     content: @Composable () -> Unit
 ) {
-    val useDark = prefersDark ?: isSystemInDarkTheme()
     val themeId = if (useDark) "dark" else "light"
     val spec = ThemeRegistry.byId(themeId)
 
@@ -224,14 +166,23 @@ private fun WidgetWheelConfigScreen(
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
     val ctx = LocalContext.current.applicationContext
-    val scope = rememberCoroutineScope()
 
-    var minutesState by remember { mutableStateOf<Int>(getWidgetDuration(ctx, appWidgetId, 15)) }
-    var sliderMinutes by remember { mutableStateOf<Int>(minutesState.coerceAtLeast(1)) }
-    var persistJob by remember { mutableStateOf<Job?>(null) }
+    val initialMinutes by SettingsPreferenceHelper.getWidgetDuration(ctx, appWidgetId)
+        .collectAsState(initial = null)
 
-    LaunchedEffect(minutesState) {
-        sliderMinutes = minutesState.coerceAtLeast(1)
+    var sliderMinutes by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(initialMinutes) {
+        if (sliderMinutes == null) {
+            sliderMinutes = initialMinutes ?: 15
+        }
+    }
+
+    if (sliderMinutes == null) {
+        Box(modifier = Modifier.fillMaxSize().background(cs.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = cs.primary)
+        }
+        return
     }
 
     Column(
@@ -244,7 +195,6 @@ private fun WidgetWheelConfigScreen(
         verticalArrangement = Arrangement.SpaceAround,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Header Section
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = stringResource(R.string.app_name),
@@ -261,38 +211,24 @@ private fun WidgetWheelConfigScreen(
             )
         }
 
-        // 2. Wheel Slider Section
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .height(320.dp)
-                .fillMaxWidth()
+            modifier = Modifier.height(320.dp).fillMaxWidth()
         ) {
             WheelSlider(
-                value = sliderMinutes,
+                value = sliderMinutes!!,
                 onValueChange = { value ->
-                    val coerced = value.coerceAtLeast(1)
-                    sliderMinutes = coerced
-                    persistJob?.cancel()
-                    persistJob = scope.launch {
-                        delay(150)
-                        minutesState = coerced
-                    }
+                    sliderMinutes = value.coerceAtLeast(1)
                 },
-                minValue = 1,
-                showCenterText = true,
-                wheelAlpha = 1f,
-                wheelScale = 1f,
-                enabled = true
+                minValue = 1
             )
             TimerCenterText(
-                minutes = sliderMinutes,
+                minutes = sliderMinutes!!,
                 seconds = 0,
                 showLabel = true
             )
         }
 
-        // 3. Action Buttons Section
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -306,64 +242,11 @@ private fun WidgetWheelConfigScreen(
                 Text(text = stringResource(R.string.cancel), color = cs.onSurface)
             }
             Button(
-                onClick = { onSave(sliderMinutes.coerceAtLeast(1)) },
+                onClick = { onSave(sliderMinutes!!) },
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = MaterialTheme.shapes.extraLarge
             ) {
                 Text(text = stringResource(R.string.save), fontWeight = FontWeight.Bold, color = cs.onPrimary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PremiumRequiredScreen(
-    onOpenApp: () -> Unit,
-    onClose: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    val extra = LocalExtraColors.current
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(cs.background)
-            .padding(horizontal = 20.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = stringResource(R.string.premium_required),
-                style = MaterialTheme.typography.headlineSmall,
-                color = extra.menu,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.premium_benefit_widget),
-                style = MaterialTheme.typography.bodyMedium,
-                color = cs.onBackground.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                FilledTonalButton(
-                    onClick = onClose,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = MaterialTheme.shapes.extraLarge
-                ) {
-                    Text(text = stringResource(R.string.cancel), color = cs.onSurface)
-                }
-                Button(
-                    onClick = onOpenApp,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = MaterialTheme.shapes.extraLarge
-                ) {
-                    Text(text = stringResource(R.string.premium_title), fontWeight = FontWeight.Bold, color = cs.onPrimary)
-                }
             }
         }
     }

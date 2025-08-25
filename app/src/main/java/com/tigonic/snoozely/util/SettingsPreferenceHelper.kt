@@ -232,4 +232,25 @@ object SettingsPreferenceHelper {
 
     suspend fun setPremiumActive(ctx: Context, v: Boolean) =
         ctx.dataStore.edit { it[PREMIUM_ACTIVE] = v }
+
+
+
+    suspend fun setWidgetDuration(context: Context, appWidgetId: Int, minutes: Int) {
+        context.dataStore.edit { settings ->
+            settings[intPreferencesKey("widget_${appWidgetId}_duration")] = minutes
+        }
+    }
+
+    // Lädt die Dauer für eine bestimmte Widget-ID
+    fun getWidgetDuration(context: Context, appWidgetId: Int): Flow<Int?> {
+        return context.dataStore.data.map { settings ->
+            settings[intPreferencesKey("widget_${appWidgetId}_duration")]
+        }
+    }
+
+    suspend fun clearWidgetDuration(context: Context, appWidgetId: Int) {
+        context.dataStore.edit { settings ->
+            settings.remove(intPreferencesKey("widget_${appWidgetId}_duration"))
+        }
+    }
 }

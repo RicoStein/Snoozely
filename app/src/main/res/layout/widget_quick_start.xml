@@ -1,42 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:minWidth="250dp"
-    android:minHeight="120dp"
-    android:padding="12dp"
-    android:background="#1F2A2E">
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:padding="8dp"
+    android:background="@drawable/widget_background_default">
 
-    <ImageButton
-        android:id="@+id/btnConfig"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentTop="true"
-        android:background="@android:color/transparent"
-        android:src="@android:drawable/ic_menu_manage"
-        android:tint="#DDECF1"
-        android:contentDescription="@string/settings" />
+    <!-- Der ablaufende Kreis -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:indeterminate="false"
+        android:max="100"
+        android:progress="100"
+        android:progressDrawable="@drawable/widget_progress_circle"
+        tools:progress="60" />
 
+    <!-- Die Zeit-Anzeige, zentriert im Kreis -->
     <TextView
         android:id="@+id/txtTime"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:text="15"
-        android:textSize="36sp"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:textColor="@android:color/white"
+        android:textSize="28sp"
         android:textStyle="bold"
-        android:textColor="#FFFFFF" />
+        tools:text="15" />
 
-    <ImageButton
-        android:id="@+id/btnToggle"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_alignParentEnd="true"
-        android:layout_centerVertical="true"
-        android:background="@android:color/transparent"
-        android:src="@android:drawable/ic_media_play"
-        android:tint="#FFFFFF"
-        android:contentDescription="@string/play" />
-</RelativeLayout>
+    <!-- Ein separater Klick-Bereich ist nicht mehr nötig -->
+
+</FrameLayout>

@@ -122,11 +122,6 @@
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name=".widget.WidgetCommandReceiver"
-            android:exported="false" />
-
-
         <activity
             android:name=".MainActivity"
             android:exported="true"

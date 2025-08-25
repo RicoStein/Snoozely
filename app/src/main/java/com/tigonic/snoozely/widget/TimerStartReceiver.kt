@@ -1,10 +1,12 @@
+// Kompletter Inhalt für TimerStartReceiver.kt
+
 package com.tigonic.snoozely.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
-import android.appwidget.AppWidgetManager
 import com.tigonic.snoozely.service.TimerContracts
 import com.tigonic.snoozely.service.TimerEngineService
 import com.tigonic.snoozely.ui.screens.startForegroundServiceCompat
@@ -15,21 +17,38 @@ import kotlinx.coroutines.runBlocking
 
 class TimerStartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Unterscheide zwischen den Aktionen, die vom Widget kommen können
+        when (intent.action) {
+            TimerContracts.ACTION_START -> handleStart(context, intent)
+            TimerContracts.ACTION_STOP -> handleStop(context)
+        }
+    }
+
+    private fun handleStart(context: Context, intent: Intent) {
         val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
 
+        // Dein Premium-Check
         val isPremium = runBlocking { SettingsPreferenceHelper.getPremiumActive(context).first() }
         if (!isPremium) {
             Toast.makeText(context, "Premium erforderlich – bitte freischalten.", Toast.LENGTH_SHORT).show()
             return
         }
 
+        // Dauer aus den synchronen SharedPreferences lesen
         val minutes = getWidgetDuration(context, appWidgetId, 15)
+
         val startIntent = Intent(context, TimerEngineService::class.java)
             .setAction(TimerContracts.ACTION_START)
             .putExtra(TimerContracts.EXTRA_MINUTES, minutes)
 
         context.startForegroundServiceCompat(startIntent)
         runBlocking { TimerPreferenceHelper.startTimer(context, minutes) }
+    }
+
+    private fun handleStop(context: Context) {
+        val stopIntent = Intent(context, TimerEngineService::class.java)
+            .setAction(TimerContracts.ACTION_STOP)
+        context.startForegroundServiceCompat(stopIntent)
     }
 }
