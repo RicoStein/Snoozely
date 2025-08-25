@@ -28,7 +28,7 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
@@ -40,7 +40,6 @@
             android:name=".service.TimerEngineService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
-
 
         <!-- Notification + Heads-up -->
         <service
@@ -85,6 +84,43 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <!-- Widget-Provider: sichtbar im Picker -->
+        <receiver
+            android:name=".widget.TimerQuickStartWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_quick_start_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/timer_quick_start_widget_info" />
+        </receiver>
+
+        <!-- Konfigurations-Activity (Premium-Gate) -->
+        <activity
+            android:name=".widget.TimerWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Snoozely">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- Klick-Receiver vom Widget -->
+        <receiver
+            android:name=".widget.TimerStartReceiver"
+            android:exported="false" />
+
+        <!-- Optional: Premium Toggle -->
+        <receiver
+            android:name=".widget.PremiumToggleReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.tigonic.snoozely.DEBUG_PREMIUM_TOGGLE" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".MainActivity"

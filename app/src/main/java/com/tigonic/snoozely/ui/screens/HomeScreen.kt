@@ -7,12 +7,17 @@ import android.os.Build
 import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,9 +33,11 @@ import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.service.TimerContracts
 import com.tigonic.snoozely.service.TimerEngineService
+import com.tigonic.snoozely.ui.components.PremiumPaywallDialog
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.ui.theme.LocalExtraColors
+import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,6 +47,7 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "HomeScreenDebug"
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onSettingsClick: () -> Unit,
@@ -51,6 +59,10 @@ fun HomeScreen(
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
 
+    // Premium Dialog State
+    var showPremiumDialog by remember { mutableStateOf(false) }
+    var overflowOpen by remember { mutableStateOf(false) }
+
     // Live-States aus DataStore
     val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 5)
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
@@ -60,7 +72,7 @@ fun HomeScreen(
     var sliderMinutes by rememberSaveable { mutableStateOf(timerMinutes.coerceAtLeast(1)) }
     var persistJob by remember { mutableStateOf<Job?>(null) }
 
-    // Slider nur synchronisieren, wenn kein Timer läuft (kein Drag-End-Callback vorhanden)
+    // Slider nur synchronisieren, wenn kein Timer läuft
     LaunchedEffect(timerMinutes, timerRunning) {
         if (!timerRunning) {
             sliderMinutes = timerMinutes.coerceAtLeast(1)
@@ -83,12 +95,11 @@ fun HomeScreen(
     val elapsedMillis: Long = if (startTimeValid) now - timerStartTime else 0L
     val elapsedSec: Int = (elapsedMillis / 1000L).toInt()
 
-    // Alles strikt Int, damit keine BigDecimal-Overloads greifen
     val totalSeconds: Int = when {
-        !timerRunning     -> sliderMinutes * 60
-        !startTimeValid   -> timerMinutes * 60
-        elapsedSec < 0    -> timerMinutes * 60
-        else              -> (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
+        !timerRunning -> sliderMinutes * 60
+        !startTimeValid -> timerMinutes * 60
+        elapsedSec < 0 -> timerMinutes * 60
+        else -> (timerMinutes * 60 - elapsedSec).coerceAtLeast(0)
     }
 
     val remainingMinutes: Int = totalSeconds / 60
@@ -109,7 +120,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(cs.background) // Theme-Fläche
+            .background(cs.background)
     ) {
         Column(
             modifier = Modifier
@@ -128,15 +139,50 @@ fun HomeScreen(
                 Text(
                     text = stringResource(R.string.app_name),
                     fontSize = MaterialTheme.typography.headlineLarge.fontSize,
-                    color = extra.menu, // markenprägnante Überschrift-Farbe aus Theme
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onSettingsClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = stringResource(R.string.settings),
-                        tint = extra.menu // Icons folgen ExtraColors
+                    color = extra.menu,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            // Toggle Premium schnell
+                            scope.launch {
+                                val current = SettingsPreferenceHelper.getPremiumActive(context).first()
+                                SettingsPreferenceHelper.setPremiumActive(context, !current)
+                                val msg = if (!current) "Premium AN" else "Premium AUS"
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     )
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.settings),
+                            tint = extra.menu
+                        )
+                    }
+                    Box {
+                        IconButton(onClick = { overflowOpen = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = stringResource(R.string.more),
+                                tint = extra.menu
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = overflowOpen,
+                            onDismissRequest = { overflowOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.premium_activate_q)) },
+                                onClick = {
+                                    overflowOpen = false
+                                    showPremiumDialog = true
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -160,7 +206,6 @@ fun HomeScreen(
                         if (!timerRunning) {
                             val coerced = value.coerceAtLeast(1)
                             sliderMinutes = coerced
-                            // Debounce: schreibe erst 250 ms nach der letzten Änderung
                             persistJob?.cancel()
                             persistJob = scope.launch {
                                 delay(250)
@@ -172,13 +217,11 @@ fun HomeScreen(
                     showCenterText = !timerRunning,
                     wheelAlpha = wheelAlpha,
                     wheelScale = wheelScale
-                    // Farben/Grafik bezieht WheelSlider intern über Theme (cs/extra)
                 )
 
                 TimerCenterText(
                     minutes = remainingMinutes,
                     seconds = remainingSeconds
-                    // Textfarben zieht sich die Komponente aus dem Theme
                 )
             }
 
@@ -218,6 +261,21 @@ fun HomeScreen(
                 )
             }
         }
+
+        // Premium Paywall Dialog
+        if (showPremiumDialog) {
+            PremiumPaywallDialog(
+                onClose = { showPremiumDialog = false },
+                onPurchase = {
+                    // TODO: replace with Billing-Flow
+                    // Platzhalter: Premium lokal setzen
+                    scope.launch {
+                        SettingsPreferenceHelper.setPremiumActive(context, true)
+                    }
+                    showPremiumDialog = false
+                }
+            )
+        }
     }
 }
 
@@ -227,7 +285,7 @@ fun Context.startForegroundServiceCompat(intent: Intent) {
     val baseShould =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
                 (action == TimerContracts.ACTION_START ||
-                        action == TimerContracts.ACTION_STOP  ||
+                        action == TimerContracts.ACTION_STOP ||
                         action == TimerContracts.ACTION_EXTEND)
 
     if (!baseShould) {

@@ -164,4 +164,27 @@
     <string name="notifications_progress_hint">Zeigt den Fortschritt in der Statusbar</string>
 
 
+    <!-- PREMIUM -->
+    <string name="premium_activate_q">Premium aktivieren?</string>
+    <string name="premium_title">Snoozely Premium</string>
+    <string name="premium_benefits_title">Das bekommst du mit Premium</string>
+    <string name="premium_benefit_widget">Quick-Start Widget für den Homescreen</string>
+    <string name="premium_benefit_no_ads">Zukünftig keine Werbung</string>
+    <string name="premium_benefit_support">Unterstütze die Weiterentwicklung</string>
+    <string name="premium_buy_with_google_play">Mit Google Play freischalten</string>
+    <string name="more">Mehr</string>
+
+    <!-- Optional: um die aapt-Warnung zu beseitigen -->
+    <string name="sleep_timer">Schlaftimer</string>
+
+    <!-- WIDGET -->
+    <string name="widget_quick_start_title">Schnellstart</string>
+    <string name="widget_quick_start_subtitle">Startet mit deinen aktuellen Einstellungen</string>
+    <string name="widget_config_title">Widget konfigurieren</string>
+    <string name="widget_config_duration">Dauer (Minuten)</string>
+    <string name="widget_add">Hinzufügen</string>
+    <string name="premium_required">Premium erforderlich</string>
+    <string name="widget_quick_start_description">widget beschreibung hier</string>
+
+
 </resources>
