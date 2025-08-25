@@ -45,9 +45,7 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         Log.d(TAG, "onDeleted called for widget IDs: ${appWidgetIds.joinToString()}")
-        for (appWidgetId in appWidgetIds) {
-            deleteWidget(context, appWidgetId)
-        }
+        // Hier ist keine Aktion mehr nötig, da die Dauer nicht mehr pro Widget gespeichert wird
     }
 
     companion object {
@@ -56,7 +54,7 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
             try {
                 val running = TimerPreferenceHelper.getTimerRunning(context).first()
                 val startTime = TimerPreferenceHelper.getTimerStartTime(context).first()
-                val totalMinutes = getWidgetDuration(context, appWidgetId)
+                val totalMinutes = TimerPreferenceHelper.getTimer(context).first()
 
                 val views = RemoteViews(context.packageName, R.layout.widget_quick_start)
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -65,6 +63,7 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
                     val totalMs = totalMinutes * 60_000L
                     val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(0)
                     val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
+
                     val remainingMinutes = (remainingMs / 60_000L).toInt()
                     val progress = if (totalMs > 0) (remainingMs * 100 / totalMs).toInt() else 0
 
@@ -77,7 +76,8 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
                     views.setOnClickPendingIntent(R.id.widget_root, stopPendingIntent)
 
                 } else {
-                    views.setTextViewText(R.id.txtTime, totalMinutes.toString())
+                    val configMinutes = getWidgetDuration(context, appWidgetId, totalMinutes)
+                    views.setTextViewText(R.id.txtTime, configMinutes.toString())
                     views.setViewVisibility(R.id.progress_bar, View.GONE)
 
                     val startIntent = Intent(context, TimerStartReceiver::class.java).apply {
@@ -92,16 +92,6 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error in suspend updateAppWidget for $appWidgetId", e)
             }
-        }
-
-        fun requestUpdateAll(context: Context) {
-            val intent = Intent(context, TimerQuickStartWidgetProvider::class.java).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                val appWidgetManager = AppWidgetManager.getInstance(context)
-                val ids = appWidgetManager.getAppWidgetIds(android.content.ComponentName(context, TimerQuickStartWidgetProvider::class.java))
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            }
-            context.sendBroadcast(intent)
         }
     }
 }

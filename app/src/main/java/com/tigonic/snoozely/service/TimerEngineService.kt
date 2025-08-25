@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -45,6 +46,7 @@ class TimerEngineService : Service() {
         private const val SHAKE_COOLDOWN_MS = 3000L
 
         @Volatile var isForeground: Boolean = false
+
     }
 
     // --- Shake-Integration ---
@@ -121,6 +123,8 @@ class TimerEngineService : Service() {
                     // Ticker starten
                     startTickerIfNeeded()
 
+
+
                     // AudioFade laufen lassen
                     startServiceSafe(Intent(ctx, AudioFadeService::class.java))
 
@@ -128,7 +132,8 @@ class TimerEngineService : Service() {
                     sendRunningUpdateNow()
 
                     // Widgets sofort aktualisieren
-                    kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+                    //kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+                    requestWidgetUpdate()
 
                 }
 
@@ -322,9 +327,6 @@ class TimerEngineService : Service() {
                 }
 
                 // --- Widget live updaten (jede Sekunde, nur wenn läuft) ---
-                kotlin.runCatching {
-                    TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext)
-                }
 
                 // --- Reminder EINMALIG kurz vor Ablauf ---
                 if (showReminder) {
@@ -352,6 +354,7 @@ class TimerEngineService : Service() {
                 }
 
                 delay(1000)
+                requestWidgetUpdate()
             }
         }
         serviceScope.launch {
@@ -439,6 +442,7 @@ class TimerEngineService : Service() {
         val newTotal   = remaining + extendMin * 60_000L
         val newMinutes = (((newTotal) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
         TimerPreferenceHelper.setTimer(ctx, newMinutes)
+        requestWidgetUpdate()
     }
 
     // Einmaliges akustisches oder haptisches Feedback
@@ -607,7 +611,7 @@ class TimerEngineService : Service() {
             val newTotal   = remaining + extend * 60_000L
             val newMinutes = (((newTotal) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
             TimerPreferenceHelper.setTimer(ctx, newMinutes)
-            kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+            //kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
 
         }
     }
@@ -633,7 +637,8 @@ class TimerEngineService : Service() {
             val newMinutes = (((newTotalMs) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
 
             TimerPreferenceHelper.setTimer(ctx, newMinutes)
-            kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+            //kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+            requestWidgetUpdate()
         }
     }
 
@@ -645,7 +650,7 @@ class TimerEngineService : Service() {
 
             startServiceSafe(Intent(ctx, AudioFadeService::class.java).setAction(ACTION_FADE_FINALIZE))
             stopEverything(timerFinished = true)
-            kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+            ///kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
         }
     }
 
@@ -688,7 +693,8 @@ class TimerEngineService : Service() {
         disableBluetooth()
         disableWifi()
         stopShakeDetectorAndSound()
-        kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+        //kotlin.runCatching { TimerQuickStartWidgetProvider.requestUpdateAll(applicationContext) }
+        requestWidgetUpdate()
         stopForegroundCompat()
         stopSelf()
     }
@@ -741,6 +747,16 @@ class TimerEngineService : Service() {
         if (!nm.areNotificationsEnabled()) return false
         val ch = nm.getNotificationChannel(id) ?: return true
         return ch.importance != NotificationManager.IMPORTANCE_NONE
+    }
+
+    private fun requestWidgetUpdate() {
+        val intent = Intent(this, TimerQuickStartWidgetProvider::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
+            val ids = appWidgetManager.getAppWidgetIds(android.content.ComponentName(applicationContext, TimerQuickStartWidgetProvider::class.java))
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        }
+        sendBroadcast(intent)
     }
 
     private fun flagImmutable(): Int =
