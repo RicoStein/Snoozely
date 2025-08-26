@@ -19,3 +19,11 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Ads/UMP keep rules (konservativ)
+-keep class com.google.android.gms.ads.** { *; }
+-keep interface com.google.android.gms.ads.** { *; }
+-dontwarn com.google.android.gms.**
+-keep class com.google.ads.** { *; }
+-keep class com.google.android.ump.** { *; }
+-dontwarn com.google.android.ump.**

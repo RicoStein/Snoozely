@@ -16,15 +16,10 @@ object TimerPreferenceHelper {
     private val TIMER_RUNNING = booleanPreferencesKey("timer_running")
     private val TIMER_USER_BASE = intPreferencesKey("timer_user_base_minutes")
 
-    /**
-     * Liefert den Timer-Wert. Falls noch keiner gespeichert ist,
-     * kommt der Default aus SettingsPreferenceHelper zurück.
-     * Ergebnis ist immer >= 1.
-     */
     fun getTimer(context: Context): Flow<Int> =
         combine(
-            context.dataStore.data.map { it[TIMER_KEY] },                        // gespeicherter Wert oder null
-            SettingsPreferenceHelper.getDefaultTimerMinutes(context)             // Default aus Settings
+            context.dataStore.data.map { it[TIMER_KEY] },
+            SettingsPreferenceHelper.getDefaultTimerMinutes(context)
         ) { saved, def ->
             (saved ?: def).coerceAtLeast(1)
         }
@@ -53,8 +48,8 @@ object TimerPreferenceHelper {
         val safe = max(1, minutes)
         val now = System.currentTimeMillis()
         context.dataStore.edit { prefs ->
-            prefs[TIMER_KEY] = safe             // laufender Zielwert
-            prefs[TIMER_USER_BASE] = safe       // User-Startwert für Rücksetz-Logik
+            prefs[TIMER_KEY] = safe
+            prefs[TIMER_USER_BASE] = safe
             prefs[TIMER_START_TIME] = now
             prefs[TIMER_RUNNING] = true
         }

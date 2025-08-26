@@ -1,5 +1,6 @@
 package com.tigonic.snoozely.ui.screens
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -26,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.ads.HomeBanner
 import com.tigonic.snoozely.service.TimerContracts
 import com.tigonic.snoozely.service.TimerEngineService
 import com.tigonic.snoozely.ui.components.PremiumPaywallDialog
@@ -40,14 +42,23 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-private const val TAG = "HomeScreenDebug"
+private const val TAG = "HomeScreenAds"
+private const val TEST_BANNER = "ca-app-pub-3940256099942544/6300978111"
 
+@SuppressLint("ContextCastToActivity")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onSettingsClick: () -> Unit,
+    adsGateIsAllowed: Boolean,
+    adsGateIsNonPersonalized: Boolean,
+    consentResolved: Boolean,
+    consentType: String,
+    premium: Boolean,
+    onOpenPrivacyOptions: () -> Unit,
+    onRequestAdThenStart: (onAfter: () -> Unit) -> Unit
 ) {
-    val context = LocalContext.current.applicationContext
+    val appCtx = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
 
     val cs = MaterialTheme.colorScheme
@@ -56,10 +67,9 @@ fun HomeScreen(
     var showPremiumDialog by remember { mutableStateOf(false) }
     var overflowOpen by remember { mutableStateOf(false) }
 
-    // Die initial-Werte können jetzt wieder sicher sein, da der Splash-Screen wartet.
-    val timerMinutes by TimerPreferenceHelper.getTimer(context).collectAsState(initial = 5)
-    val timerStartTime by TimerPreferenceHelper.getTimerStartTime(context).collectAsState(initial = 0L)
-    val timerRunning by TimerPreferenceHelper.getTimerRunning(context).collectAsState(initial = false)
+    val timerMinutes by TimerPreferenceHelper.getTimer(appCtx).collectAsState(initial = 5)
+    val timerStartTime by TimerPreferenceHelper.getTimerStartTime(appCtx).collectAsState(initial = 0L)
+    val timerRunning by TimerPreferenceHelper.getTimerRunning(appCtx).collectAsState(initial = false)
 
     var sliderMinutes by rememberSaveable { mutableStateOf(timerMinutes.coerceAtLeast(1)) }
     var persistJob by remember { mutableStateOf<Job?>(null) }
@@ -105,150 +115,201 @@ fun HomeScreen(
         label = "wheelScale"
     )
 
-    Box(
-        modifier = Modifier.fillMaxSize().background(cs.background)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    fun startTimerNow() {
+        Log.d("Timer", "startTimerNow called, sliderMinutes=$sliderMinutes running=$timerRunning")
+        scope.launch {
+            if (!timerRunning && sliderMinutes > 0) {
+                if (timerMinutes != sliderMinutes) {
+                    TimerPreferenceHelper.setTimer(appCtx, sliderMinutes)
+                }
+                val startIntent = Intent(appCtx, TimerEngineService::class.java)
+                    .setAction(TimerContracts.ACTION_START)
+                    .putExtra(TimerContracts.EXTRA_MINUTES, sliderMinutes)
+                appCtx.startForegroundServiceCompat(startIntent)
+                TimerPreferenceHelper.startTimer(appCtx, sliderMinutes)
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = cs.background,
+        topBar = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    fontSize = MaterialTheme.typography.headlineLarge.fontSize,
-                    color = extra.menu,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.combinedClickable(
-                        onClick = {},
-                        onLongClick = {
-                            scope.launch {
-                                val current = SettingsPreferenceHelper.getPremiumActive(context).first()
-                                SettingsPreferenceHelper.setPremiumActive(context, !current)
-                                val msg = if (!current) "Premium AN" else "Premium AUS"
-                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        fontSize = MaterialTheme.typography.headlineLarge.fontSize,
+                        color = extra.menu,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                scope.launch {
+                                    val current = SettingsPreferenceHelper.getPremiumActive(appCtx).first()
+                                    SettingsPreferenceHelper.setPremiumActive(appCtx, !current)
+                                    android.widget.Toast
+                                        .makeText(appCtx, if (!current) "Premium AN" else "Premium AUS", android.widget.Toast.LENGTH_SHORT)
+                                        .show()
+                                }
                             }
-                        }
-                    )
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = stringResource(R.string.settings),
-                            tint = extra.menu
                         )
-                    }
-                    Box {
-                        IconButton(onClick = { overflowOpen = true }) {
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onSettingsClick) {
                             Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = stringResource(R.string.more),
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = stringResource(R.string.settings),
                                 tint = extra.menu
                             )
                         }
-                        DropdownMenu(
-                            expanded = overflowOpen,
-                            onDismissRequest = { overflowOpen = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.premium_activate_q)) },
-                                onClick = {
-                                    overflowOpen = false
-                                    showPremiumDialog = true
-                                }
-                            )
+                        Box {
+                            IconButton(onClick = { overflowOpen = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.MoreVert,
+                                    contentDescription = stringResource(R.string.more),
+                                    tint = extra.menu
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = overflowOpen,
+                                onDismissRequest = { overflowOpen = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.premium_activate_q)) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        showPremiumDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Datenschutz-Einstellungen") },
+                                    onClick = {
+                                        overflowOpen = false
+                                        onOpenPrivacyOptions()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-
-        Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 0.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(cs.background)
         ) {
-            Spacer(modifier = Modifier.height(100.dp))
-
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.height(320.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 0.dp)
+                    .padding(bottom = 72.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                WheelSlider(
-                    value = sliderMinutes,
-                    onValueChange = { value ->
-                        if (!timerRunning) {
-                            val coerced = value.coerceAtLeast(1)
-                            sliderMinutes = coerced
-                            persistJob?.cancel()
-                            persistJob = scope.launch {
-                                delay(250)
-                                TimerPreferenceHelper.setTimer(context, coerced)
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.height(320.dp)
+                ) {
+                    WheelSlider(
+                        value = sliderMinutes,
+                        onValueChange = { value ->
+                            if (!timerRunning) {
+                                val coerced = value.coerceAtLeast(1)
+                                sliderMinutes = coerced
+                                persistJob?.cancel()
+                                persistJob = scope.launch {
+                                    delay(250)
+                                    TimerPreferenceHelper.setTimer(appCtx, coerced)
+                                }
+                            }
+                        },
+                        minValue = 1,
+                        showCenterText = !timerRunning,
+                        wheelAlpha = wheelAlpha,
+                        wheelScale = wheelScale
+                    )
+                    TimerCenterText(
+                        minutes = remainingMinutes,
+                        seconds = remainingSeconds
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(60.dp))
+
+                IconButton(
+                    onClick = {
+                        if (!timerRunning && sliderMinutes > 0) {
+                            onRequestAdThenStart {
+                                startTimerNow()
+                            }
+                        } else if (timerRunning) {
+                            scope.launch {
+                                val stopIntent = Intent(appCtx, TimerEngineService::class.java)
+                                    .setAction(TimerContracts.ACTION_STOP)
+                                appCtx.startForegroundServiceCompat(stopIntent)
                             }
                         }
                     },
-                    minValue = 1,
-                    showCenterText = !timerRunning,
-                    wheelAlpha = wheelAlpha,
-                    wheelScale = wheelScale
-                )
-                TimerCenterText(
-                    minutes = remainingMinutes,
-                    seconds = remainingSeconds
-                )
-            }
-
-            Spacer(modifier = Modifier.height(60.dp))
-
-            IconButton(
-                onClick = {
-                    scope.launch {
-                        if (!timerRunning && sliderMinutes > 0) {
-                            if (timerMinutes != sliderMinutes) {
-                                TimerPreferenceHelper.setTimer(context, sliderMinutes)
-                            }
-                            val startIntent = Intent(context, TimerEngineService::class.java)
-                                .setAction(TimerContracts.ACTION_START)
-                                .putExtra(TimerContracts.EXTRA_MINUTES, sliderMinutes)
-                            context.startForegroundServiceCompat(startIntent)
-                            TimerPreferenceHelper.startTimer(context, sliderMinutes)
-                        } else if (timerRunning) {
-                            val stopIntent = Intent(context, TimerEngineService::class.java)
-                                .setAction(TimerContracts.ACTION_STOP)
-                            context.startForegroundServiceCompat(stopIntent)
-                        }
-                    }
-                },
-                modifier = Modifier.size(72.dp).background(cs.primary, shape = MaterialTheme.shapes.extraLarge)
-            ) {
-                Icon(
-                    imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (timerRunning) stringResource(R.string.pause) else stringResource(R.string.play),
-                    tint = cs.onPrimary,
-                    modifier = Modifier.size(44.dp)
-                )
-            }
-        }
-
-        if (showPremiumDialog) {
-            PremiumPaywallDialog(
-                onClose = { showPremiumDialog = false },
-                onPurchase = {
-                    scope.launch {
-                        SettingsPreferenceHelper.setPremiumActive(context, true)
-                    }
-                    showPremiumDialog = false
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(cs.primary, shape = MaterialTheme.shapes.extraLarge)
+                ) {
+                    Icon(
+                        imageVector = if (timerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (timerRunning) stringResource(R.string.pause) else stringResource(R.string.play),
+                        tint = cs.onPrimary,
+                        modifier = Modifier.size(44.dp)
+                    )
                 }
-            )
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            if (adsGateIsAllowed) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                ) {
+                    HomeBanner(
+                        isAdsAllowed = true,
+                        adUnitId = TEST_BANNER,
+                        nonPersonalized = adsGateIsNonPersonalized
+                    )
+                }
+            }
+
+            if (showPremiumDialog) {
+                PremiumPaywallDialog(
+                    onClose = { showPremiumDialog = false },
+                    onPurchase = {
+                        scope.launch {
+                            SettingsPreferenceHelper.setPremiumActive(appCtx, true)
+                        }
+                        showPremiumDialog = false
+                    }
+                )
+            }
         }
     }
 }
-
-
 
 /** Startet nur als Foreground-Service, wenn Progress-Notifications erlaubt sind. */
 fun Context.startForegroundServiceCompat(intent: Intent) {

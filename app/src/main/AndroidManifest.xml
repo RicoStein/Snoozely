@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Berechtigungen -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
@@ -14,13 +16,11 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
 
-    <!-- Bluetooth -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:ignore="UnusedAttribute" />
 
-    <!-- WLAN -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
@@ -35,108 +35,53 @@
         android:theme="@style/Theme.Snoozely"
         tools:targetApi="31">
 
-        <!-- Motor / Zeit-Engine -->
-        <service
-            android:name=".service.TimerEngineService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+        <!-- AdMob App-ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-9926405837320362~9872099437" />
 
-        <!-- Notification + Heads-up -->
-        <service
-            android:name=".service.TimerNotificationService"
-            android:exported="false" />
-
-        <!-- Audio-Fade / Stop -->
-        <service
-            android:name=".service.AudioFadeService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
-
-        <!-- Screen sperren -->
-        <service
-            android:name=".service.ScreenLockService"
-            android:exported="false" />
-
-        <!-- Bluetooth -->
-        <service
-            android:name=".service.BluetoothService"
-            android:enabled="true"
-            android:exported="false" />
-
-        <!-- WLAN -->
-        <service
-            android:name=".service.WifiControlService"
-            android:exported="false" />
-
-        <!-- Haptik -->
-        <service
-            android:name=".service.HapticsService"
-            android:exported="false" />
-
-        <!-- Schnelleinstellungs-Tile -->
-        <service
-            android:name=".tile.SleepTimerTileService"
-            android:exported="true"
-            android:icon="@drawable/ic_qs_sleeptimer"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+        <!-- Services/Activities/Receiver (unverändert) -->
+        <service android:name=".service.TimerEngineService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".service.TimerNotificationService" android:exported="false" />
+        <service android:name=".service.AudioFadeService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".service.ScreenLockService" android:exported="false" />
+        <service android:name=".service.BluetoothService" android:enabled="true" android:exported="false" />
+        <service android:name=".service.WifiControlService" android:exported="false" />
+        <service android:name=".service.HapticsService" android:exported="false" />
+        <service android:name=".tile.SleepTimerTileService" android:exported="true" android:icon="@drawable/ic_qs_sleeptimer" android:label="@string/app_name" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
 
-        <!-- Widget-Provider -->
-        <receiver
-            android:name=".widget.TimerQuickStartWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_quick_start_title">
+        <receiver android:name=".widget.TimerQuickStartWidgetProvider" android:exported="true" android:label="@string/widget_quick_start_title">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/timer_quick_start_widget_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/timer_quick_start_widget_info" />
         </receiver>
 
-        <!-- Konfigurations-Activity (für Long-Press “Einstellungen”) -->
-        <activity
-            android:name=".widget.TimerWidgetConfigActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Snoozely">
+        <activity android:name=".widget.TimerWidgetConfigActivity" android:exported="true" android:theme="@style/Theme.Snoozely">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
 
-
-        <!-- Optional: Premium Toggle -->
-        <receiver
-            android:name=".widget.PremiumToggleReceiver"
-            android:exported="true">
+        <receiver android:name=".widget.PremiumToggleReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="com.tigonic.snoozely.DEBUG_PREMIUM_TOGGLE" />
             </intent-filter>
         </receiver>
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.Snoozely">
+        <activity android:name=".MainActivity" android:exported="true" android:label="@string/app_name" android:theme="@style/Theme.Snoozely">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Device Admin (für Screen-Off) -->
-        <receiver
-            android:name=".util.ScreenOffAdminReceiver"
-            android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:exported="false">
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_receiver" />
+        <receiver android:name=".util.ScreenOffAdminReceiver" android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="false">
+            <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin_receiver" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>

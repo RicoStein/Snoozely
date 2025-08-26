@@ -11,9 +11,10 @@ private val PROGRESS_EXTEND_MINUTES = intPreferencesKey("progress_extend_minutes
 
 object SettingsPreferenceHelper {
 
-    // Wheel
+    // Wheel / Timer Defaults
     private val DEFAULT_TIMER_MINUTES = intPreferencesKey("default_timer_minutes")
 
+    // General settings
     private val STOP_AUDIO = booleanPreferencesKey("stop_audio")
     private val SCREEN_OFF = booleanPreferencesKey("screen_off")
     private val NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
@@ -25,35 +26,44 @@ object SettingsPreferenceHelper {
     private val REMINDER_MINUTES = intPreferencesKey("reminder_minutes")
     private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
 
-    // Shake-Keys
+    // Shake settings
     private val KEY_SHAKE_ENABLED = booleanPreferencesKey("shake_extend_enabled")
-    private val KEY_SHAKE_STRENGTH = intPreferencesKey("shake_strength") // 0..100
-    private val KEY_SHAKE_EXTEND_MIN = intPreferencesKey("shake_extend_minutes") // 1..30
-    private val KEY_SHAKE_SOUND_MODE = stringPreferencesKey("shake_sound_mode") // "tone" | "vibrate"
-    private val KEY_SHAKE_RINGTONE = stringPreferencesKey("shake_ringtone_uri") // optional URI
-    private val KEY_SHAKE_VOLUME = floatPreferencesKey("shake_volume") // 0f..1f
+    private val KEY_SHAKE_STRENGTH = intPreferencesKey("shake_strength")
+    private val KEY_SHAKE_EXTEND_MIN = intPreferencesKey("shake_extend_minutes")
+    private val KEY_SHAKE_SOUND_MODE = stringPreferencesKey("shake_sound_mode")
+    private val KEY_SHAKE_RINGTONE = stringPreferencesKey("shake_ringtone_uri")
+    private val KEY_SHAKE_VOLUME = floatPreferencesKey("shake_volume")
 
-    // Shake Aktivierungsfenster
+    // Shake activation window
     private val KEY_SHAKE_ACTIVATION_MODE = stringPreferencesKey("shake_activation_mode") // "immediate" | "after_start"
-    private val KEY_SHAKE_ACTIVATION_DELAY_MIN = intPreferencesKey("shake_activation_delay_min") // 1..30
+    private val KEY_SHAKE_ACTIVATION_DELAY_MIN = intPreferencesKey("shake_activation_delay_min") // minutes
 
-    // Notification-Buttons
+    // Notification buttons
     private val PROGRESS_EXTEND_ENABLED = booleanPreferencesKey("progress_extend_enabled")
     private val REMINDER_EXTEND_ENABLED = booleanPreferencesKey("reminder_extend_enabled")
     private val REMINDER_EXTEND_MINUTES = intPreferencesKey("reminder_extend_minutes")
 
-    // THEME
-    private val THEME_MODE = stringPreferencesKey("theme_mode")
+    // Theme
+    private val THEME_MODE = stringPreferencesKey("theme_mode") // "system" | "light" | "dark"
     private val THEME_DYNAMIC = booleanPreferencesKey("theme_dynamic")
 
-    // Bluetooth/WLAN
+    // Bluetooth/WiFi control requests
     private val KEY_BLUETOOTH_DISABLE_REQUESTED = booleanPreferencesKey("bluetooth_disable_requested")
     private val KEY_WIFI_DISABLE_REQUESTED = booleanPreferencesKey("wifi_disable_requested")
 
-    // PREMIUM
+    // Premium
     private val PREMIUM_ACTIVE = booleanPreferencesKey("premium_active")
 
-    // -------- Getter --------
+    // Ads/Consent
+    private val ADS_CONSENT_RESOLVED = booleanPreferencesKey("ads_consent_resolved")
+    private val ADS_CONSENT_TYPE = stringPreferencesKey("ads_consent_type")
+    private val ADS_OPEN_COUNTER = intPreferencesKey("ads_open_counter")
+
+    // ----------------- GETTER -----------------
+
+    fun getDefaultTimerMinutes(ctx: Context): Flow<Int> =
+        ctx.dataStore.data.map { it[DEFAULT_TIMER_MINUTES] ?: 15 }
+
     fun getProgressExtendMinutes(context: Context): Flow<Int> =
         context.dataStore.data.map { it[PROGRESS_EXTEND_MINUTES] ?: 5 }
 
@@ -87,6 +97,7 @@ object SettingsPreferenceHelper {
     fun getIsFirstRun(context: Context): Flow<Boolean> =
         context.dataStore.data.map { it[IS_FIRST_RUN] ?: true }
 
+    // Shake getters
     fun getShakeEnabled(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_ENABLED] ?: false }
     fun getShakeStrength(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_STRENGTH] ?: 50 }
     fun getShakeExtendMinutes(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_EXTEND_MIN] ?: 10 }
@@ -94,8 +105,7 @@ object SettingsPreferenceHelper {
     fun getShakeRingtone(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_RINGTONE] ?: "" }
     fun getShakeVolume(ctx: Context) = ctx.dataStore.data.map { it[KEY_SHAKE_VOLUME] ?: 1f }
 
-    fun getPremiumActive(ctx: Context) = ctx.dataStore.data.map { it[PREMIUM_ACTIVE] ?: false }
-
+    // Shake activation getters
     fun getShakeActivationMode(ctx: Context) = ctx.dataStore.data.map { prefs ->
         prefs[KEY_SHAKE_ACTIVATION_MODE] ?: "immediate"
     }
@@ -103,6 +113,7 @@ object SettingsPreferenceHelper {
         prefs[KEY_SHAKE_ACTIVATION_DELAY_MIN] ?: 3
     }
 
+    // Notification action settings
     fun getProgressExtendEnabled(ctx: Context) =
         ctx.dataStore.data.map { it[PROGRESS_EXTEND_ENABLED] ?: false }
 
@@ -110,26 +121,43 @@ object SettingsPreferenceHelper {
         ctx.dataStore.data.map { it[REMINDER_EXTEND_ENABLED] ?: false }
 
     fun getReminderExtendMinutes(ctx: Context) =
-        ctx.dataStore.data.map { prefs -> prefs[REMINDER_EXTEND_MINUTES] ?: (prefs[PROGRESS_EXTEND_MINUTES] ?: 5) }
+        ctx.dataStore.data.map { prefs ->
+            prefs[REMINDER_EXTEND_MINUTES] ?: (prefs[PROGRESS_EXTEND_MINUTES] ?: 5)
+        }
 
+    // Theme getters
     fun getThemeMode(ctx: Context) = ctx.dataStore.data.map { prefs ->
         prefs[THEME_MODE] ?: "dark"
     }
-
     fun getThemeDynamic(ctx: Context) = ctx.dataStore.data.map { prefs ->
         prefs[THEME_DYNAMIC] ?: true
     }
 
+    // Bluetooth/WiFi getters
     fun getBluetoothDisableRequested(ctx: Context): Flow<Boolean> =
         ctx.dataStore.data.map { prefs -> prefs[KEY_BLUETOOTH_DISABLE_REQUESTED] ?: false }
 
-    fun getWifiDisableRequested(ctx: Context) =
-        ctx.dataStore.data.map { it[KEY_WIFI_DISABLE_REQUESTED] ?: false }
+    fun getWifiDisableRequested(ctx: Context): Flow<Boolean> =
+        ctx.dataStore.data.map { prefs -> prefs[KEY_WIFI_DISABLE_REQUESTED] ?: false }
 
-    fun getDefaultTimerMinutes(ctx: Context) =
-        ctx.dataStore.data.map { it[DEFAULT_TIMER_MINUTES] ?: 15 }
+    // Premium
+    fun getPremiumActive(ctx: Context) = ctx.dataStore.data.map { it[PREMIUM_ACTIVE] ?: false }
 
-    // -------- Setter --------
+    // Ads/Consent getters
+    fun getAdsConsentResolved(ctx: Context): Flow<Boolean> =
+        ctx.dataStore.data.map { it[ADS_CONSENT_RESOLVED] ?: false }
+    fun getAdsConsentType(ctx: Context): Flow<String> =
+        ctx.dataStore.data.map { it[ADS_CONSENT_TYPE] ?: "Unknown" }
+    fun getAdsOpenCounter(ctx: Context): Flow<Int> =
+        ctx.dataStore.data.map { it[ADS_OPEN_COUNTER] ?: 0 }
+
+    // ----------------- SETTER -----------------
+
+    suspend fun setDefaultTimerMinutes(context: Context, value: Int) {
+        val v = value.coerceIn(1, 300)
+        context.dataStore.edit { it[DEFAULT_TIMER_MINUTES] = v }
+    }
+
     suspend fun setProgressExtendMinutes(context: Context, value: Int) {
         val v = value.coerceIn(1, 30)
         context.dataStore.edit { it[PROGRESS_EXTEND_MINUTES] = v }
@@ -177,6 +205,7 @@ object SettingsPreferenceHelper {
         context.dataStore.edit { it[IS_FIRST_RUN] = value }
     }
 
+    // Shake setters
     suspend fun setShakeEnabled(ctx: Context, v: Boolean) =
         ctx.dataStore.edit { it[KEY_SHAKE_ENABLED] = v }
 
@@ -187,70 +216,74 @@ object SettingsPreferenceHelper {
         ctx.dataStore.edit { it[KEY_SHAKE_EXTEND_MIN] = v.coerceIn(1, 30) }
 
     suspend fun setShakeSoundMode(ctx: Context, v: String) =
-        ctx.dataStore.edit { it[KEY_SHAKE_SOUND_MODE] = if (v == "vibrate") "vibrate" else "tone" }
+        ctx.dataStore.edit { it[KEY_SHAKE_SOUND_MODE] = v }
 
-    suspend fun setShakeRingtone(ctx: Context, uri: String) =
-        ctx.dataStore.edit { it[KEY_SHAKE_RINGTONE] = uri }
+    suspend fun setShakeRingtone(ctx: Context, v: String) =
+        ctx.dataStore.edit { it[KEY_SHAKE_RINGTONE] = v }
 
-    suspend fun setShakeVolume(ctx: Context, rel: Float) =
-        ctx.dataStore.edit { it[KEY_SHAKE_VOLUME] = rel.coerceIn(0f, 1f) }
+    suspend fun setShakeVolume(ctx: Context, v: Float) =
+        ctx.dataStore.edit { it[KEY_SHAKE_VOLUME] = v.coerceIn(0f, 1f) }
 
-    suspend fun setProgressExtendEnabled(ctx: Context, v: Boolean) =
-        ctx.dataStore.edit { it[PROGRESS_EXTEND_ENABLED] = v }
+    // Fehlende Setter ergänzt:
 
-    suspend fun setReminderExtendEnabled(ctx: Context, v: Boolean) =
-        ctx.dataStore.edit { it[REMINDER_EXTEND_ENABLED] = v }
-
-    suspend fun setReminderExtendMinutes(ctx: Context, m: Int) =
-        ctx.dataStore.edit { it[REMINDER_EXTEND_MINUTES] = m.coerceIn(1, 30) }
-
-    suspend fun setShakeActivationMode(ctx: Context, mode: String) =
-        ctx.dataStore.edit { it[KEY_SHAKE_ACTIVATION_MODE] = if (mode == "after_start") "after_start" else "immediate" }
-
-    suspend fun setShakeActivationDelayMinutes(ctx: Context, minutes: Int) =
-        ctx.dataStore.edit { it[KEY_SHAKE_ACTIVATION_DELAY_MIN] = minutes.coerceIn(1, 30) }
-
-    suspend fun setThemeMode(ctx: Context, id: String) {
-        ctx.dataStore.edit { it[THEME_MODE] = id }
-    }
-
-    suspend fun setThemeDynamic(ctx: Context, enabled: Boolean) {
-        ctx.dataStore.edit { it[THEME_DYNAMIC] = enabled }
-    }
-
-    suspend fun setBluetoothDisableRequested(ctx: Context, value: Boolean) {
-        ctx.dataStore.edit { prefs ->
-            prefs[KEY_BLUETOOTH_DISABLE_REQUESTED] = value
+    // Theme setters
+    suspend fun setThemeMode(ctx: Context, value: String) {
+        // erwartet "system", "light", "dark"
+        val safe = when (value) {
+            "system", "light", "dark" -> value
+            else -> "system"
         }
+        ctx.dataStore.edit { it[THEME_MODE] = safe }
     }
 
-    suspend fun setWifiDisableRequested(ctx: Context, v: Boolean) =
-        ctx.dataStore.edit { it[KEY_WIFI_DISABLE_REQUESTED] = v }
+    suspend fun setThemeDynamic(ctx: Context, value: Boolean) {
+        ctx.dataStore.edit { it[THEME_DYNAMIC] = value }
+    }
 
-    suspend fun setDefaultTimerMinutes(ctx: Context, minutes: Int) =
-        ctx.dataStore.edit { it[DEFAULT_TIMER_MINUTES] = minutes.coerceIn(1, 600) }
+    // Bluetooth/WiFi request setters
+    suspend fun setBluetoothDisableRequested(ctx: Context, value: Boolean) {
+        ctx.dataStore.edit { it[KEY_BLUETOOTH_DISABLE_REQUESTED] = value }
+    }
 
+    suspend fun setWifiDisableRequested(ctx: Context, value: Boolean) {
+        ctx.dataStore.edit { it[KEY_WIFI_DISABLE_REQUESTED] = value }
+    }
+
+    // Shake activation window setters
+    suspend fun setShakeActivationMode(ctx: Context, value: String) {
+        // erlaubt "immediate" oder "after_start"
+        val safe = when (value) {
+            "immediate", "after_start" -> value
+            else -> "immediate"
+        }
+        ctx.dataStore.edit { it[KEY_SHAKE_ACTIVATION_MODE] = safe }
+    }
+
+    suspend fun setShakeActivationDelayMinutes(ctx: Context, value: Int) {
+        val v = value.coerceIn(1, 30)
+        ctx.dataStore.edit { it[KEY_SHAKE_ACTIVATION_DELAY_MIN] = v }
+    }
+
+    // Premium
     suspend fun setPremiumActive(ctx: Context, v: Boolean) =
         ctx.dataStore.edit { it[PREMIUM_ACTIVE] = v }
 
-
-
-    suspend fun setWidgetDuration(context: Context, appWidgetId: Int, minutes: Int) {
-        context.dataStore.edit { settings ->
-            settings[intPreferencesKey("widget_${appWidgetId}_duration")] = minutes
+    // Ads/Consent setters
+    suspend fun setAdsConsent(ctx: Context, resolved: Boolean, type: String) {
+        ctx.dataStore.edit {
+            it[ADS_CONSENT_RESOLVED] = resolved
+            it[ADS_CONSENT_TYPE] = type
         }
     }
 
-    // Lädt die Dauer für eine bestimmte Widget-ID
-    fun getWidgetDuration(context: Context, appWidgetId: Int): Flow<Int?> {
-        return context.dataStore.data.map { settings ->
-            settings[intPreferencesKey("widget_${appWidgetId}_duration")]
+    suspend fun incrementAdsOpenCounter(ctx: Context) {
+        ctx.dataStore.edit { prefs ->
+            val current = prefs[ADS_OPEN_COUNTER] ?: 0
+            prefs[ADS_OPEN_COUNTER] = (current + 1).coerceAtMost(99999)
         }
     }
 
-    suspend fun clearWidgetDuration(context: Context, appWidgetId: Int) {
-        context.dataStore.edit { settings ->
-            settings.remove(intPreferencesKey("widget_${appWidgetId}_duration"))
-        }
+    suspend fun resetAdsOpenCounter(ctx: Context) {
+        ctx.dataStore.edit { it[ADS_OPEN_COUNTER] = 0 }
     }
 }
