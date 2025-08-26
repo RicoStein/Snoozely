@@ -174,22 +174,26 @@ class MainActivity : ComponentActivity() {
     }
 
     fun showInterstitialThenStart(onAfter: () -> Unit) {
-        Log.d("Interstitial", "showInterstitialThenStart invoked")
+        // Zufallsentscheidung pro Klick
+        val roll = (1..100).random()
+        val shouldShowAd = isAdsAllowed && roll > 70
+        android.util.Log.d("Interstitial", "randomRoll=$roll shouldShowAd=$shouldShowAd")
+
         val manager = interstitialManager
-        val allowed = isAdsAllowed
-        Log.d("Interstitial", "manager=${manager!=null} allowed=$allowed")
-        if (manager == null || !allowed) {
-            Log.d("Interstitial", "No manager or not allowed -> start now")
+        if (!shouldShowAd || manager == null) {
+            // Keine Werbung -> direkt starten
             onAfter()
             return
         }
-        // Direkt aufrufen, kein zusätzliches launch – der Manager kümmert sich
+
+        // Werbung zeigen, danach starten
         manager.showOrFallback {
-            Log.d("Interstitial", "After/fallback -> start now")
+            android.util.Log.d("Interstitial", "After/fallback -> start now")
             onAfter()
         }
         manager.warmPreload(nonPersonalized = nonPersonalized)
     }
+
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
