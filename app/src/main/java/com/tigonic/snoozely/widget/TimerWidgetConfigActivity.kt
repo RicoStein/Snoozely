@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -23,11 +24,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
+import com.tigonic.snoozely.MainActivity
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.ui.theme.*
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val TAG = "WidgetConfig"
@@ -40,11 +44,7 @@ class TimerWidgetConfigActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate: Activity started.")
 
-        if (ThemeRegistry.themes.isEmpty()) {
-            registerDefaultThemes()
-        }
-
-        // Standardmäßig auf "Abgebrochen" setzen
+        // Standardmäßig auf "Abgebrochen" setzen, falls etwas schiefgeht
         setResult(Activity.RESULT_CANCELED)
 
         appWidgetId = intent?.extras?.getInt(
@@ -52,14 +52,42 @@ class TimerWidgetConfigActivity : ComponentActivity() {
             AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
-        Log.d(TAG, "onCreate: Received appWidgetId: $appWidgetId")
-
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             Log.e(TAG, "onCreate: Invalid appWidgetId. Finishing activity.")
             finish()
             return
         }
 
+        // --- START: PREMIUM-PRÜFUNG ---
+        lifecycleScope.launch {
+            val isPremium = SettingsPreferenceHelper.getPremiumActive(applicationContext).first()
+            if (!isPremium) {
+                Log.d(TAG, "Premium not active. Redirecting to MainActivity with Paywall.")
+                // App starten und Paywall zeigen
+                val intent = Intent(applicationContext, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    putExtra("showPaywall", true)
+                }
+                startActivity(intent)
+
+                // Informieren, warum das Widget nicht hinzugefügt wurde
+                Toast.makeText(applicationContext, getString(R.string.premium_feature_widget), Toast.LENGTH_LONG).show()
+
+                // Konfigurations-Activity beenden
+                finish()
+                return@launch
+            }
+
+            // Wenn Premium aktiv ist, fahre normal fort
+            setupContent()
+        }
+        // --- ENDE: PREMIUM-PRÜFUNG ---
+    }
+
+    private fun setupContent() {
+        if (ThemeRegistry.themes.isEmpty()) {
+            registerDefaultThemes()
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
@@ -77,28 +105,21 @@ class TimerWidgetConfigActivity : ComponentActivity() {
                     appWidgetId = appWidgetId,
                     onSave = { minutes ->
                         Log.d(TAG, "onSave: User clicked Save for widget $appWidgetId with $minutes minutes.")
-
                         scope.launch {
-                            // 1. Dauer in die synchronen SharedPreferences speichern
                             saveWidgetDuration(applicationContext, appWidgetId, minutes)
-                            Log.d(TAG, "onSave: Duration saved successfully via SharedPreferences.")
+                            Log.d(TAG, "onSave: Duration saved successfully.")
 
-                            // 2. Manuelles Update des Widgets anstoßen, um die neue Zeit sofort anzuzeigen
                             val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
                             TimerQuickStartWidgetProvider.updateAppWidget(applicationContext, appWidgetManager, appWidgetId)
 
-                            // 3. Das Ergebnis-Intent für den Launcher vorbereiten
                             val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                             setResult(Activity.RESULT_OK, resultValue)
-
-                            // 4. Activity vollständig beenden und aus den letzten Tasks entfernen
                             finishAndRemoveTask()
                         }
                     },
                     onCancel = {
                         Log.d(TAG, "onCancel: User clicked Cancel for widget $appWidgetId.")
                         setResult(Activity.RESULT_CANCELED)
-                        // Activity vollständig beenden und aus den letzten Tasks entfernen
                         finishAndRemoveTask()
                     }
                 )

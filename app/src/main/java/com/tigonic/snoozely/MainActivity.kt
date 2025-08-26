@@ -33,18 +33,17 @@ import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.collectAsState
 import com.tigonic.snoozely.ui.screens.startForegroundServiceCompat
 
 class MainActivity : ComponentActivity() {
 
-    // NEU: Den MainViewModel für die Activity instanziieren
     private val viewModel: MainViewModel by viewModels()
 
+    // Der Zustand für die Paywall wird auf Activity-Ebene gehalten.
+    private var showPaywall by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Splash-Screen installieren VOR super.onCreate()
         installSplashScreen().apply {
-            // Halte den Splash-Screen so lange sichtbar, bis isLoading im ViewModel false ist.
             setKeepOnScreenCondition {
                 viewModel.isLoading.value
             }
@@ -53,17 +52,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Verarbeite das Intent, das die Activity gestartet hat.
+        // Das 'intent'-Property der Activity ist von Natur aus nullable (Intent?).
+        handleIntent(intent)
+
         registerDefaultThemes()
         lifecycleScope.launch { maybeStartEngineIfTimerRunning() }
-        val initialShowPaywall = intent?.getBooleanExtra("showPaywall", false) == true
 
         setContent {
             val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
             val dynamic by SettingsPreferenceHelper.getThemeDynamic(this).collectAsState(initial = true)
 
             SnoozelyTheme(themeId = themeId, dynamicColor = dynamic) {
-                var showPaywall by remember { mutableStateOf(initialShowPaywall) }
-
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -116,6 +116,28 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Korrekte Signatur: 'intent' ist hier NON-NULLABLE (Intent).
+     * Diese Methode wird aufgerufen, wenn die Activity bereits läuft und ein neues Intent empfängt.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Das non-nullable Intent wird an die Hilfsfunktion weitergegeben.
+        handleIntent(intent)
+    }
+
+    /**
+     * Hilfsfunktion, die ein NULLABLE Intent verarbeiten kann, da `activity.intent` nullable ist.
+     */
+    private fun handleIntent(intent: Intent?) {
+        // Die sichere ?.let-Prüfung verhindert Fehler, falls das Intent null ist.
+        intent?.let {
+            if (it.getBooleanExtra("showPaywall", false)) {
+                this.showPaywall = true
             }
         }
     }

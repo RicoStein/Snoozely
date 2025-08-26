@@ -188,5 +188,6 @@
     <string name="widget_quick_start_description">widget beschreibung hier</string>
     <string name="save">Speichern</string>
     <string name="loading">Lade…</string>
+    <string name="premium_feature_widget">Widget ist ein Premium-Feature</string>
 
 </resources>
