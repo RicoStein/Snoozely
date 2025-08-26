@@ -67,75 +67,84 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
                 val views = RemoteViews(context.packageName, R.layout.widget_quick_start)
                 val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
 
-                // Lese die Widget-Größe in DP
                 val isPortrait = context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
                 val widthDp = options.getInt(if (isPortrait) AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
                 val heightDp = options.getInt(if (isPortrait) AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
 
-                // Finde die kleinere Dimension, um die Größe unseres Zeichenquadrats zu bestimmen
                 val sideDp = min(widthDp, heightDp)
-                if (sideDp <= 0) return // Verhindert Absturz bei ungültiger Größe
+                if (sideDp <= 0) return
 
                 val displayMetrics = context.resources.displayMetrics
                 val sidePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, sideDp.toFloat(), displayMetrics).toInt()
                 if (sidePx <= 0) return
 
-                // Erstelle eine leere, quadratische Bitmap
                 val bitmap = Bitmap.createBitmap(sidePx, sidePx, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bitmap)
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-                // 1. Zeichne den schwarzen Hintergrundkreis
                 paint.color = Color.BLACK
                 paint.style = Paint.Style.FILL
                 canvas.drawCircle(sidePx / 2f, sidePx / 2f, sidePx / 2f, paint)
 
-                // Lade die Timer-Daten
                 val running = TimerPreferenceHelper.getTimerRunning(context).first()
                 val startTime = TimerPreferenceHelper.getTimerStartTime(context).first()
                 val totalMinutes = TimerPreferenceHelper.getTimer(context).first()
 
                 if (running && startTime > 0) {
-                    // --- FALL 1: TIMER LÄUFT ---
-                    // 2. Zeichne den blauen Fortschritts-ARC (Bogen) darüber
                     paint.color = Color.parseColor("#4285F4")
                     paint.style = Paint.Style.STROKE
-                    // Die Dicke des Rings, passt sich an die Größe an
                     val strokeWidth = sidePx / 14f
                     paint.strokeWidth = strokeWidth
-                    paint.strokeCap = Paint.Cap.BUTT // Flache Enden für den Bogen
+                    paint.strokeCap = Paint.Cap.BUTT
 
-                    // Definiere das Rechteck, in das der Bogen gezeichnet wird.
-                    // Der halbe strokeWidth wird abgezogen, damit der Bogen nicht abgeschnitten wird.
                     val oval = RectF(strokeWidth / 2f, strokeWidth / 2f, sidePx - strokeWidth / 2f, sidePx - strokeWidth / 2f)
 
-                    // Berechne den Winkel für den Bogen
                     val totalMs = totalMinutes * 60_000L
                     val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(0)
                     val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
                     val progress = if (totalMs > 0) remainingMs.toFloat() / totalMs.toFloat() else 0f
                     val sweepAngle = progress * 360f
 
-                    // Zeichne den Bogen (-90 Grad ist oben)
                     canvas.drawArc(oval, -90f, sweepAngle, false, paint)
 
-                    // Aktualisiere den Text
                     val remainingMinutes = (remainingMs / 60_000L).toInt()
-                    views.setTextViewText(R.id.txtTime, remainingMinutes.toString())
+                    val numberString = remainingMinutes.toString()
+
+                    // --- START: DYNAMISCHE SCHRIFTGRÖSSE ---
+                    // Basisgröße ist proportional zur Widget-Größe (z.B. 1/3 des Durchmessers)
+                    var textSizePx = sidePx / 2f
+                    // Schrift verkleinern, wenn die Zahl mehr Ziffern hat
+                    if (numberString.length >= 4) {
+                        textSizePx *= 0.7f // z.B. für "1000"
+                    } else if (numberString.length >= 3) {
+                        textSizePx *= 0.85f // z.B. für "120"
+                    }
+                    views.setTextViewTextSize(R.id.txtTime, TypedValue.COMPLEX_UNIT_PX, textSizePx)
+                    // --- ENDE: DYNAMISCHE SCHRIFTGRÖSSE ---
+
+                    views.setTextViewText(R.id.txtTime, numberString)
                     views.setTextColor(R.id.txtTime, getAnimatedBlueColor())
 
                 } else {
-                    // --- FALL 2: TIMER IST AUS ---
-                    // Es muss nichts extra gezeichnet werden, der schwarze Kreis ist schon da.
                     val configMinutes = getWidgetDuration(context, appWidgetId, totalMinutes)
-                    views.setTextViewText(R.id.txtTime, configMinutes.toString())
+                    val numberString = configMinutes.toString()
+
+                    // --- START: DYNAMISCHE SCHRIFTGRÖSSE ---
+                    var textSizePx = sidePx / 2f
+                    if (numberString.length >= 4) {
+                        textSizePx *= 0.7f
+                    } else if (numberString.length >= 3) {
+                        textSizePx *= 0.85f
+                    }
+                    views.setTextViewTextSize(R.id.txtTime, TypedValue.COMPLEX_UNIT_PX, textSizePx)
+                    // --- ENDE: DYNAMISCHE SCHRIFTGRÖSSE ---
+
+                    views.setTextViewText(R.id.txtTime, numberString)
                     views.setTextColor(R.id.txtTime, Color.WHITE)
                 }
 
-                // Setze die fertige, selbst gezeichnete Bitmap in das ImageView
                 views.setImageViewBitmap(R.id.widget_image, bitmap)
 
-                // Setze die Klick-Aktionen
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
                 val intent = if (running) {
                     Intent(context, TimerEngineService::class.java).apply { action = TimerContracts.ACTION_STOP }
