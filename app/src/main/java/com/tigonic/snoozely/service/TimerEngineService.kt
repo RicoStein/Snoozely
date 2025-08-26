@@ -353,7 +353,7 @@ class TimerEngineService : Service() {
                     return@launch
                 }
 
-                delay(1000)
+                delay(100)
                 requestWidgetUpdate()
             }
         }

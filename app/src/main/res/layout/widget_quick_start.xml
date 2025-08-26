@@ -4,34 +4,34 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@android:color/transparent"
     android:minWidth="110dp"
-    android:minHeight="110dp"
-    android:padding="8dp"
-    android:background="@drawable/widget_background_default">
+    android:minHeight="110dp">
 
-    <!-- Der ablaufende Kreis -->
+    <!--
+    Die ProgressBar ist das einzige grafische Element.
+    Ihre Größe und Position wird jetzt vollständig vom Code gesteuert.
+    -->
     <ProgressBar
-        android:id="@+id/progress_bar"
+        android:id="@+id/widget_progressbar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center"
         android:indeterminate="false"
-        android:max="100"
-        android:progress="100"
         android:progressDrawable="@drawable/widget_progress_circle"
-        tools:progress="60" />
+        tools:progress="75" />
 
-    <!-- Die Zeit-Anzeige, zentriert im Kreis -->
+    <!-- Die Zeit-Anzeige, die immer in der Mitte liegt. -->
     <TextView
         android:id="@+id/txtTime"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:gravity="center"
-        android:textColor="@android:color/white"
-        android:textSize="28sp"
+        android:textSize="32sp"
         android:textStyle="bold"
-        tools:text="15" />
+        tools:text="15"
+        tools:textColor="@android:color/white" />
 
 </FrameLayout>
