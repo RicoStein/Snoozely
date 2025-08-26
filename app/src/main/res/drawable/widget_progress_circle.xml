@@ -1,20 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-    Hintergrund-Layer: Ein solider schwarzer Kreis.
-    Dieser Teil ist immer sichtbar, solange die ProgressBar sichtbar ist.
-    -->
     <item android:id="@android:id/background">
         <shape android:shape="oval">
             <solid android:color="@android:color/black" />
         </shape>
     </item>
 
-    <!--
-    Fortschritts-Layer: Ein blauer Ring, der über den schwarzen Kreis gezeichnet wird.
-    Seine Sichtbarkeit wird durch den Fortschrittswert der ProgressBar gesteuert.
-    -->
     <item android:id="@android:id/progress">
         <rotate
             android:fromDegrees="-90"
@@ -22,10 +14,11 @@
             <shape
                 android:shape="ring"
                 android:useLevel="true"
-                android:thicknessRatio="20.0"> <!-- Steuert die Dicke des Rings. Größere Zahl = dünner. -->
-                <solid android:color="#4285F4" />
-            </shape>
-        </rotate>
-    </item>
+            android:thicknessRatio="18.0"
+            android:innerRadiusRatio="2.2">
+            <solid android:color="#4285F4" />
+        </shape>
+    </rotate>
+</item>
 
-</layer-list>
+    </layer-list>

@@ -7,7 +7,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.Color
+import android.graphics.*
 import android.os.Build
 import android.util.Log
 import android.util.TypedValue
@@ -27,7 +27,6 @@ private const val TAG = "WidgetProvider"
 
 class TimerQuickStartWidgetProvider : AppWidgetProvider() {
 
-    // onUpdate wird jetzt einfacher und ruft nur noch die neue Logik auf.
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -43,8 +42,6 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    // onAppWidgetOptionsChanged wird aufgerufen, wenn der Nutzer die Widget-Größe ändert.
-    // Wir lösen hier einfach ein manuelles Update aus.
     override fun onAppWidgetOptionsChanged(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -68,66 +65,92 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
         suspend fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             try {
                 val views = RemoteViews(context.packageName, R.layout.widget_quick_start)
-
-                // --- START DER NEUEN LOGIK ---
-                // Lese die Widget-Größe in DP
                 val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+
+                // Lese die Widget-Größe in DP
                 val isPortrait = context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-                val width = options.getInt(if (isPortrait) AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
-                val height = options.getInt(if (isPortrait) AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+                val widthDp = options.getInt(if (isPortrait) AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
+                val heightDp = options.getInt(if (isPortrait) AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
 
-                // Finde die kleinere der beiden Dimensionen, das wird die Seite unseres Quadrats
-                val side = min(width, height)
+                // Finde die kleinere Dimension, um die Größe unseres Zeichenquadrats zu bestimmen
+                val sideDp = min(widthDp, heightDp)
+                if (sideDp <= 0) return // Verhindert Absturz bei ungültiger Größe
 
-                // Berechne den horizontalen und vertikalen Abstand, um das Quadrat zu zentrieren
-                val horizontalPadding = (width - side) / 2
-                val verticalPadding = (height - side) / 2
-
-                // Konvertiere die DP-Werte in Pixel, da setViewPadding Pixel erwartet
                 val displayMetrics = context.resources.displayMetrics
-                val horizontalPaddingPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, horizontalPadding.toFloat(), displayMetrics).toInt()
-                val verticalPaddingPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, verticalPadding.toFloat(), displayMetrics).toInt()
+                val sidePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, sideDp.toFloat(), displayMetrics).toInt()
+                if (sidePx <= 0) return
 
-                // Wende das Padding auf das Root-Layout an. Dies erzeugt unsere quadratische Zeichenfläche.
-                views.setViewPadding(R.id.widget_root, horizontalPaddingPx, verticalPaddingPx, horizontalPaddingPx, verticalPaddingPx)
-                // --- ENDE DER NEUEN LOGIK ---
+                // Erstelle eine leere, quadratische Bitmap
+                val bitmap = Bitmap.createBitmap(sidePx, sidePx, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+                // 1. Zeichne den schwarzen Hintergrundkreis
+                paint.color = Color.BLACK
+                paint.style = Paint.Style.FILL
+                canvas.drawCircle(sidePx / 2f, sidePx / 2f, sidePx / 2f, paint)
 
-                // Der Rest des Codes bleibt fast gleich
+                // Lade die Timer-Daten
                 val running = TimerPreferenceHelper.getTimerRunning(context).first()
                 val startTime = TimerPreferenceHelper.getTimerStartTime(context).first()
                 val totalMinutes = TimerPreferenceHelper.getTimer(context).first()
-                val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
 
                 if (running && startTime > 0) {
+                    // --- FALL 1: TIMER LÄUFT ---
+                    // 2. Zeichne den blauen Fortschritts-ARC (Bogen) darüber
+                    paint.color = Color.parseColor("#4285F4")
+                    paint.style = Paint.Style.STROKE
+                    // Die Dicke des Rings, passt sich an die Größe an
+                    val strokeWidth = sidePx / 14f
+                    paint.strokeWidth = strokeWidth
+                    paint.strokeCap = Paint.Cap.BUTT // Flache Enden für den Bogen
+
+                    // Definiere das Rechteck, in das der Bogen gezeichnet wird.
+                    // Der halbe strokeWidth wird abgezogen, damit der Bogen nicht abgeschnitten wird.
+                    val oval = RectF(strokeWidth / 2f, strokeWidth / 2f, sidePx - strokeWidth / 2f, sidePx - strokeWidth / 2f)
+
+                    // Berechne den Winkel für den Bogen
                     val totalMs = totalMinutes * 60_000L
                     val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(0)
                     val remainingMs = (totalMs - elapsedMs).coerceAtLeast(0)
-                    val remainingMinutes = (remainingMs / 60_000L).toInt()
-                    val progress = if (totalMs > 0) ((remainingMs * 1000) / totalMs).toInt() else 0
+                    val progress = if (totalMs > 0) remainingMs.toFloat() / totalMs.toFloat() else 0f
+                    val sweepAngle = progress * 360f
 
-                    views.setProgressBar(R.id.widget_progressbar, 1000, progress, false)
+                    // Zeichne den Bogen (-90 Grad ist oben)
+                    canvas.drawArc(oval, -90f, sweepAngle, false, paint)
+
+                    // Aktualisiere den Text
+                    val remainingMinutes = (remainingMs / 60_000L).toInt()
                     views.setTextViewText(R.id.txtTime, remainingMinutes.toString())
                     views.setTextColor(R.id.txtTime, getAnimatedBlueColor())
 
-                    val stopIntent = Intent(context, TimerEngineService::class.java).apply { action = TimerContracts.ACTION_STOP }
-                    val stopPendingIntent = PendingIntent.getForegroundService(context, appWidgetId, stopIntent, flags)
-                    views.setOnClickPendingIntent(R.id.widget_root, stopPendingIntent)
                 } else {
-                    views.setProgressBar(R.id.widget_progressbar, 1000, 0, false)
+                    // --- FALL 2: TIMER IST AUS ---
+                    // Es muss nichts extra gezeichnet werden, der schwarze Kreis ist schon da.
                     val configMinutes = getWidgetDuration(context, appWidgetId, totalMinutes)
                     views.setTextViewText(R.id.txtTime, configMinutes.toString())
                     views.setTextColor(R.id.txtTime, Color.WHITE)
+                }
 
-                    val startIntent = Intent(context, TimerEngineService::class.java).apply {
+                // Setze die fertige, selbst gezeichnete Bitmap in das ImageView
+                views.setImageViewBitmap(R.id.widget_image, bitmap)
+
+                // Setze die Klick-Aktionen
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+                val intent = if (running) {
+                    Intent(context, TimerEngineService::class.java).apply { action = TimerContracts.ACTION_STOP }
+                } else {
+                    val configMinutes = getWidgetDuration(context, appWidgetId, totalMinutes)
+                    Intent(context, TimerEngineService::class.java).apply {
                         action = TimerContracts.ACTION_START
                         putExtra(TimerContracts.EXTRA_MINUTES, configMinutes)
                     }
-                    val startPendingIntent = PendingIntent.getForegroundService(context, appWidgetId, startIntent, flags)
-                    views.setOnClickPendingIntent(R.id.widget_root, startPendingIntent)
                 }
+                val pendingIntent = PendingIntent.getForegroundService(context, appWidgetId, intent, flags)
+                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
 
                 appWidgetManager.updateAppWidget(appWidgetId, views)
+
             } catch (e: Exception) {
                 Log.e(TAG, "Error in suspend updateAppWidget for $appWidgetId", e)
             }
