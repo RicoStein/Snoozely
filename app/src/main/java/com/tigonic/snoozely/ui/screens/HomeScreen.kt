@@ -47,6 +47,26 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+// ==========================
+// ZENTRALE TUNING-KONSTANTEN
+// ==========================
+
+// Top-Bar-Abstände:
+// - TopBarPadHorizontal/Vertical steuern den ZUSÄTZLICHEN Abstand um Titel/Icons.
+// - statusBarsPadding() sorgt automatisch für den exakten Statusbar-Abstand (nicht manuell veränderbar).
+private val TopBarPadHorizontal = 10.dp   // z.B. 10–16dp
+private val TopBarPadVertical   = 2.dp    // z.B. 2–6dp
+
+// Wheel-Layout und vertikale Abstände im Content:
+private val WheelTopSpacer      = 24.dp   // Abstand über dem Wheel (wirkt optisch wie vorher)
+private val WheelHeight         = 320.dp  // Wheel-Höhe (inkl. CenterText-Overlay)
+private val BetweenWheelAndBtn  = 80.dp   // Abstand zwischen Wheel und Start/Pause-Button
+private val AfterButtonSpacer   = 24.dp   // Abstand unter dem Button
+
+// Reserveplatz für Werbebanner, wenn wenig vertikaler Platz (Querformat oder kleine Höhe).
+// Wird nur dynamisch hinzugefügt, damit der Button nicht verdeckt wird – Wheel-Position bleibt stabil.
+private val BannerReserve       = 72.dp
+
 private const val TAG = "HomeScreenAds"
 private const val TEST_BANNER = "ca-app-pub-3940256099942544/6300978111"
 
@@ -79,12 +99,14 @@ fun HomeScreen(
     var sliderMinutes by rememberSaveable { mutableStateOf(timerMinutes.coerceAtLeast(1)) }
     var persistJob by remember { mutableStateOf<Job?>(null) }
 
+    // Slider-Wert synchronisieren, wenn nicht läuft
     LaunchedEffect(timerMinutes, timerRunning) {
         if (!timerRunning) {
             sliderMinutes = timerMinutes.coerceAtLeast(1)
         }
     }
 
+    // Ticker für Restzeit-Anzeige
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning && timerStartTime > 0L) {
@@ -140,21 +162,19 @@ fun HomeScreen(
     val isLandscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
 
-    // Nur bei wenig Höhe/Querformat unten extra Platz, damit der Button über dem Banner bleibt.
-    val bannerReserve = 72.dp
+    // Nur bei wenig Höhe/Querformat unten Reserveplatz, damit der Button über dem Banner bleibt.
     val needExtraBottomSpace = adsGateIsAllowed && (isLandscape || config.screenHeightDp < 620)
-    val extraBottomSpacer = if (needExtraBottomSpace) bannerReserve else 0.dp
+    val extraBottomSpacer = if (needExtraBottomSpace) BannerReserve else 0.dp
 
     Scaffold(
         containerColor = cs.background,
         topBar = {
-            // Minimaler, genauer Abstand:
-            // - statusBarsPadding(): nur Höhe der Statusleiste oben
-            // - systemBars Horizontal: sorgt im Querformat für Abstand zur seitlichen Nav-Bar
+            // Top-Bar: minimaler Abstand zur Statusbar + horizontale System-Insets (Querformat).
+            // Feintuning über TopBarPadHorizontal/TopBarPadVertical.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
+                    .statusBarsPadding() // exakte Höhe der Android-Statusleiste
                     .windowInsetsPadding(
                         WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
                     ),
@@ -163,7 +183,7 @@ fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                        .padding(horizontal = TopBarPadHorizontal, vertical = TopBarPadVertical),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -235,10 +255,10 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(cs.background)
-                // Unten Systemleisten respektieren, damit nichts unter die Navi/Gestenleiste rutscht
+                // Unten Systemleisten respektieren, damit nichts unter die Navi-/Gestenleiste rutscht.
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
-            // Scrollbarer, zentrierter Inhalt (Wheel bleibt in gewohnter Position)
+            // Scrollbarer, zentrierter Inhalt – Wheel bleibt optisch wie zuvor positioniert.
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -247,11 +267,11 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(WheelTopSpacer))
 
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.height(320.dp)
+                    modifier = Modifier.height(WheelHeight)
                 ) {
                     WheelSlider(
                         value = sliderMinutes,
@@ -277,7 +297,7 @@ fun HomeScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(60.dp))
+                Spacer(modifier = Modifier.height(BetweenWheelAndBtn))
 
                 IconButton(
                     onClick = {
@@ -304,12 +324,14 @@ fun HomeScreen(
                 }
 
                 if (needExtraBottomSpace) {
+                    // Nur bei wenig Höhe/Querformat: zusätzlicher Platz, damit der Button über dem Banner bleibt.
                     Spacer(modifier = Modifier.height(extraBottomSpacer))
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(AfterButtonSpacer))
             }
 
+            // Banner bleibt fix am unteren Rand; Content hat ggf. extra Reserve, damit nichts verdeckt wird.
             if (adsGateIsAllowed) {
                 Box(
                     modifier = Modifier
@@ -330,10 +352,12 @@ fun HomeScreen(
                     isPremium = premium,
                     onClose = { showPremiumDialog = false },
                     onPurchase = {
+                        // Nur im Nicht-Premium-Dialog sichtbar:
                         scope.launch { SettingsPreferenceHelper.setPremiumActive(appCtx, true) }
                         showPremiumDialog = false
                     },
                     onDonate = { amountEur ->
+                        // Beispiel: Spenden-Handler, hier nur Toast. Alternativ: URL öffnen / In-App-Donation.
                         android.widget.Toast
                             .makeText(appCtx, "Danke für deine Unterstützung: ${amountEur}€", android.widget.Toast.LENGTH_SHORT)
                             .show()
