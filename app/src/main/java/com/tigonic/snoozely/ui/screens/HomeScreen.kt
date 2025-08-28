@@ -58,9 +58,9 @@ private val TopBarPadHorizontal = 10.dp   // z.B. 10–16dp
 private val TopBarPadVertical   = 2.dp    // z.B. 2–6dp
 
 // Wheel-Layout und vertikale Abstände im Content:
-private val WheelTopSpacer      = 24.dp   // Abstand über dem Wheel (wirkt optisch wie vorher)
+private val WheelTopSpacer      = 90.dp   // Abstand über dem Wheel (wirkt optisch wie vorher)
 private val WheelHeight         = 320.dp  // Wheel-Höhe (inkl. CenterText-Overlay)
-private val BetweenWheelAndBtn  = 80.dp   // Abstand zwischen Wheel und Start/Pause-Button
+private val BetweenWheelAndBtn  = 70.dp   // Abstand zwischen Wheel und Start/Pause-Button
 private val AfterButtonSpacer   = 24.dp   // Abstand unter dem Button
 
 // Reserveplatz für Werbebanner, wenn wenig vertikaler Platz (Querformat oder kleine Höhe).
