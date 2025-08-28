@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
@@ -12,6 +13,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -22,12 +25,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ads.HomeBanner
 import com.tigonic.snoozely.service.TimerContracts
@@ -43,7 +46,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import androidx.compose.ui.zIndex
 
 private const val TAG = "HomeScreenAds"
 private const val TEST_BANNER = "ca-app-pub-3940256099942544/6300978111"
@@ -134,19 +136,36 @@ fun HomeScreen(
         }
     }
 
+    val config = LocalConfiguration.current
+    val isLandscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val scrollState = rememberScrollState()
+
+    // Zusätzlicher Abstand NUR bei wenig Höhe/Querformat, damit der Start-Button über dem Banner bleibt,
+    // ohne die zentrale Wheel-Position in typischen Fällen zu verschieben.
+    val bannerReserve = 72.dp
+    val needExtraBottomSpace = adsGateIsAllowed && (isLandscape || config.screenHeightDp < 620)
+    val extraBottomSpacer = if (needExtraBottomSpace) bannerReserve else 0.dp
+
     Scaffold(
         containerColor = cs.background,
         topBar = {
+            // TopBar respektiert Status- und Navigationsleisten (links/rechts in Landscape),
+            // damit die 3 Punkte nicht halb in der System-UI stecken.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp),
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                        )
+                    )
+                    .padding(top = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -214,20 +233,24 @@ fun HomeScreen(
             }
         }
     ) { innerPadding ->
-        // Root-Box ohne innerPadding, damit das Banner nicht hochgeschoben wird
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(cs.background)
+                // Auch der Content-Bereich respektiert unten die Systemleisten,
+                // damit Inhalte nicht unter die Gesten-/Nav-Bar laufen.
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
-            // Hauptinhalt: hier innerPadding anwenden (für TopBar etc.)
+            // Scrollbarer Inhalt, wieder zentriert wie zuvor
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // Oberer kleiner Abstand (wie vorher)
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Box(
@@ -286,17 +309,17 @@ fun HomeScreen(
                     )
                 }
 
+                // Zusätzlicher Abstand nur bei wenig Höhe/Querformat,
+                // damit der Button sicher über dem Banner bleibt.
+                if (needExtraBottomSpace) {
+                    Spacer(modifier = Modifier.height(extraBottomSpacer))
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // Banner exakt direkt über der System-Navigation-Bar (ohne zusätzlichen Abstand)
+            // Banner bleibt unten über dem Content liegen
             if (adsGateIsAllowed) {
-                // Optional: falls du Safe-Insets trotzdem berücksichtigen willst, nutze sie bewusst:
-                // val bottomInset: Dp = with(LocalDensity.current) {
-                //     val bottomPx = WindowInsets.safeDrawing.getBottom(this)
-                //     (bottomPx / density).dp
-                // }
-
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -316,17 +339,12 @@ fun HomeScreen(
                     isPremium = premium,
                     onClose = { showPremiumDialog = false },
                     onPurchase = {
-                        // Nur im Nicht-Premium-Dialog erreichbar
                         scope.launch {
                             SettingsPreferenceHelper.setPremiumActive(appCtx, true)
                         }
                         showPremiumDialog = false
                     },
                     onDonate = { amountEur ->
-                        // Beispiel: Spenden-Handler – hier könntest du einen Browser öffnen oder In-App-Kauf triggern
-                        // val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://deine-spenden-url.tld?amount=$amountEur"))
-                        // intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        // appCtx.startActivity(intent)
                         android.widget.Toast
                             .makeText(appCtx, "Danke für deine Unterstützung: ${amountEur}€", android.widget.Toast.LENGTH_SHORT)
                             .show()
