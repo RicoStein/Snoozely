@@ -189,7 +189,12 @@ fun HomeScreen(
                                 onDismissRequest = { overflowOpen = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.premium_activate_q)) },
+                                    text = {
+                                        Text(
+                                            if (premium) stringResource(R.string.premium_user_label)
+                                            else stringResource(R.string.premium_activate_q)
+                                        )
+                                    },
                                     onClick = {
                                         overflowOpen = false
                                         showPremiumDialog = true
@@ -308,12 +313,23 @@ fun HomeScreen(
 
             if (showPremiumDialog) {
                 PremiumPaywallDialog(
+                    isPremium = premium,
                     onClose = { showPremiumDialog = false },
                     onPurchase = {
+                        // Nur im Nicht-Premium-Dialog erreichbar
                         scope.launch {
                             SettingsPreferenceHelper.setPremiumActive(appCtx, true)
                         }
                         showPremiumDialog = false
+                    },
+                    onDonate = { amountEur ->
+                        // Beispiel: Spenden-Handler – hier könntest du einen Browser öffnen oder In-App-Kauf triggern
+                        // val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://deine-spenden-url.tld?amount=$amountEur"))
+                        // intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        // appCtx.startActivity(intent)
+                        android.widget.Toast
+                            .makeText(appCtx, "Danke für deine Unterstützung: ${amountEur}€", android.widget.Toast.LENGTH_SHORT)
+                            .show()
                     }
                 )
             }

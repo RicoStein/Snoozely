@@ -8,6 +8,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,8 +21,10 @@ import com.tigonic.snoozely.ui.theme.LocalExtraColors
 
 @Composable
 fun PremiumPaywallDialog(
+    isPremium: Boolean = false,
     onClose: () -> Unit,
-    onPurchase: () -> Unit
+    onPurchase: () -> Unit = {},
+    onDonate: (Int) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
@@ -32,11 +35,13 @@ fun PremiumPaywallDialog(
         text = {
             Column(Modifier.fillMaxWidth()) {
                 Text(
-                    stringResource(R.string.premium_benefits_title),
+                    if (isPremium) stringResource(R.string.premium_benefits_title_active)
+                    else stringResource(R.string.premium_benefits_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = cs.onSurface
                 )
                 Spacer(Modifier.height(8.dp))
+
                 val benefits = listOf(
                     stringResource(R.string.premium_benefit_widget),
                     stringResource(R.string.premium_benefit_no_ads),
@@ -56,18 +61,51 @@ fun PremiumPaywallDialog(
                         Text(it, color = cs.onSurface)
                     }
                 }
+
+                if (isPremium) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.premium_thanks),
+                        color = cs.onSurface
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.donate_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = cs.onSurface
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(2, 5, 10).forEach { amount ->
+                            OutlinedButton(onClick = { onDonate(amount) }) {
+                                Text(stringResource(R.string.donate_amount_eur, amount))
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
-            Button(onClick = onPurchase) {
-                Icon(imageVector = Icons.Filled.Payment, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.premium_buy_with_google_play))
+            if (!isPremium) {
+                Button(onClick = onPurchase) {
+                    Icon(imageVector = Icons.Filled.Payment, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.premium_buy_with_google_play))
+                }
+            } else {
+                TextButton(onClick = onClose) {
+                    Text(stringResource(R.string.close))
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onClose) {
-                Text(stringResource(R.string.close))
+            if (!isPremium) {
+                TextButton(onClick = onClose) {
+                    Text(stringResource(R.string.close))
+                }
             }
         }
     )

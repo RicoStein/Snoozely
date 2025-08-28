@@ -174,6 +174,14 @@
     <string name="premium_buy_with_google_play">Mit Google Play freischalten</string>
     <string name="more">Mehr</string>
 
+    <!-- PREMIUM: UI Texte für aktiven Premium-Status -->
+    <string name="premium_user_label">Premium Nutzer</string>
+    <string name="premium_benefits_title_active">Das hast du mit Premium</string>
+    <string name="premium_thanks">Vielen Dank, für die Unterstützung</string>
+    <string name="donate_title">Freiwillig spenden</string>
+    <string name="donate_amount_eur">%1$d € spenden</string>
+    <string name="donate">Spenden</string>
+
     <!-- Optional: um die aapt-Warnung zu beseitigen -->
     <string name="sleep_timer">Schlaftimer</string>
 
