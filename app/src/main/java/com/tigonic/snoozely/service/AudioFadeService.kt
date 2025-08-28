@@ -28,43 +28,26 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/**
- * Service, der die Medienlautstärke abhängig von der verbleibenden Zeit
- * des Sleep-Timers linear herunterfährt.
- *
- * Logik:
- * - Hört auf ACTION_TICK (Engine-Broadcast mit REMAINING/TOTAL).
- * - Wenn STOP_AUDIO aktiviert und FADE_OUT > 0:
- *      - Bei remainingSec <= fadeOutSec → Fade aktiv:
- *          volume = originalVolume * (remainingSec / fadeOutSec)
- *      - Bei Verlängerung (remainingSec > fadeOutSec) → Fade abbrechen + Volume restore.
- * - Bei Service-Stopp oder Abschalten der Funktion → Volume restore.
- */
 class AudioFadeService : Service() {
 
     companion object {
         private const val TAG = "AudioFadeService"
         private const val FADE_CHANNEL_ID = "audio_fade"
         private const val FADE_NOTIFICATION_ID = 1007
-
-        // NEU: Finalisierungs-Action (bitte String identisch in der Engine verwenden)
         const val ACTION_FADE_FINALIZE = "com.tigonic.snoozely.action.FADE_FINALIZE"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    // Audio
     private lateinit var audioManager: AudioManager
     private val stream = AudioManager.STREAM_MUSIC
     private var originalVolume: Int? = null
     private var fadingActive: Boolean = false
 
-    // Settings-Cache (wird bei jedem Tick aktualisiert)
     @Volatile private var stopAudioEnabled: Boolean = true
-    @Volatile private var fadeOutSec: Int = 30 // Default, wird aus Settings gelesen
+    @Volatile private var fadeOutSec: Int = 30
     @Volatile private var finalizing: Boolean = false
 
-    // Receiver für Ticks aus dem Engine-Service
     private val tickReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != ACTION_TICK) return
@@ -78,33 +61,26 @@ class AudioFadeService : Service() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         registerReceivers()
-        // Channel für optionalen Foreground (nur wenn du ihn aktivierst)
         createFadeChannelIfNeeded()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         if (action == ACTION_FADE_FINALIZE) {
-            // Wir sind am Timerende: kurz warten, bis Player pausiert / Screen off ist,
-            // dann erst auf Original-Lautstärke zurück.
             finalizing = true
             scope.launch {
                 try {
-                    kotlinx.coroutines.delay(1200) // 1.2s Puffer – je nach Gerät ggf. anpassen
+                    kotlinx.coroutines.delay(1200)
                 } catch (_: Throwable) { /* ignore */ }
                 restoreVolumeIfNeeded()
                 stopSelf()
             }
             return START_NOT_STICKY
         }
-        // Normalfall: Service lebt im Hintergrund und reagiert auf Ticks.
         return START_STICKY
     }
 
-
     override fun onDestroy() {
-        // Nur dann SOFORT restaurieren, wenn wir NICHT im Finalisieren-Flow sind.
-        // Beim Finalisieren übernehmen wir das nach kurzer Verzögerung in onStartCommand().
         if (!finalizing) {
             restoreVolumeIfNeeded()
         }
@@ -115,17 +91,13 @@ class AudioFadeService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // ---- Core ----
-
     private fun onTick(totalMs: Long, remainingMs: Long) {
         scope.launch {
-            // Settings aktuell lesen (billig genug für jeden Tick)
             stopAudioEnabled = SettingsPreferenceHelper.getStopAudio(applicationContext).first()
             val fadeOut = SettingsPreferenceHelper.getFadeOut(applicationContext).first()
-            fadeOutSec = max(0, fadeOut.roundToInt()) // float (Sekunden) → int
+            fadeOutSec = max(0, fadeOut.roundToInt())
 
             if (!stopAudioEnabled || fadeOutSec <= 0 || totalMs <= 0L) {
-                // Funktion deaktiviert → sicherstellen, dass kein Fade aktiv bleibt
                 if (fadingActive) {
                     restoreVolumeIfNeeded()
                     stopForegroundIfRunning()
@@ -136,24 +108,17 @@ class AudioFadeService : Service() {
             val remainingSec = max(0L, remainingMs / 1000L).toInt()
 
             if (remainingSec <= fadeOutSec) {
-                // Fade-Fenster erreicht → linear reduzieren
                 if (!fadingActive) {
-                    // Start der Fade-Phase → Ausgangslautstärke einmalig puffern
                     originalVolume = audioManager.getStreamVolume(stream).coerceAtLeast(0)
                     fadingActive = true
-                    // Optional: Foreground, falls du es brauchst:
-                    // startForegroundWithTinyNotification()
                 }
 
                 val base = (originalVolume ?: audioManager.getStreamVolume(stream)).coerceAtLeast(0)
-                // Verhältnis 0..1
                 val ratio: Double = remainingSec.toDouble() / max(1, fadeOutSec).toDouble()
-                // mindestens 0, maximal base
                 val target = (base * ratio).let { ceil(it).toInt() }.coerceIn(0, base)
 
                 setStreamVolumeSafe(target)
             } else {
-                // Außerhalb des Fade-Fensters → ggf. abbrechen & Lautstärke zurück
                 if (fadingActive) {
                     restoreVolumeIfNeeded()
                     stopForegroundIfRunning()
@@ -161,8 +126,6 @@ class AudioFadeService : Service() {
             }
         }
     }
-
-    // ---- Helpers ----
 
     private fun setStreamVolumeSafe(vol: Int) {
         try {
@@ -184,11 +147,14 @@ class AudioFadeService : Service() {
         fadingActive = false
     }
 
-    // ---- Broadcast-Handling ----
-
     private fun registerReceivers() {
         val f = IntentFilter().apply { addAction(ACTION_TICK) }
-        registerReceiver(tickReceiver, f)
+        // KORREKTUR: Flag für Android 13+ hinzufügen
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(tickReceiver, f, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(tickReceiver, f)
+        }
     }
 
     private fun unregisterReceivers() {
@@ -196,8 +162,6 @@ class AudioFadeService : Service() {
             unregisterReceiver(tickReceiver)
         } catch (_: Throwable) { /* ignore */ }
     }
-
-    // ---- (Optional) Foreground während des echten Fades ----
 
     private fun createFadeChannelIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -222,7 +186,7 @@ class AudioFadeService : Service() {
         val notif = NotificationCompat.Builder(this, FADE_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_silent_mode)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.fade_out_running)) // z. B. „Audio wird ausgeblendet…“
+            .setContentText(getString(R.string.fade_out_running))
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()

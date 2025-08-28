@@ -35,12 +35,10 @@
         android:theme="@style/Theme.Snoozely"
         tools:targetApi="31">
 
-        <!-- AdMob App-ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-9926405837320362~9872099437" />
 
-        <!-- Services/Activities/Receiver (unverändert) -->
         <service android:name=".service.TimerEngineService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <service android:name=".service.TimerNotificationService" android:exported="false" />
         <service android:name=".service.AudioFadeService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
@@ -48,40 +46,63 @@
         <service android:name=".service.BluetoothService" android:enabled="true" android:exported="false" />
         <service android:name=".service.WifiControlService" android:exported="false" />
         <service android:name=".service.HapticsService" android:exported="false" />
-        <service android:name=".tile.SleepTimerTileService" android:exported="true" android:icon="@drawable/ic_qs_sleeptimer" android:label="@string/app_name" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+
+        <service
+            android:name=".tile.SleepTimerTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_sleeptimer"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
 
-        <receiver android:name=".widget.TimerQuickStartWidgetProvider" android:exported="true" android:label="@string/widget_quick_start_title">
+        <receiver
+            android:name=".widget.TimerQuickStartWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_quick_start_title">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/timer_quick_start_widget_info" />
         </receiver>
 
-        <activity android:name=".widget.TimerWidgetConfigActivity" android:exported="true" android:theme="@style/Theme.Snoozely">
+        <activity
+            android:name=".widget.TimerWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Snoozely">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
 
-        <receiver android:name=".widget.PremiumToggleReceiver" android:exported="true">
+        <receiver
+            android:name=".widget.PremiumToggleReceiver"
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.tigonic.snoozely.DEBUG_PREMIUM_TOGGLE" />
             </intent-filter>
         </receiver>
 
-        <activity android:name=".MainActivity" android:exported="true" android:label="@string/app_name" android:theme="@style/Theme.Snoozely">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Snoozely">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <receiver android:name=".util.ScreenOffAdminReceiver" android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="false">
-            <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin_receiver" />
+        <receiver
+            android:name=".util.ScreenOffAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="false">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
