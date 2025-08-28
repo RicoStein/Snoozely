@@ -23,8 +23,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ads.HomeBanner
@@ -41,6 +43,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.compose.ui.zIndex
 
 private const val TAG = "HomeScreenAds"
 private const val TEST_BANNER = "ca-app-pub-3940256099942544/6300978111"
@@ -206,17 +209,17 @@ fun HomeScreen(
             }
         }
     ) { innerPadding ->
+        // Root-Box ohne innerPadding, damit das Banner nicht hochgeschoben wird
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .background(cs.background)
         ) {
+            // Hauptinhalt: hier innerPadding anwenden (für TopBar etc.)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 0.dp)
-                    .padding(bottom = 72.dp),
+                    .padding(innerPadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -281,12 +284,19 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
+            // Banner exakt direkt über der System-Navigation-Bar (ohne zusätzlichen Abstand)
             if (adsGateIsAllowed) {
+                // Optional: falls du Safe-Insets trotzdem berücksichtigen willst, nutze sie bewusst:
+                // val bottomInset: Dp = with(LocalDensity.current) {
+                //     val bottomPx = WindowInsets.safeDrawing.getBottom(this)
+                //     (bottomPx / density).dp
+                // }
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp)
+                        .zIndex(1f)
                 ) {
                     HomeBanner(
                         isAdsAllowed = true,
