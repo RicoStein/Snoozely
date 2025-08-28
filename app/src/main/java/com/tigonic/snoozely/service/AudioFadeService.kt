@@ -149,7 +149,6 @@ class AudioFadeService : Service() {
 
     private fun registerReceivers() {
         val f = IntentFilter().apply { addAction(ACTION_TICK) }
-        // KORREKTUR: Flag für Android 13+ hinzufügen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(tickReceiver, f, Context.RECEIVER_NOT_EXPORTED)
         } else {
