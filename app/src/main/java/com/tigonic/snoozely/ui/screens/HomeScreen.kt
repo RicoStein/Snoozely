@@ -140,8 +140,7 @@ fun HomeScreen(
     val isLandscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
 
-    // Zusätzlicher Abstand NUR bei wenig Höhe/Querformat, damit der Start-Button über dem Banner bleibt,
-    // ohne die zentrale Wheel-Position in typischen Fällen zu verschieben.
+    // Nur bei wenig Höhe/Querformat unten extra Platz, damit der Button über dem Banner bleibt.
     val bannerReserve = 72.dp
     val needExtraBottomSpace = adsGateIsAllowed && (isLandscape || config.screenHeightDp < 620)
     val extraBottomSpacer = if (needExtraBottomSpace) bannerReserve else 0.dp
@@ -149,23 +148,22 @@ fun HomeScreen(
     Scaffold(
         containerColor = cs.background,
         topBar = {
-            // TopBar respektiert Status- und Navigationsleisten (links/rechts in Landscape),
-            // damit die 3 Punkte nicht halb in der System-UI stecken.
+            // Minimaler, genauer Abstand:
+            // - statusBarsPadding(): nur Höhe der Statusleiste oben
+            // - systemBars Horizontal: sorgt im Querformat für Abstand zur seitlichen Nav-Bar
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
-                        )
-                    )
-                    .padding(top = 16.dp),
+                        WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
+                    ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -237,11 +235,10 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(cs.background)
-                // Auch der Content-Bereich respektiert unten die Systemleisten,
-                // damit Inhalte nicht unter die Gesten-/Nav-Bar laufen.
+                // Unten Systemleisten respektieren, damit nichts unter die Navi/Gestenleiste rutscht
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
-            // Scrollbarer Inhalt, wieder zentriert wie zuvor
+            // Scrollbarer, zentrierter Inhalt (Wheel bleibt in gewohnter Position)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -250,7 +247,6 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Oberer kleiner Abstand (wie vorher)
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Box(
@@ -286,9 +282,7 @@ fun HomeScreen(
                 IconButton(
                     onClick = {
                         if (!timerRunning && sliderMinutes > 0) {
-                            onRequestAdThenStart {
-                                startTimerNow()
-                            }
+                            onRequestAdThenStart { startTimerNow() }
                         } else if (timerRunning) {
                             scope.launch {
                                 val stopIntent = Intent(appCtx, TimerEngineService::class.java)
@@ -309,8 +303,6 @@ fun HomeScreen(
                     )
                 }
 
-                // Zusätzlicher Abstand nur bei wenig Höhe/Querformat,
-                // damit der Button sicher über dem Banner bleibt.
                 if (needExtraBottomSpace) {
                     Spacer(modifier = Modifier.height(extraBottomSpacer))
                 }
@@ -318,7 +310,6 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // Banner bleibt unten über dem Content liegen
             if (adsGateIsAllowed) {
                 Box(
                     modifier = Modifier
@@ -339,9 +330,7 @@ fun HomeScreen(
                     isPremium = premium,
                     onClose = { showPremiumDialog = false },
                     onPurchase = {
-                        scope.launch {
-                            SettingsPreferenceHelper.setPremiumActive(appCtx, true)
-                        }
+                        scope.launch { SettingsPreferenceHelper.setPremiumActive(appCtx, true) }
                         showPremiumDialog = false
                     },
                     onDonate = { amountEur ->
