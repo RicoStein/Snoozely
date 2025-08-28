@@ -35,6 +35,7 @@ import android.provider.Settings
 import android.util.Log
 import com.tigonic.snoozely.shake.ShakeDetector
 import com.tigonic.snoozely.widget.TimerQuickStartWidgetProvider
+import kotlin.math.roundToInt
 
 class TimerEngineService : Service() {
 
@@ -44,7 +45,6 @@ class TimerEngineService : Service() {
         private const val NOTIF_ID_REMINDER = 43
         private const val REQ_EXTEND = 2002
         private const val REQ_STOP = 2003
-        private const val ACTION_FADE_FINALIZE = "com.tigonic.snoozely.action.FADE_FINALIZE"
         private const val SHAKE_COOLDOWN_MS = 3000L
 
         @Volatile var isForeground: Boolean = false
@@ -61,6 +61,9 @@ class TimerEngineService : Service() {
     @Volatile private var reminderSentForStartTime: Long = -1L
     @Volatile private var lastStartMinutesCache: Int? = null
 
+    // Audio-Fade Status
+    @Volatile private var fadeStarted: Boolean = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -76,6 +79,7 @@ class TimerEngineService : Service() {
         serviceScope.cancel()
         isForeground = false
         stopShakeDetectorAndSound()
+        fadeStarted = false
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -98,8 +102,9 @@ class TimerEngineService : Service() {
                     else runCatching { TimerPreferenceHelper.getTimer(ctx).first() }.getOrDefault(5)
                     lastStartMinutesCache = minutes
                     TimerPreferenceHelper.startTimer(ctx, minutes)
+                    fadeStarted = false // reset fade state
                     startTickerIfNeeded()
-                    startServiceSafe(Intent(ctx, AudioFadeService::class.java))
+                    // AudioFadeService wird erst beim Fade-Zeitpunkt gestartet
                     sendRunningUpdateNow()
                     requestWidgetUpdate()
                 }
@@ -219,6 +224,35 @@ class TimerEngineService : Service() {
                 val elapsed   = now - startTime
                 val remaining = (totalMs - elapsed).coerceAtLeast(0)
 
+                // Audio Fade Triggering
+                val stopAudio = runCatching { SettingsPreferenceHelper.getStopAudio(ctx).first() }.getOrDefault(true)
+                val fadeSec = runCatching { SettingsPreferenceHelper.getFadeOut(ctx).first().roundToInt() }.getOrDefault(30)
+                val thresholdMs = (fadeSec.coerceAtLeast(0) * 1000L)
+
+                if (stopAudio && fadeSec > 0) {
+                    if (remaining <= thresholdMs && !fadeStarted) {
+                        // Start Fade ONLY (keine Pause)
+                        startServiceSafe(
+                            Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_AND_STOP)
+                        )
+                        fadeStarted = true
+                    } else if (fadeStarted && remaining > thresholdMs) {
+                        // Timer verlängert: Fade abbrechen und Lautstärke wieder hochregeln
+                        startServiceSafe(
+                            Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)
+                        )
+                        fadeStarted = false
+                    }
+                } else {
+                    // Stop-Audio deaktiviert -> laufenden Fade abbrechen
+                    if (fadeStarted) {
+                        startServiceSafe(
+                            Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)
+                        )
+                        fadeStarted = false
+                    }
+                }
+
                 sendBroadcast(Intent(TimerContracts.ACTION_TICK).apply {
                     putExtra(TimerContracts.EXTRA_TOTAL_MS, totalMs)
                     putExtra(TimerContracts.EXTRA_REMAINING_MS, remaining)
@@ -266,7 +300,6 @@ class TimerEngineService : Service() {
         val mode = SettingsPreferenceHelper.getShakeActivationMode(ctx).first()
         val delayMin = SettingsPreferenceHelper.getShakeActivationDelayMinutes(ctx).first()
         val start = TimerPreferenceHelper.getTimerStartTime(ctx).first()
-        val totalMin = TimerPreferenceHelper.getTimer(ctx).first()
         val elapsedMin = ((now - start) / 60_000L).toInt()
         val isActive = when (mode) {
             "after_start" -> elapsedMin >= delayMin
@@ -349,7 +382,6 @@ class TimerEngineService : Service() {
             shakeDetector = null
         }
 
-        // Release WakeLock
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
             wakeLock = null
@@ -363,9 +395,11 @@ class TimerEngineService : Service() {
     private fun onTimerFinished() {
         serviceScope.launch {
             val ctx = applicationContext
+            // Haptics / Screen lock
             startServiceSafe(Intent(ctx, HapticsService::class.java).setAction("END"))
             startServiceSafe(Intent(ctx, ScreenLockService::class.java))
-            startServiceSafe(Intent(ctx, AudioFadeService::class.java).setAction(ACTION_FADE_FINALIZE))
+            // Jetzt erst: Pause und Lautstärke wiederherstellen
+            startServiceSafe(Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_FINALIZE))
             stopEverything(timerFinished = true)
         }
     }
@@ -374,6 +408,7 @@ class TimerEngineService : Service() {
         tickerJob?.cancel()
         tickerJob = null
         val ctx = applicationContext
+
         val base = runCatching { kotlinx.coroutines.runBlocking {
             TimerPreferenceHelper.getTimerUserBase(ctx).first()
         } }.getOrDefault(0)
@@ -385,16 +420,24 @@ class TimerEngineService : Service() {
         kotlinx.coroutines.runBlocking {
             TimerPreferenceHelper.stopTimer(ctx, fallback)
         }
-        reminderSentForStartTime = -1L
+
+        // Audio-Fade aufräumen
         if (!timerFinished) {
-            try { stopService(Intent(applicationContext, AudioFadeService::class.java)) } catch (_: Throwable) {}
+            // Manuell gestoppt: Fade abbrechen und Lautstärke wiederherstellen
+            runCatching {
+                startServiceSafe(Intent(applicationContext, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE))
+            }
+            runCatching { stopService(Intent(applicationContext, AudioFadeService::class.java)) }
         }
+        fadeStarted = false
+
         try {
             getSystemService(NotificationManager::class.java).apply {
                 cancel(TimerNotificationService.NOTIFICATION_ID_RUNNING)
                 cancel(TimerNotificationService.NOTIFICATION_ID_REMINDER)
             }
         } catch (_: Throwable) {}
+
         disableBluetooth()
         disableWifi()
         stopShakeDetectorAndSound()
