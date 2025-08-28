@@ -14,6 +14,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -28,9 +29,9 @@ fun WheelSlider(
     value: Int,
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    minValue: Int = 1,
-    maxValue: Int = 1000,
-    stepsPerCircle: Int = 60,
+    minValue: Int = 1,          // Minimum (Minuten)
+    maxValue: Int = 1000,       // Maximum (Minuten)
+    stepsPerCircle: Int = 60,   // 60 Schritte = 60 Minuten pro Kreis
     showCenterText: Boolean = true,
     wheelAlpha: Float = 1f,
     wheelScale: Float = 1f,
@@ -53,26 +54,30 @@ fun WheelSlider(
     val center = Offset(sizePx / 2f, sizePx / 2f)
 
     // Interaktionsparameter
-    // Drags innerhalb dieser relativen Radius-Schwelle werden ignoriert oder auf den Rand projiziert
     val innerDeadZoneR = 0.65f
     val snapEnter = 0.88f
     val snapExit = 0.82f
-    // Begrenze pro Event den maximalen Winkel-Schritt stark, damit die Anzeige ruhig bleibt
     val maxDeltaPerEventDeg = 12f
+
+    // Winkel-Grenzen (entsprechend min/max Minuten)
+    val minAngle = (minValue.toFloat() / stepsPerCircle) * 360f // 1 min -> 6°
+    val maxAngle = (maxValue.toFloat() / stepsPerCircle) * 360f
 
     // State
     var rounds by remember { mutableStateOf(value / stepsPerCircle) }
     var angleInCircle by remember { mutableStateOf((value % stepsPerCircle) * 360f / stepsPerCircle) }
-    var continuousAngleDeg by remember { mutableStateOf((value.toFloat() / stepsPerCircle) * 360f) }
+    var continuousAngleDeg by remember {
+        mutableStateOf(((value.toFloat() / stepsPerCircle) * 360f).coerceIn(minAngle, maxAngle))
+    }
     var snapMode by remember { mutableStateOf(false) }
     var lastEmitted by remember { mutableStateOf(value.coerceIn(minValue, maxValue)) }
     var ignoreDrag by remember { mutableStateOf(false) }
 
-    LaunchedEffect(value) {
+    LaunchedEffect(value, minAngle, maxAngle) {
         val clamped = value.coerceIn(minValue, maxValue)
         rounds = clamped / stepsPerCircle
         angleInCircle = (clamped % stepsPerCircle) * 360f / stepsPerCircle
-        continuousAngleDeg = (clamped.toFloat() / stepsPerCircle) * 360f
+        continuousAngleDeg = ((clamped.toFloat() / stepsPerCircle) * 360f).coerceIn(minAngle, maxAngle)
         lastEmitted = clamped
     }
 
@@ -80,6 +85,7 @@ fun WheelSlider(
     fun polarAngleFrom(offset: Offset): Float {
         val x = offset.x - center.x
         val y = offset.y - center.y
+        // 0° = oben (12 Uhr), clockwise
         return (((Math.toDegrees(atan2(y.toDouble(), x.toDouble())) + 450.0) % 360.0).toFloat())
     }
     fun radialR(pos: Offset): Float {
@@ -88,7 +94,6 @@ fun WheelSlider(
         return (hypot(dx, dy) / wheelRadius).coerceIn(0f, 1f)
     }
     fun projectToEdge(pos: Offset): Offset {
-        // Projektiert einen Punkt radial auf den Kreisrand
         val dx = pos.x - center.x
         val dy = pos.y - center.y
         val len = hypot(dx, dy).coerceAtLeast(1e-3f)
@@ -118,28 +123,36 @@ fun WheelSlider(
             angleInCircle = ((steps % stepsPerCircle).toFloat() / stepsPerCircle) * 360f
             onValueChange(steps)
         } else {
-            // Nur interne Winkel-States aktualisieren, nicht emittieren
             rounds = steps / stepsPerCircle
             angleInCircle = ((steps % stepsPerCircle).toFloat() / stepsPerCircle) * 360f
         }
         return steps
     }
 
-    val drawSteps = ((continuousAngleDeg / 360f) * stepsPerCircle).roundToInt()
-        .coerceIn(minValue, maxValue)
-    val sweep = (drawSteps.toFloat() / stepsPerCircle) * 360f
+    // Zeichnungswinkel: kontinuierlich, aber hart auf min/max geklemmt (kein < 1 Minute)
+    val sweepExact = continuousAngleDeg.coerceIn(minAngle, maxAngle)
     val normalizedAngle = ((continuousAngleDeg % 360f) + 360f) % 360f
+
+    // Kopfzentrum
     val radians = Math.toRadians((normalizedAngle - 90f).toDouble())
     val handleCenter = Offset(
         x = (center.x + cos(radians) * wheelRadius).toFloat(),
         y = (center.y + sin(radians) * wheelRadius).toFloat()
     )
 
-    // Min/Max-Winkel
-    val minAngle = (minValue.toFloat() / stepsPerCircle) * 360f
-    val maxAngle = (maxValue.toFloat() / stepsPerCircle) * 360f
-
     if (wheelAlpha <= 0f) return
+
+    // Farben für Verlauf: Blau -> helleres Blau -> Türkis -> leicht helles Grün
+    val headDark = Color(0xFF1E88E5)   // Blau (Kopf)
+    val blueLight = Color(0xFF64B5F6)  // helleres Blau
+    val turquoise = Color(0xFF26C6DA)  // Türkis
+    val greenLight = Color(0xFF4AC3AB) // leicht helles Grün
+
+    // Kurzer Cap direkt hinter dem Kopf (ca. 4° ≈ < 1 Minute)
+    val capAngleDeg = min(sweepExact, 4f)
+
+    // Ausrichtung: 0° zeigt in Kopfrichtung (oben)
+    val rotateToHead = normalizedAngle - 90f
 
     Box(
         contentAlignment = Alignment.Center,
@@ -159,9 +172,8 @@ fun WheelSlider(
                                         val r = radialR(pos)
                                         val posEdge = if (r < innerDeadZoneR) projectToEdge(pos) else pos
                                         val finger = polarAngleFrom(posEdge)
-                                        continuousAngleDeg =
-                                            closestEquivalentAngle(finger, continuousAngleDeg)
-                                                .coerceIn(minAngle, maxAngle)
+                                        continuousAngleDeg = closestEquivalentAngle(finger, continuousAngleDeg)
+                                            .coerceIn(minAngle, maxAngle) // clamp erzwingt >= 1 min
                                         emitFromContinuous()
                                         try { this.tryAwaitRelease() } catch (_: Throwable) {}
                                     },
@@ -169,9 +181,8 @@ fun WheelSlider(
                                         val r = radialR(pos)
                                         val posEdge = if (r < innerDeadZoneR) projectToEdge(pos) else pos
                                         val finger = polarAngleFrom(posEdge)
-                                        continuousAngleDeg =
-                                            closestEquivalentAngle(finger, continuousAngleDeg)
-                                                .coerceIn(minAngle, maxAngle)
+                                        continuousAngleDeg = closestEquivalentAngle(finger, continuousAngleDeg)
+                                            .coerceIn(minAngle, maxAngle) // clamp erzwingt >= 1 min
                                         emitFromContinuous()
                                     }
                                 )
@@ -185,9 +196,8 @@ fun WheelSlider(
                                         val finger = polarAngleFrom(posUse)
                                         snapMode = r >= snapEnter
                                         if (snapMode) {
-                                            continuousAngleDeg =
-                                                closestEquivalentAngle(finger, continuousAngleDeg)
-                                                    .coerceIn(minAngle, maxAngle)
+                                            continuousAngleDeg = closestEquivalentAngle(finger, continuousAngleDeg)
+                                                .coerceIn(minAngle, maxAngle)
                                             emitFromContinuous()
                                         }
                                     },
@@ -195,35 +205,30 @@ fun WheelSlider(
                                         val rRaw = radialR(change.position)
                                         val r = rRaw.coerceIn(0f, 1f)
                                         if (r < innerDeadZoneR) {
-                                            // Inner Dead-Zone: handle bleibt stabil, aber wir projizieren für den Winkel
                                             val posEdge = projectToEdge(change.position)
                                             val finger = polarAngleFrom(posEdge)
-                                            // Im Inneren schalten wir in einen sanften Snap
                                             snapMode = true
-                                            continuousAngleDeg =
-                                                closestEquivalentAngle(finger, continuousAngleDeg)
-                                                    .coerceIn(minAngle, maxAngle)
+                                            continuousAngleDeg = closestEquivalentAngle(finger, continuousAngleDeg)
+                                                .coerceIn(minAngle, maxAngle) // clamp
                                             emitFromContinuous()
                                             return@detectDragGestures
                                         }
 
-                                        // Snap-Modus je nach Radius
                                         if (!snapMode && r >= snapEnter) snapMode = true
                                         else if (snapMode && r < snapExit) snapMode = false
 
                                         val finger = polarAngleFrom(change.position)
                                         if (snapMode) {
-                                            continuousAngleDeg =
-                                                closestEquivalentAngle(finger, continuousAngleDeg)
+                                            continuousAngleDeg = closestEquivalentAngle(finger, continuousAngleDeg)
                                         } else {
                                             val currentMod = ((continuousAngleDeg % 360f) + 360f) % 360f
                                             var delta = finger - currentMod
                                             if (delta > 180f) delta -= 360f
                                             if (delta < -180f) delta += 360f
-                                            // Keine Radial-Speed-Booster mehr – ruhig halten
                                             val deltaAdj = delta.coerceIn(-maxDeltaPerEventDeg, maxDeltaPerEventDeg)
                                             continuousAngleDeg += deltaAdj
                                         }
+                                        // Harter Clamp auf min/max – verhindert < 1 Minute
                                         continuousAngleDeg = continuousAngleDeg.coerceIn(minAngle, maxAngle)
                                         emitFromContinuous()
                                     },
@@ -241,32 +246,66 @@ fun WheelSlider(
                 style = Stroke(width = strokePx)
             )
 
-            // Fortschrittsbogen (Gradients)
-            if (drawSteps > 0) {
-                val base = extra.wheelGradient
-                val closed = if (base.isNotEmpty() && base.first() != base.last()) {
-                    base + base.first()
-                } else base
-                val sweepClamped = sweep.coerceAtMost(359.999f)
+            if (sweepExact > 0f) {
+                val sweepClamped = sweepExact.coerceIn(minAngle, 359.999f)
 
                 withTransform({
-                    rotate(degrees = -90f, pivot = center)
+                    rotate(degrees = rotateToHead, pivot = center)
                 }) {
+                    // Verlauf hinter dem Kopf: [startTrail .. 360)
+                    val startTrail = (360f - sweepClamped) % 360f
+                    val tailLen = (sweepClamped - capAngleDeg).coerceAtLeast(0f)
+
+                    // Farbverlauf (Blau -> helleres Blau -> Türkis -> leicht helles Grün)
+                    val stops = buildList {
+                        add(0.00f to headDark) // gegenüberliegende Seite dunkel (Artefakte vermeiden)
+                        val s = startTrail / 360f
+                        if (tailLen > 0f) {
+                            add(s to greenLight)                                        // Schwanz: grün
+                            add(((startTrail + tailLen * 0.40f) / 360f) to turquoise)   // -> türkis
+                            add(((startTrail + tailLen * 0.70f) / 360f) to blueLight)   // -> helleres blau
+                            add(((startTrail + tailLen * 0.98f) / 360f) to headDark)    // -> nahe Kopf abdunkeln
+                        } else {
+                            add(s to headDark)
+                        }
+                        add(1.00f to headDark) // am Kopf dunkel
+                    }.sortedBy { it.first }.toTypedArray()
+
+                    val brush = Brush.sweepGradient(
+                        colorStops = stops,
+                        center = center
+                    )
+
+                    // Verlaufsspur
                     drawArc(
-                        brush = Brush.sweepGradient(colors = closed, center = center),
-                        startAngle = 0f,
+                        brush = brush,
+                        startAngle = startTrail,
                         sweepAngle = sweepClamped,
                         useCenter = false,
                         style = Stroke(width = strokePx, cap = StrokeCap.Butt),
                         topLeft = Offset(center.x - wheelRadius, center.y - wheelRadius),
                         size = Size(wheelRadius * 2, wheelRadius * 2)
                     )
+
+                    // Kurzer dunkler Cap direkt hinter dem Kopf
+                    if (capAngleDeg > 0f) {
+                        val capStart = (360f - capAngleDeg) % 360f
+                        drawArc(
+                            color = headDark,
+                            startAngle = capStart,
+                            sweepAngle = capAngleDeg,
+                            useCenter = false,
+                            style = Stroke(width = strokePx, cap = StrokeCap.Butt),
+                            topLeft = Offset(center.x - wheelRadius, center.y - wheelRadius),
+                            size = Size(wheelRadius * 2, wheelRadius * 2)
+                        )
+                    }
                 }
             }
 
-            // Handle
+            // Kopf (immer dunkel)
             drawCircle(
-                color = if (enabled) extra.toggle else cs.onSurface.copy(alpha = 0.4f),
+                color = headDark,
                 radius = handlePx,
                 center = handleCenter
             )
