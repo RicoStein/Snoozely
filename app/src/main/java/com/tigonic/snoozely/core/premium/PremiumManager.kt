@@ -30,7 +30,12 @@ class PremiumManager(
     fun start() {
         if (billingClient != null) return
         billingClient = BillingClient.newBuilder(appContext)
-            .enablePendingPurchases()
+            .enablePendingPurchases(
+                PendingPurchasesParams
+                    .newBuilder()
+                    .enableOneTimeProducts()  // für Einmalkäufe (INAPP)
+                    .build()
+            )
             .setListener(this)
             .build()
         billingClient!!.startConnection(object : BillingClientStateListener {
