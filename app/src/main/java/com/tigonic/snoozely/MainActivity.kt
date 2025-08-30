@@ -67,14 +67,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Check for and request battery optimization permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                val intent = Intent().apply {
-                    action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                    data = Uri.parse("package:$packageName")
+            lifecycleScope.launch {
+                val handled = SettingsPreferenceHelper
+                    .getBatteryOptPromptHandled(applicationContext)
+                    .first()
+
+                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                val alreadyIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
+
+                if (!handled && !alreadyIgnoring) {
+                    val ok = runCatching {
+                        startActivity(Intent("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS").apply {
+                            data = Uri.parse("package:$packageName")
+                        })
+                    }.isSuccess
+                    SettingsPreferenceHelper.setBatteryOptPromptHandled(applicationContext, true.takeIf { ok } ?: true)
                 }
-                // In a real app, you might show a dialog first to explain why this is needed.
-                startActivity(intent)
             }
         }
         enableEdgeToEdge()

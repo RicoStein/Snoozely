@@ -62,6 +62,8 @@ object SettingsPreferenceHelper {
     //BatteryOptimization
     private val KEY_SUPPRESS_SETUP_HINT = booleanPreferencesKey("suppress_setup_hint")
 
+    //Akkunutzungsabfrage bei Erstinstallation
+    private val KEY_BATTERY_OPT_PROMPT_HANDLED = booleanPreferencesKey("battery_opt_prompt_handled")
 
     // ----------------- GETTER -----------------
 
@@ -297,5 +299,13 @@ object SettingsPreferenceHelper {
 
     suspend fun setSuppressSetupHint(context: Context, suppress: Boolean) {
         context.dataStore.edit { it[KEY_SUPPRESS_SETUP_HINT] = suppress }
+    }
+
+    //Akkunutzungsabfrage bei Erstinstallation
+    fun getBatteryOptPromptHandled(context: Context): Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_BATTERY_OPT_PROMPT_HANDLED] ?: false }
+
+    suspend fun setBatteryOptPromptHandled(context: Context, handled: Boolean) {
+        context.dataStore.edit { it[KEY_BATTERY_OPT_PROMPT_HANDLED] = handled }
     }
 }
