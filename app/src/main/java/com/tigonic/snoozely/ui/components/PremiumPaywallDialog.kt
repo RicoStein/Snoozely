@@ -67,7 +67,7 @@ fun PremiumPaywallDialog(
                 }
 
                 if (!isPremium) {
-                    // Kauf-CTA (wie zuvor)
+                    // Kauf-CTA
                     Button(
                         onClick = onPurchase,
                         modifier = Modifier.fillMaxWidth(),
@@ -78,7 +78,7 @@ fun PremiumPaywallDialog(
                         Text(stringResource(R.string.premium_buy_with_google_play))
                     }
                 } else {
-                    // Spendenbereich in neutralem Dialog-Stil (keine lila/brandfremde Fläche)
+                    // Spendenbereich
                     OutlinedCard(
                         colors = CardDefaults.outlinedCardColors(containerColor = cs.surface),
                         shape = MaterialTheme.shapes.large,
@@ -119,7 +119,7 @@ fun PremiumPaywallDialog(
                     }
                 }
 
-                // Zentrierter Schließen-Button (unten)
+                // Schließen
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center

@@ -2,7 +2,18 @@ package com.tigonic.snoozely.core.premium
 
 import android.app.Activity
 import android.content.Context
-import com.android.billingclient.api.*
+import com.android.billingclient.api.AcknowledgePurchaseParams
+import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.BillingClientStateListener
+import com.android.billingclient.api.BillingFlowParams
+import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.PendingPurchasesParams
+import com.android.billingclient.api.ProductDetails
+import com.android.billingclient.api.Purchase
+import com.android.billingclient.api.PurchasesUpdatedListener
+import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryPurchasesParams
+import com.android.billingclient.api.queryProductDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,7 +25,7 @@ class PremiumManager(
     context: Context,
     private val productInappId: String = BillingConfig.PREMIUM_INAPP,
     private val productSubsId: String? = null,           // optional: falls Premium via Abo
-    private val onPremiumChanged: (Boolean) -> Unit = {} // Callback zu deiner App
+    private val onPremiumChanged: (Boolean) -> Unit = {} // Callback in deine App (setzt z. B. Preferences)
 ) : PurchasesUpdatedListener {
 
     private val appContext = context.applicationContext
@@ -38,6 +49,7 @@ class PremiumManager(
             )
             .setListener(this)
             .build()
+
         billingClient!!.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
                 if (result.responseCode == BillingClient.BillingResponseCode.OK) {
@@ -47,8 +59,9 @@ class PremiumManager(
                     }
                 }
             }
+
             override fun onBillingServiceDisconnected() {
-                // Reconnect beim nächsten Aufruf von start()/Abfrage
+                // Reconnect erfolgt beim nächsten Bedarf (z. B. bei launchPurchase/restoreEntitlements)
             }
         })
     }
@@ -62,11 +75,13 @@ class PremiumManager(
         val client = billingClient ?: return
         val products = mutableListOf<QueryProductDetailsParams.Product>()
 
+        // INAPP (Einmalkauf)
         products += QueryProductDetailsParams.Product.newBuilder()
             .setProductId(productInappId)
             .setProductType(BillingClient.ProductType.INAPP)
             .build()
 
+        // SUBS (optional)
         productSubsId?.let {
             products += QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(it)
@@ -85,6 +100,12 @@ class PremiumManager(
 
     fun launchPurchase(activity: Activity, preferSubscription: Boolean = false) {
         val client = billingClient ?: return
+
+        // Falls ProductDetails noch nicht geladen sind (z. B. schneller Klick), versuche neu zu laden.
+        if (productDetailsInapp == null && productSubsId != null && productDetailsSubs == null) {
+            scope.launch { queryProductDetails() }
+        }
+
         val pd = when {
             preferSubscription && productDetailsSubs != null -> productDetailsSubs
             else -> productDetailsInapp
@@ -108,16 +129,24 @@ class PremiumManager(
     }
 
     override fun onPurchasesUpdated(result: BillingResult, purchases: MutableList<Purchase>?) {
-        if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
-            purchases.forEach { handlePurchase(it) }
+        when (result.responseCode) {
+            BillingClient.BillingResponseCode.OK -> {
+                purchases?.forEach { handlePurchase(it) }
+            }
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
+                // Falls Nutzer bereits gekauft hat, Rechte wiederherstellen.
+                restoreEntitlements()
+            }
+            else -> {
+                // Cancel/Fehler: nichts tun
+            }
         }
-        // Cancel/Fehler: nichts tun
     }
 
     private fun handlePurchase(purchase: Purchase) {
         if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) return
 
-        // Optional: Serverseitig verifizieren (hier weggelassen)
+        // Optional: Serverseitige Verifikation (nicht enthalten)
         grantPremium(true)
 
         if (!purchase.isAcknowledged) {
@@ -137,7 +166,10 @@ class PremiumManager(
                 .build()
         ) { r1, inapps ->
             val ownsInapp = r1.responseCode == BillingClient.BillingResponseCode.OK &&
-                    inapps.any { it.products.contains(productInappId) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                    inapps.any {
+                        it.products.contains(productInappId) &&
+                                it.purchaseState == Purchase.PurchaseState.PURCHASED
+                    }
 
             client.queryPurchasesAsync(
                 QueryPurchasesParams.newBuilder()
@@ -145,7 +177,11 @@ class PremiumManager(
                     .build()
             ) { r2, subs ->
                 val ownsSubs = r2.responseCode == BillingClient.BillingResponseCode.OK &&
-                        subs.any { productSubsId != null && it.products.contains(productSubsId) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                        subs.any {
+                            productSubsId != null &&
+                                    it.products.contains(productSubsId) &&
+                                    it.purchaseState == Purchase.PurchaseState.PURCHASED
+                        }
 
                 grantPremium(ownsInapp || ownsSubs)
             }
@@ -159,7 +195,7 @@ class PremiumManager(
     }
 
     object BillingConfig {
-        const val PREMIUM_INAPP = "premium_unlock"          // DEINE INAPP-ID
-        const val PREMIUM_SUBS = "premium_subscription"     // DEINE SUBS-ID (falls genutzt)
+        const val PREMIUM_INAPP = "premium_unlock"          // Deine INAPP-ID (Play Console)
+        const val PREMIUM_SUBS = "premium_subscription"     // SUBS-ID (falls genutzt)
     }
 }

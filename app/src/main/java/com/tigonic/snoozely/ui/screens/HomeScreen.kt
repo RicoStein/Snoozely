@@ -35,7 +35,6 @@ import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ads.HomeBanner
 import com.tigonic.snoozely.service.TimerContracts
 import com.tigonic.snoozely.service.TimerEngineService
-import com.tigonic.snoozely.ui.components.PremiumPaywallDialog
 import com.tigonic.snoozely.ui.components.TimerCenterText
 import com.tigonic.snoozely.ui.components.WheelSlider
 import com.tigonic.snoozely.ui.theme.LocalExtraColors
@@ -51,20 +50,12 @@ import kotlinx.coroutines.launch
 // ZENTRALE TUNING-KONSTANTEN
 // ==========================
 
-// Top-Bar-Abstände:
-// - TopBarPadHorizontal/Vertical steuern den ZUSÄTZLICHEN Abstand um Titel/Icons.
-// - statusBarsPadding() sorgt automatisch für den exakten Statusbar-Abstand (nicht manuell veränderbar).
-private val TopBarPadHorizontal = 10.dp   // z.B. 10–16dp
-private val TopBarPadVertical   = 2.dp    // z.B. 2–6dp
-
-// Wheel-Layout und vertikale Abstände im Content:
-private val WheelTopSpacer      = 90.dp   // Abstand über dem Wheel (wirkt optisch wie vorher)
-private val WheelHeight         = 320.dp  // Wheel-Höhe (inkl. CenterText-Overlay)
-private val BetweenWheelAndBtn  = 70.dp   // Abstand zwischen Wheel und Start/Pause-Button
-private val AfterButtonSpacer   = 24.dp   // Abstand unter dem Button
-
-// Reserveplatz für Werbebanner, wenn wenig vertikaler Platz (Querformat oder kleine Höhe).
-// Wird nur dynamisch hinzugefügt, damit der Button nicht verdeckt wird – Wheel-Position bleibt stabil.
+private val TopBarPadHorizontal = 10.dp
+private val TopBarPadVertical   = 2.dp
+private val WheelTopSpacer      = 90.dp
+private val WheelHeight         = 320.dp
+private val BetweenWheelAndBtn  = 70.dp
+private val AfterButtonSpacer   = 24.dp
 private val BannerReserve       = 72.dp
 
 private const val TAG = "HomeScreenAds"
@@ -81,7 +72,8 @@ fun HomeScreen(
     consentType: String,
     premium: Boolean,
     onOpenPrivacyOptions: () -> Unit,
-    onRequestAdThenStart: (onAfter: () -> Unit) -> Unit
+    onRequestAdThenStart: (onAfter: () -> Unit) -> Unit,
+    onRequestPurchase: () -> Unit
 ) {
     val appCtx = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
@@ -89,7 +81,6 @@ fun HomeScreen(
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
 
-    var showPremiumDialog by remember { mutableStateOf(false) }
     var overflowOpen by remember { mutableStateOf(false) }
 
     val timerMinutes by TimerPreferenceHelper.getTimer(appCtx).collectAsState(initial = 5)
@@ -99,14 +90,12 @@ fun HomeScreen(
     var sliderMinutes by rememberSaveable { mutableStateOf(timerMinutes.coerceAtLeast(1)) }
     var persistJob by remember { mutableStateOf<Job?>(null) }
 
-    // Slider-Wert synchronisieren, wenn nicht läuft
     LaunchedEffect(timerMinutes, timerRunning) {
         if (!timerRunning) {
             sliderMinutes = timerMinutes.coerceAtLeast(1)
         }
     }
 
-    // Ticker für Restzeit-Anzeige
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning && timerStartTime > 0L) {
@@ -162,19 +151,16 @@ fun HomeScreen(
     val isLandscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
 
-    // Nur bei wenig Höhe/Querformat unten Reserveplatz, damit der Button über dem Banner bleibt.
     val needExtraBottomSpace = adsGateIsAllowed && (isLandscape || config.screenHeightDp < 620)
     val extraBottomSpacer = if (needExtraBottomSpace) BannerReserve else 0.dp
 
     Scaffold(
         containerColor = cs.background,
         topBar = {
-            // Top-Bar: minimaler Abstand zur Statusbar + horizontale System-Insets (Querformat).
-            // Feintuning über TopBarPadHorizontal/TopBarPadVertical.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding() // exakte Höhe der Android-Statusleiste
+                    .statusBarsPadding()
                     .windowInsetsPadding(
                         WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
                     ),
@@ -195,6 +181,7 @@ fun HomeScreen(
                         modifier = Modifier.combinedClickable(
                             onClick = {},
                             onLongClick = {
+                                // Debug-Toggle: vorerst beibehalten
                                 scope.launch {
                                     val current = SettingsPreferenceHelper.getPremiumActive(appCtx).first()
                                     SettingsPreferenceHelper.setPremiumActive(appCtx, !current)
@@ -234,7 +221,8 @@ fun HomeScreen(
                                     },
                                     onClick = {
                                         overflowOpen = false
-                                        showPremiumDialog = true
+                                        // Paywall immer öffnen – auch bei Premium (Spendenbereich)
+                                        onRequestPurchase()
                                     }
                                 )
                                 DropdownMenuItem(
@@ -255,10 +243,8 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(cs.background)
-                // Unten Systemleisten respektieren, damit nichts unter die Navi-/Gestenleiste rutscht.
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
-            // Scrollbarer, zentrierter Inhalt – Wheel bleibt optisch wie zuvor positioniert.
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -324,14 +310,12 @@ fun HomeScreen(
                 }
 
                 if (needExtraBottomSpace) {
-                    // Nur bei wenig Höhe/Querformat: zusätzlicher Platz, damit der Button über dem Banner bleibt.
                     Spacer(modifier = Modifier.height(extraBottomSpacer))
                 }
 
                 Spacer(modifier = Modifier.height(AfterButtonSpacer))
             }
 
-            // Banner bleibt fix am unteren Rand; Content hat ggf. extra Reserve, damit nichts verdeckt wird.
             if (adsGateIsAllowed) {
                 Box(
                     modifier = Modifier
@@ -345,23 +329,6 @@ fun HomeScreen(
                         nonPersonalized = adsGateIsNonPersonalized
                     )
                 }
-            }
-
-            if (showPremiumDialog) {
-                PremiumPaywallDialog(
-                    isPremium = premium,
-                    onClose = { showPremiumDialog = false },
-                    onPurchase = {
-                        // Nur im Nicht-Premium-Dialog sichtbar:
-                        scope.launch { SettingsPreferenceHelper.setPremiumActive(appCtx, true) }
-                        showPremiumDialog = false
-                    },
-                    onDonateClick = {
-                        val url = "https://buymeacoffee.com/DEIN_LINK" // Beispiel
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                        appCtx.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }
-                )
             }
         }
     }

@@ -68,7 +68,6 @@ class MainActivity : ComponentActivity() {
         installSplashScreen().apply { setKeepOnScreenCondition { viewModel.isLoading.value } }
         super.onCreate(savedInstanceState)
 
-        // Battery-Optimierung einmalig anfragen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             lifecycleScope.launch {
                 val handled = SettingsPreferenceHelper
@@ -98,7 +97,6 @@ class MainActivity : ComponentActivity() {
         registerDefaultThemes()
         lifecycleScope.launch { maybeStartEngineIfTimerRunning() }
 
-        // UMP Consent einholen
         lifecycleScope.launch {
             Log.d(TAG_ADS, "Requesting UMP consent...")
             val consent = consentManager.requestConsent(this@MainActivity)
@@ -134,7 +132,7 @@ class MainActivity : ComponentActivity() {
                     if (interstitialManager == null) {
                         interstitialManager = InterstitialManager(
                             appContext = applicationContext,
-                            scope = lifecycleScope,            // stabiler Scope
+                            scope = lifecycleScope,
                             activityProvider = { this@MainActivity },
                             isAdsAllowed = { isAdsAllowed },
                             adUnitId = TEST_INTERSTITIAL
@@ -169,7 +167,8 @@ class MainActivity : ComponentActivity() {
                                 consentType = consentType,
                                 premium = premium,
                                 onOpenPrivacyOptions = { consentManager.showPrivacyOptions(this@MainActivity) {} },
-                                onRequestAdThenStart = { action -> showInterstitialThenStart(action) }
+                                onRequestAdThenStart = { action -> showInterstitialThenStart(action) },
+                                onRequestPurchase = { showPaywall = true }
                             )
                         }
                         composable("settings") {
@@ -196,11 +195,16 @@ class MainActivity : ComponentActivity() {
 
                     if (showPaywall) {
                         PremiumPaywallDialog(
+                            isPremium = premium, // wichtig: zeigt Spendenbereich bei aktivem Premium
                             onClose = { showPaywall = false },
                             onPurchase = {
-                                // Starte den Google Play Billing Flow
                                 premiumManager.launchPurchase(this@MainActivity)
                                 showPaywall = false
+                            },
+                            onDonateClick = {
+                                val url = "https://buymeacoffee.com/DEIN_LINK" // TODO: eigene URL
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                startActivity(intent)
                             }
                         )
                     }
@@ -208,11 +212,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // PremiumManager starten: synchronisiert Premium-Status in SettingsPreferenceHelper
         premiumManager = PremiumManager(
             context = applicationContext,
             productInappId = PremiumManager.BillingConfig.PREMIUM_INAPP,
-            productSubsId = null, // oder PremiumManager.BillingConfig.PREMIUM_SUBS, falls Abo genutzt
+            productSubsId = null,
             onPremiumChanged = { isPremium ->
                 lifecycleScope.launch {
                     SettingsPreferenceHelper.setPremiumActive(applicationContext, isPremium)
@@ -263,7 +266,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Falls ein Kauf extern abgeschlossen/abgenickt wurde
         premiumManager.restoreEntitlements()
     }
 

@@ -165,7 +165,7 @@
 
 
     <!-- PREMIUM -->
-    <string name="premium_activate_q">Premium aktivieren?</string>
+    <string name="premium_activate_q">Premium freischalten</string>
     <string name="premium_title">Snoozely Premium</string>
     <string name="premium_benefits_title">Das bekommst du mit Premium</string>
     <string name="premium_benefit_widget">Quick-Start Widget für den Homescreen</string>
@@ -175,7 +175,7 @@
     <string name="more">Mehr</string>
 
     <!-- PREMIUM: UI Texte für aktiven Premium-Status -->
-    <string name="premium_user_label">Premium Nutzer</string>
+    <string name="premium_user_label">Premium (aktiv) – Spenden</string>
     <string name="premium_benefits_title_active">Das hast du mit Premium</string>
     <string name="premium_thanks">Vielen Dank, für die Unterstützung</string>
     <string name="donate_title">Freiwillig spenden</string>
