@@ -59,6 +59,10 @@ object SettingsPreferenceHelper {
     private val ADS_CONSENT_TYPE = stringPreferencesKey("ads_consent_type")
     private val ADS_OPEN_COUNTER = intPreferencesKey("ads_open_counter")
 
+    //BatteryOptimization
+    private val KEY_SUPPRESS_SETUP_HINT = booleanPreferencesKey("suppress_setup_hint")
+
+
     // ----------------- GETTER -----------------
 
     fun getDefaultTimerMinutes(ctx: Context): Flow<Int> =
@@ -285,5 +289,13 @@ object SettingsPreferenceHelper {
 
     suspend fun resetAdsOpenCounter(ctx: Context) {
         ctx.dataStore.edit { it[ADS_OPEN_COUNTER] = 0 }
+    }
+
+    //Battery Optimization
+    fun getSuppressSetupHint(context: Context): Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_SUPPRESS_SETUP_HINT] ?: false }
+
+    suspend fun setSuppressSetupHint(context: Context, suppress: Boolean) {
+        context.dataStore.edit { it[KEY_SUPPRESS_SETUP_HINT] = suppress }
     }
 }

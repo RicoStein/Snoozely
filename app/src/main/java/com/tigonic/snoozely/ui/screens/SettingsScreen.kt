@@ -36,6 +36,8 @@ import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
 import com.tigonic.snoozely.ui.components.VerticalScrollbar
+import com.tigonic.snoozely.util.BatteryOptimizationHelper
+import com.tigonic.snoozely.util.SetupHintPrefs
 
 // ---- Helper: Context -> Activity
 private tailrec fun Context.asActivity(): Activity? = when (this) {
@@ -86,6 +88,19 @@ fun SettingsScreen(
     }
     var showRemoveAdminDialog by remember { mutableStateOf(false) }
 
+
+    // Nutzerpräferenz: Hinweis dauerhaft ausblenden?
+    var suppressHint by remember { mutableStateOf(SetupHintPrefs.getSuppressSetupHint(ctx)) }
+
+    // Aktueller Systemstatus: „uneingeschränkt“?
+    var isUnrestricted by remember { mutableStateOf(BatteryOptimizationHelper.isUnrestricted(ctx)) }
+
+    // Sheet-Visibility
+    var showSetupSheet by remember { mutableStateOf(false) }
+
+    // Nur anzeigen, wenn nicht unterdrückt und Systemstatus nicht „uneingeschränkt“
+    val showHint = !suppressHint && !isUnrestricted
+
     // Admin-Status mit Switch synchron halten
     LaunchedEffect(screenOff) {
         val now = dpm.isAdminActive(admin)
@@ -133,6 +148,36 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+
+                if (showHint) {
+                    SetupHintCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showSetupSheet = true }
+                    )
+                }
+
+                if (showSetupSheet) {
+                    SetupBottomSheet(
+                        onDismiss = {
+                            // Beim Schließen neu prüfen, ob der Nutzer umgestellt hat
+                            isUnrestricted = BatteryOptimizationHelper.isUnrestricted(ctx)
+                            if (isUnrestricted) {
+                                // Wenn jetzt uneingeschränkt, Karte automatisch verschwinden lassen
+                                suppressHint = SetupHintPrefs.getSuppressSetupHint(ctx) // belasse Nutzerpräferenz
+                            }
+                            showSetupSheet = false
+                        },
+                        onDontShowAgain = { suppress ->
+                            SetupHintPrefs.setSuppressSetupHint(ctx, suppress)
+                            suppressHint = suppress
+                        },
+                        onOpenSettings = {
+                            // Öffnet die passenden Systemseiten, dort „Uneingeschränkt/Nicht optimieren“ setzen
+                            BatteryOptimizationHelper.openBatterySettings(ctx)
+                        },
+                        isCompleted = isUnrestricted
+                    )
+                }
 
                 // ===== App / Playback =====
                 SectionHeader(text = stringResource(R.string.app_name))
@@ -457,3 +502,120 @@ private fun iconTint(active: Boolean, enabled: Boolean = true): Color {
     val animated by animateColorAsState(targetValue = target, label = "iconTint")
     return animated
 }
+
+@Composable
+private fun SetupHintCard(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    ElevatedCard(
+        onClick = onClick,
+        modifier = modifier,
+        colors = CardDefaults.elevatedCardColors(containerColor = cs.surfaceVariant)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.setup_required_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = cs.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.setup_required_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = cs.onSurface.copy(alpha = 0.75f)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SetupBottomSheet(
+    onDismiss: () -> Unit,
+    onDontShowAgain: (Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
+    isCompleted: Boolean
+) {
+    val cs = MaterialTheme.colorScheme
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var dontShow by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.setup_sheet_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = cs.onSurface
+            )
+            Spacer(Modifier.height(10.dp))
+
+            if (isCompleted) {
+                AssistChip(
+                    onClick = {},
+                    label = { Text(stringResource(R.string.setup_sheet_done)) },
+                    leadingIcon = { Icon(Icons.Filled.Check, contentDescription = null) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = cs.primaryContainer,
+                        labelColor = cs.onPrimaryContainer
+                    )
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
+            Text(
+                text = stringResource(R.string.setup_sheet_instructions),
+                style = MaterialTheme.typography.bodyMedium,
+                color = cs.onSurface.copy(alpha = 0.85f)
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.extraLarge
+                ) {
+                    Text(stringResource(R.string.open))
+                }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.extraLarge
+                ) {
+                    Text(stringResource(R.string.close))
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = dontShow,
+                    onCheckedChange = {
+                        dontShow = it
+                        onDontShowAgain(it)
+                    }
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(text = stringResource(R.string.dont_show_again), color = cs.onSurface)
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+

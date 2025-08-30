@@ -198,4 +198,20 @@
     <string name="loading">Lade…</string>
     <string name="premium_feature_widget">Widget ist ein Premium-Feature</string>
 
+    <!-- Battery Optimization -->
+    <!-- Titel/Buttons allgemein -->
+    <string name="dont_show_again">Nicht mehr anzeigen</string>
+
+    <!-- Sektionen, Beispiel -->
+    <string name="open">Öffnen</string>
+
+    <!-- Hinweiskarte -->
+    <string name="setup_required_title">Erforderliche Einrichtung fehlt</string>
+    <string name="setup_required_body">Klicken Sie hier, um die erforderlichen Berechtigungen einzurichten, damit die Anwendung im Hintergrund zuverlässig funktioniert (z. B. bei geschlossener App).</string>
+
+    <!-- BottomSheet -->
+    <string name="setup_sheet_title">Erforderliche Einrichtung</string>
+    <string name="setup_sheet_done">Einrichtung abgeschlossen</string>
+    <string name="setup_sheet_instructions">Um eine unterbrechungsfreie Funktion zu gewährleisten, schließen Sie die App von der „Batterieoptimierung“ aus bzw. wählen Sie „Uneingeschränkt“.\n\n1. Tippen Sie auf „Nicht optimiert“ oder „Alle Apps“ auf dem nächsten Bildschirm\n2. Wählen Sie die App aus\n3. Hintergrundnutzung zulassen\n4. Wählen Sie „Uneingeschränkt“ / „Nicht optimieren“ oder deaktivieren Sie die Batterieoptimierung.</string>
+
 </resources>
