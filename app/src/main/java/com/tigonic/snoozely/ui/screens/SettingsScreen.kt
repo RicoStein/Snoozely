@@ -541,6 +541,7 @@ private fun SetupBottomSheet(
     val cs = MaterialTheme.colorScheme
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var dontShow by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -549,6 +550,7 @@ private fun SetupBottomSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(scrollState)      // <- macht den Inhalt scrollbar
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Text(
@@ -618,4 +620,5 @@ private fun SetupBottomSheet(
         }
     }
 }
+
 
