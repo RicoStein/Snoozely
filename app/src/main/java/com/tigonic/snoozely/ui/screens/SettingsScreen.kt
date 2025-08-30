@@ -620,5 +620,3 @@ private fun SetupBottomSheet(
         }
     }
 }
-
-

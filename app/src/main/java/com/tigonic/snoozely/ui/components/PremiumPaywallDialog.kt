@@ -20,9 +20,9 @@ import com.tigonic.snoozely.R
 fun PremiumPaywallDialog(
     isPremium: Boolean = false,
     onClose: () -> Unit,
-    onPurchase: () -> Unit = {},
-    onDonate: (Int) -> Unit = {},                 // Backwards-Compat (falls onDonateClick null)
-    onDonateClick: (() -> Unit)? = null           // Ein Button => Weiterleitung
+    onPurchase: () -> Unit,
+    onDonate: (Int) -> Unit = {},
+    onDonateClick: (() -> Unit)? = null
 ) {
     val cs = MaterialTheme.colorScheme
 

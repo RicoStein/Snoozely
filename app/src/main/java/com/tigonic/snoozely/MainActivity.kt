@@ -2,11 +2,10 @@ package com.tigonic.snoozely
 
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
-import android.os.PowerManager
-import android.provider.Settings
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.os.PowerManager
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,6 +29,7 @@ import com.google.android.gms.ads.MobileAds
 import com.tigonic.snoozely.ads.AdsConsent
 import com.tigonic.snoozely.ads.ConsentManager
 import com.tigonic.snoozely.ads.InterstitialManager
+import com.tigonic.snoozely.core.premium.PremiumManager
 import com.tigonic.snoozely.service.TimerEngineService
 import com.tigonic.snoozely.ui.NotificationSettingsScreen
 import com.tigonic.snoozely.ui.components.PremiumPaywallDialog
@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
     private var nonPersonalized by mutableStateOf(false)
     private var isAdsAllowed by mutableStateOf(false)
 
+    private lateinit var premiumManager: PremiumManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         MobileAds.initialize(this) {
             Log.d(TAG_ADS, "MobileAds.initialize completed")
@@ -65,7 +67,8 @@ class MainActivity : ComponentActivity() {
 
         installSplashScreen().apply { setKeepOnScreenCondition { viewModel.isLoading.value } }
         super.onCreate(savedInstanceState)
-        // Check for and request battery optimization permission
+
+        // Battery-Optimierung einmalig anfragen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             lifecycleScope.launch {
                 val handled = SettingsPreferenceHelper
@@ -81,16 +84,21 @@ class MainActivity : ComponentActivity() {
                             data = Uri.parse("package:$packageName")
                         })
                     }.isSuccess
-                    SettingsPreferenceHelper.setBatteryOptPromptHandled(applicationContext, true.takeIf { ok } ?: true)
+                    SettingsPreferenceHelper.setBatteryOptPromptHandled(
+                        applicationContext,
+                        true.takeIf { ok } ?: true
+                    )
                 }
             }
         }
+
         enableEdgeToEdge()
 
         handleIntent(intent)
         registerDefaultThemes()
         lifecycleScope.launch { maybeStartEngineIfTimerRunning() }
 
+        // UMP Consent einholen
         lifecycleScope.launch {
             Log.d(TAG_ADS, "Requesting UMP consent...")
             val consent = consentManager.requestConsent(this@MainActivity)
@@ -100,7 +108,11 @@ class MainActivity : ComponentActivity() {
                 AdsConsent.NoAds -> "NoAds"
                 else -> "Unknown"
             }
-            SettingsPreferenceHelper.setAdsConsent(applicationContext, resolved = true, type = typeString)
+            SettingsPreferenceHelper.setAdsConsent(
+                applicationContext,
+                resolved = true,
+                type = typeString
+            )
         }
 
         setContent {
@@ -122,7 +134,7 @@ class MainActivity : ComponentActivity() {
                     if (interstitialManager == null) {
                         interstitialManager = InterstitialManager(
                             appContext = applicationContext,
-                            scope = lifecycleScope,            // WICHTIG: stabiler Scope
+                            scope = lifecycleScope,            // stabiler Scope
                             activityProvider = { this@MainActivity },
                             isAdsAllowed = { isAdsAllowed },
                             adUnitId = TEST_INTERSTITIAL
@@ -157,7 +169,7 @@ class MainActivity : ComponentActivity() {
                                 consentType = consentType,
                                 premium = premium,
                                 onOpenPrivacyOptions = { consentManager.showPrivacyOptions(this@MainActivity) {} },
-                                onRequestAdThenStart = { action -> showInterstitialThenStart(action) } // übergebe Lambda
+                                onRequestAdThenStart = { action -> showInterstitialThenStart(action) }
                             )
                         }
                         composable("settings") {
@@ -186,9 +198,8 @@ class MainActivity : ComponentActivity() {
                         PremiumPaywallDialog(
                             onClose = { showPaywall = false },
                             onPurchase = {
-                                lifecycleScope.launch {
-                                    SettingsPreferenceHelper.setPremiumActive(applicationContext, true)
-                                }
+                                // Starte den Google Play Billing Flow
+                                premiumManager.launchPurchase(this@MainActivity)
                                 showPaywall = false
                             }
                         )
@@ -196,29 +207,38 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        // PremiumManager starten: synchronisiert Premium-Status in SettingsPreferenceHelper
+        premiumManager = PremiumManager(
+            context = applicationContext,
+            productInappId = PremiumManager.BillingConfig.PREMIUM_INAPP,
+            productSubsId = null, // oder PremiumManager.BillingConfig.PREMIUM_SUBS, falls Abo genutzt
+            onPremiumChanged = { isPremium ->
+                lifecycleScope.launch {
+                    SettingsPreferenceHelper.setPremiumActive(applicationContext, isPremium)
+                }
+            }
+        )
+        premiumManager.start()
     }
 
     fun showInterstitialThenStart(onAfter: () -> Unit) {
-        // Zufallsentscheidung pro Klick
         val roll = (1..100).random()
         val shouldShowAd = isAdsAllowed && roll > 70
         android.util.Log.d("Interstitial", "randomRoll=$roll shouldShowAd=$shouldShowAd")
 
         val manager = interstitialManager
         if (!shouldShowAd || manager == null) {
-            // Keine Werbung -> direkt starten
             onAfter()
             return
         }
 
-        // Werbung zeigen, danach starten
         manager.showOrFallback {
             android.util.Log.d("Interstitial", "After/fallback -> start now")
             onAfter()
         }
         manager.warmPreload(nonPersonalized = nonPersonalized)
     }
-
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -239,5 +259,16 @@ class MainActivity : ComponentActivity() {
             val intent = Intent(ctx, TimerEngineService::class.java)
             ctx.startForegroundServiceCompat(intent)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Falls ein Kauf extern abgeschlossen/abgenickt wurde
+        premiumManager.restoreEntitlements()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        premiumManager.release()
     }
 }
