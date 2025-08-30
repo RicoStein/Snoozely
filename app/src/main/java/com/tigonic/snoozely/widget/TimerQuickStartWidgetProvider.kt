@@ -120,7 +120,7 @@ class TimerQuickStartWidgetProvider : AppWidgetProvider() {
 
                     views.setTextViewTextSize(R.id.txtTime, TypedValue.COMPLEX_UNIT_PX, textSizePx)
                     views.setTextViewText(R.id.txtTime, numberString)
-                    views.setTextColor(R.id.txtTime, getAnimatedBlueColor())
+                    views.setTextColor(R.id.txtTime, android.graphics.Color.parseColor("#1E88E5"))
                 } else {
                     // Timer ist aus: Kein Fortschrittsbalken, weißer Text
                     val configMinutes = getWidgetDuration(context, appWidgetId, totalMinutes)
