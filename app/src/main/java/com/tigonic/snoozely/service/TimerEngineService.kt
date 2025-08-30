@@ -259,7 +259,7 @@ class TimerEngineService : Service() {
                 })
 
                 sendRunningUpdateNow()
-
+                requestWidgetUpdate()
                 if (remaining <= 0L) {
                     onTimerFinished()
                     return@launch
