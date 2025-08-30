@@ -1,46 +1,57 @@
 package com.tigonic.snoozely.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Payment
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.tigonic.snoozely.R
-import com.tigonic.snoozely.ui.theme.LocalExtraColors
 
 @Composable
 fun PremiumPaywallDialog(
     isPremium: Boolean = false,
     onClose: () -> Unit,
     onPurchase: () -> Unit = {},
-    onDonate: (Int) -> Unit = {}
+    onDonate: (Int) -> Unit = {},                 // Backwards-Compat (falls onDonateClick null)
+    onDonateClick: (() -> Unit)? = null           // Ein Button => Weiterleitung
 ) {
     val cs = MaterialTheme.colorScheme
-    val extra = LocalExtraColors.current
 
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text(stringResource(R.string.premium_title), color = cs.onSurface) },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
+    Dialog(onDismissRequest = onClose) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
+            color = cs.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
                 Text(
-                    if (isPremium) stringResource(R.string.premium_benefits_title_active)
+                    text = stringResource(R.string.premium_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = cs.onSurface
+                )
+
+                Text(
+                    text = if (isPremium) stringResource(R.string.premium_benefits_title_active)
                     else stringResource(R.string.premium_benefits_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = cs.onSurface
                 )
-                Spacer(Modifier.height(8.dp))
 
                 val benefits = listOf(
                     stringResource(R.string.premium_benefit_widget),
@@ -48,65 +59,79 @@ fun PremiumPaywallDialog(
                     stringResource(R.string.premium_benefit_support)
                 )
                 benefits.forEach {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = extra.iconActive
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = cs.primary)
                         Spacer(Modifier.width(8.dp))
                         Text(it, color = cs.onSurface)
                     }
                 }
 
-                if (isPremium) {
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = stringResource(R.string.premium_thanks),
-                        color = cs.onSurface
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = stringResource(R.string.donate_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = cs.onSurface
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(
+                if (!isPremium) {
+                    // Kauf-CTA (wie zuvor)
+                    Button(
+                        onClick = onPurchase,
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        shape = MaterialTheme.shapes.extraLarge
                     ) {
-                        listOf(2, 5, 10).forEach { amount ->
-                            OutlinedButton(onClick = { onDonate(amount) }) {
-                                Text(stringResource(R.string.donate_amount_eur, amount))
+                        Icon(Icons.Filled.Payment, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.premium_buy_with_google_play))
+                    }
+                } else {
+                    // Spendenbereich in neutralem Dialog-Stil (keine lila/brandfremde Fläche)
+                    OutlinedCard(
+                        colors = CardDefaults.outlinedCardColors(containerColor = cs.surface),
+                        shape = MaterialTheme.shapes.large,
+                        border = CardDefaults.outlinedCardBorder()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Filled.Favorite,
+                                    contentDescription = null,
+                                    tint = cs.onSurfaceVariant
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.donate_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = cs.onSurface
+                                )
+                            }
+                            Text(
+                                text = stringResource(R.string.premium_thanks),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = cs.onSurfaceVariant
+                            )
+                            Button(
+                                onClick = { onDonateClick?.invoke() ?: onDonate(0) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.extraLarge
+                            ) {
+                                Text(stringResource(R.string.donate))
                             }
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            if (!isPremium) {
-                Button(onClick = onPurchase) {
-                    Icon(imageVector = Icons.Filled.Payment, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.premium_buy_with_google_play))
-                }
-            } else {
-                TextButton(onClick = onClose) {
-                    Text(stringResource(R.string.close))
-                }
-            }
-        },
-        dismissButton = {
-            if (!isPremium) {
-                TextButton(onClick = onClose) {
-                    Text(stringResource(R.string.close))
+
+                // Zentrierter Schließen-Button (unten)
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TextButton(
+                        onClick = onClose,
+                        shape = MaterialTheme.shapes.extraLarge
+                    ) {
+                        Text(stringResource(R.string.close))
+                    }
                 }
             }
         }
-    )
+    }
 }

@@ -356,11 +356,10 @@ fun HomeScreen(
                         scope.launch { SettingsPreferenceHelper.setPremiumActive(appCtx, true) }
                         showPremiumDialog = false
                     },
-                    onDonate = { amountEur ->
-                        // Beispiel: Spenden-Handler, hier nur Toast. Alternativ: URL öffnen / In-App-Donation.
-                        android.widget.Toast
-                            .makeText(appCtx, "Danke für deine Unterstützung: ${amountEur}€", android.widget.Toast.LENGTH_SHORT)
-                            .show()
+                    onDonateClick = {
+                        val url = "https://buymeacoffee.com/DEIN_LINK" // Beispiel
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                        appCtx.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
                     }
                 )
             }
