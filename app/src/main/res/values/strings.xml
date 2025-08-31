@@ -198,6 +198,27 @@
     <string name="loading">Lade…</string>
     <string name="premium_feature_widget">Widget ist ein Premium-Feature</string>
 
+    <!-- Widget Farbeinstellungen -->
+    <string name="widget_color_quick_start_title">Schnellstart (Farbe)</string>
+
+
+    <!-- Widget: Controls -->
+    <string name="widget_timer_controls_title">Snoozely Timer</string>
+
+    <!-- Widget Farbeinstellungen / Picker -->
+    <string name="widget_color_background">Hintergrund</string>
+    <string name="widget_color_opacity">Deckkraft</string>
+    <string name="widget_color_text">Text</string>
+    <string name="percent_format">%1$d%%</string>
+    <string name="widget_color_picker">Farbauswahl</string>
+    <string name="background">Hintergrund</string>
+    <string name="text">Text</string>
+    <string name="saturation">Sättigung</string>
+    <string name="brightness">Helligkeit</string>
+    <string name="color">Farbe</string>
+
+
+
     <!-- Battery Optimization -->
     <!-- Titel/Buttons allgemein -->
     <string name="dont_show_again">Nicht mehr anzeigen</string>

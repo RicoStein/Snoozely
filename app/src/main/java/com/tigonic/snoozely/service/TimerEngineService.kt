@@ -627,14 +627,30 @@ class TimerEngineService : Service() {
     }
 
     private fun requestWidgetUpdate() {
-        val intent = Intent(this, TimerQuickStartWidgetProvider::class.java).apply {
+        // QuickStart
+        val intent1 = Intent(this, com.tigonic.snoozely.widget.TimerQuickStartWidgetProvider::class.java).apply {
             action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
-            val ids = appWidgetManager.getAppWidgetIds(android.content.ComponentName(applicationContext, TimerQuickStartWidgetProvider::class.java))
+            val awm = AppWidgetManager.getInstance(applicationContext)
+            val ids = awm.getAppWidgetIds(
+                android.content.ComponentName(applicationContext, com.tigonic.snoozely.widget.TimerQuickStartWidgetProvider::class.java)
+            )
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
         }
-        sendBroadcast(intent)
+        sendBroadcast(intent1)
+
+        // Control (3x1)
+        val intent2 = Intent(this, com.tigonic.snoozely.widget.TimerControlWidgetProvider::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val awm = AppWidgetManager.getInstance(applicationContext)
+            val ids = awm.getAppWidgetIds(
+                android.content.ComponentName(applicationContext, com.tigonic.snoozely.widget.TimerControlWidgetProvider::class.java)
+            )
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        }
+        sendBroadcast(intent2)
     }
+
+
 
     private fun flagImmutable(): Int =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0

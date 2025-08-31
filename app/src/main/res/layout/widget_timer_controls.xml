@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="8dp">
+
+    <!-- Dynamischer, abgerundeter Hintergrund -->
+    <ImageView
+        android:id="@+id/bg_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:adjustViewBounds="true"
+        android:scaleType="fitXY" />
+
+    <!-- Inhalt -->
+    <LinearLayout
+        android:id="@+id/content_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp">
+
+        <ImageView
+            android:id="@+id/imgIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_app_logo" />
+
+        <TextView
+            android:id="@+id/txtTime"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingLeft="8dp"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:ellipsize="none"
+            android:text="01:00"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+
+        <!-- Reihenfolge: − | Play/Pause | + -->
+        <ImageView
+            android:id="@+id/btnMinusIv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingLeft="4dp"
+            android:src="@drawable/ic_minus_24" />
+
+        <ImageView
+            android:id="@+id/btnPlayIv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingLeft="4dp"
+            android:src="@drawable/ic_play_24" />
+
+        <ImageView
+            android:id="@+id/btnPlusIv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingLeft="4dp"
+            android:src="@drawable/ic_plus_24" />
+    </LinearLayout>
+</RelativeLayout>

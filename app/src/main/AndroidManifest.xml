@@ -114,5 +114,53 @@
             </intent-filter>
         </receiver>
 
+
+        <!-- Quick-Start (1x1) unverändert -->
+        <receiver
+            android:name=".widget.TimerQuickStartWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_quick_start_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/timer_quick_start_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".widget.TimerWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Snoozely">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- NEU: Control-Widget (3x1) -->
+        <receiver
+            android:name=".widget.TimerControlWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_timer_controls_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.tigonic.snoozely.ACTION_TICK" />
+                <action android:name="com.tigonic.snoozely.widget.ACTION_MINUS" />
+                <action android:name="com.tigonic.snoozely.widget.ACTION_PLUS" />
+                <action android:name="com.tigonic.snoozely.widget.ACTION_TOGGLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/timer_control_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".widget.TimerControlWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Snoozely">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+
     </application>
 </manifest>
