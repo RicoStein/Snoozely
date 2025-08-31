@@ -33,7 +33,7 @@ fun TimerCenterText(
             text = timeText,
             fontWeight = FontWeight.ExtraBold,
             style = MaterialTheme.typography.displayLarge,
-            color = extra.heading, // markante Akzentfarbe aus Theme
+            color = extra.menu, // markante Akzentfarbe aus Theme
             fontFamily = FontFamily.Monospace
         )
         if (showLabel) {
