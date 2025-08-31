@@ -133,9 +133,28 @@ class TimerControlWidgetProvider : AppWidgetProvider() {
         const val ACTION_TOGGLE = "com.tigonic.snoozely.widget.ACTION_TOGGLE"
 
         private fun startSvcCompat(context: Context, intent: Intent) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
-            else context.startService(intent)
+            val action = intent.action ?: ""
+            val needsForeground = action == TimerContracts.ACTION_START
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (needsForeground) {
+                    // Nur bei START in den Vordergrund
+                    context.startForegroundService(intent)
+                } else {
+                    // Für STOP/EXTEND/REDUCE: normalen Start versuchen (liefert Intent an laufenden Service)
+                    try {
+                        context.startService(intent)
+                    } catch (t: Throwable) {
+                        // Fallback: wenn Service wider Erwarten nicht läuft, nicht crashe(n),
+                        // sondern minimal absichern – aber KEIN FGS erzwingen
+                        Log.w(TAG, "startService failed for ${intent.action}, ignoring in background", t)
+                    }
+                }
+            } else {
+                context.startService(intent)
+            }
         }
+
 
         fun requestSelfUpdate(context: Context) {
             try {
@@ -276,7 +295,7 @@ class TimerControlWidgetProvider : AppWidgetProvider() {
 
                 // Logo in gleicher Einheit (keine Tönung)
                 runCatching {
-                    val logoBmp = vectorToBitmap(context, R.drawable.ic_app_logo, unit, tint = null)
+                    val logoBmp = vectorToBitmap(context, R.drawable.ic_app_logo, unit, tint = textColor)
                     views.setImageViewBitmap(R.id.imgIcon, logoBmp)
                 }
 
