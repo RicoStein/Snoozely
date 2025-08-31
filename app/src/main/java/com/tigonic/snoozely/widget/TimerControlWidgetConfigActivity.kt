@@ -122,7 +122,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                 Scaffold(
                     containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
-                        Surface(color = MaterialTheme.colorScheme.surface) {
+                        Surface(color = MaterialTheme.colorScheme.background) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -161,7 +161,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(inner)
-                            .statusBarsPadding()
+                            //.statusBarsPadding()
                             .padding(horizontal = 20.dp)
                             .verticalScroll(scroll),
                         horizontalAlignment = Alignment.CenterHorizontally,
