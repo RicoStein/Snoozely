@@ -10,5 +10,7 @@
     android:widgetFeatures="reconfigurable"
     android:resizeMode="horizontal"
     android:widgetCategory="home_screen"
-    android:previewImage="@mipmap/ic_launcher_round"
+
+    android:previewLayout="@layout/widget_timer_controls_preview"
+
     android:autoAdvanceViewId="@+id/txtTime" />

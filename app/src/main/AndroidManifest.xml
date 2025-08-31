@@ -64,24 +64,6 @@
             </intent-filter>
         </service>
 
-        <receiver
-            android:name=".widget.TimerQuickStartWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_quick_start_title">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/timer_quick_start_widget_info" />
-        </receiver>
-
-        <activity
-            android:name=".widget.TimerWidgetConfigActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Snoozely">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
 
         <receiver
             android:name=".widget.PremiumToggleReceiver"
@@ -113,27 +95,6 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
-
-
-        <!-- Quick-Start (1x1) unverändert -->
-        <receiver
-            android:name=".widget.TimerQuickStartWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_quick_start_title">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/timer_quick_start_widget_info" />
-        </receiver>
-
-        <activity
-            android:name=".widget.TimerWidgetConfigActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Snoozely">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
 
         <!-- NEU: Control-Widget (3x1) -->
         <receiver
