@@ -104,11 +104,6 @@ fun SettingsScreen(
         val now = dpm.isAdminActive(admin)
         isAdmin = now
         scope.launch { SettingsPreferenceHelper.setScreenOff(app, now) }
-        Toast.makeText(
-            app,
-            if (now) app.getString(R.string.device_admin_enabled) else app.getString(R.string.device_admin_failed),
-            Toast.LENGTH_SHORT
-        ).show()
     }
     var showRemoveAdminDialog by remember { mutableStateOf(false) }
 
@@ -257,14 +252,12 @@ fun SettingsScreen(
                                 adminLauncher.launch(intent)
                             } else {
                                 scope.launch { SettingsPreferenceHelper.setScreenOff(app, true) }
-                                Toast.makeText(app, app.getString(R.string.device_admin_enabled), Toast.LENGTH_SHORT).show()
                             }
                         } else {
                             if (isAdmin && activity != null) {
                                 showRemoveAdminDialog = true
                             } else {
                                 scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
-                                Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -282,7 +275,6 @@ fun SettingsScreen(
                                     runCatching { dpm.removeActiveAdmin(admin) }
                                     isAdmin = false
                                     scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
-                                    Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
                                 }
                             ) { Text(stringResource(R.string.remove_admin_confirm_button)) }
                         },
