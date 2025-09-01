@@ -13,21 +13,17 @@
     <string name="timer">Timer</string>
     <string name="minutes">MINUTEN</string>
     <string name="pause">Pause</string>
-    <string name="play">Play</string>
+    <string name="play">Starten</string>
     <string name="stop">Stoppen</string>
     <string name="timer_stop">Stoppen</string>
     <string name="timer_plus_x">+ %1$d min</string>
     <string name="extend">Verlängern</string>
-    <string name="extend_by_minutes">Verlängerungszeit (Minuten)</string>
-    <string name="fade_out_duration">Fade-out-Dauer</string>
-    <string name="fade_out_running">Audio wird ausgefaded</string>
+    <string name="extend_by_minutes">Verlängerungsschritt (Minuten)</string>
+    <string name="fade_out_duration">Ausblenddauer</string>
+    <string name="fade_out_running">Audio wird ausgeblendet</string>
     <string name="seconds">%1$d Sekunden</string>
 
     <string name="timer_minus_x">- %1$d min</string>
-    <string name="notification_timer_runningnotification_timer_running">Timer läuft</string>
-    <string name="notification_remaining_timenotification_remaining_time">Verbleibend: %1$s</string>
-    <string name="reminder_popup_titlereminder_popup_title">Erinnerung</string>
-    <string name="reminder_popup_messagereminder_popup_message">Der Timer läuft bald ab.</string>
 
     <!-- Playback -->
     <string name="playback">Wiedergabe</string>
@@ -44,11 +40,11 @@
     <string name="remove_admin_title">Adminrechte entfernen?</string>
     <string name="remove_admin_message">Möchtest du die Berechtigung zum Bildschirm ausschalten entziehen? Gehe in die Geräteeinstellungen und entferne den Admin dort.</string>
     <string name="open_settings">Geräteeinstellungen öffnen</string>
-    <string name="device_admin_remove_in_settings">Entferne die Adminrechte in den Einstellungen!</string>
-    <string name="admin_permission_required">Adminrechte benötigt</string>
-    <string name="device_admin_explanation">Admin rechte Erklärung</string>
+    <string name="device_admin_remove_in_settings">Entferne die Administratorrechte in den Einstellungen!</string>
+    <string name="admin_permission_required">Administratorrechte benötigt</string>
+    <string name="device_admin_explanation">Erläuterung der Administratorrechte</string>
     <string name="device_admin_remove_manual_hint">Bitte öffne die Geräteeinstellungen manuell und entferne dort den Geräteadministrator.</string>
-    <string name="remove_admin_confirm_button">Sicher entfernen?</string>
+    <string name="remove_admin_confirm_button">Administratorrechte entfernen?</string>
 
     <!-- Language -->
     <string name="language">Sprache</string>
@@ -66,15 +62,15 @@
     <string name="notification">Benachrichtigung</string>
     <string name="enable_notification">Benachrichtigung aktivieren</string>
     <string name="notification_permission_title">Benachrichtigung aktivieren</string>
-    <string name="notification_permission_rationale">Zum Anzeigen und Interagieren mit Timer-Benachrichtigungen benötigt</string>
+    <string name="notification_permission_rationale">Zum Anzeigen und Steuern der Timer-Benachrichtigungen erforderlich</string>
     <string name="notification_permission_denied">Berechtigung verweigert</string>
     <string name="notification_disable_title">Benachrichtigung deaktivieren?</string>
     <string name="notification_disable_message">Benachrichtigung wurde deaktiviert</string>
     <string name="notification_timer_running">Timer läuft</string>
     <string name="notification_remaining_time">Noch %1$s</string>
     <string name="notification_channel_running">Timer läuft</string>
-    <string name="notification_channel_reminder">Timer Erinnerung</string>
-    <string name="show_remaining_time">Keine Ahnung</string>
+    <string name="notification_channel_reminder">Timer-Erinnerung</string>
+    <string name="show_remaining_time">Restzeit anzeigen</string>
 
 
     <!-- Notification Settings -->
@@ -84,12 +80,12 @@
 
     <string name="notifications_section_progress">Statusleistenanzeige</string>
     <string name="notifications_progress_show">Fortschritt anzeigen</string>
-    <string name="notifications_progress_extend_btn">Verlängerungsschaltfläche anzeigen</string>
+    <string name="notifications_progress_extend_btn">Verlängern-Button anzeigen</string>
 
     <string name="notifications_section_reminder">Erinnerung</string>
-    <string name="notifications_reminder_show">Reminder vor Ablauf</string>
+    <string name="notifications_reminder_show">Erinnerung vor Ablauf</string>
     <string name="notifications_reminder_minutes">%1$d Minuten vorher</string>
-    <string name="notifications_reminder_extend_btn">Verlängerung im Reminder anzeigen</string>
+    <string name="notifications_reminder_extend_btn">Verlängern-Button im Reminder anzeigen</string>
 
     <string name="notifications_extend_minutes">Verlängerungsschritt: %1$d Minuten</string>
 
@@ -98,7 +94,7 @@
 
     <!-- Reminder Popup -->
     <string name="reminder_popup_title">Erinnerung</string>
-    <string name="reminder_popup_message">Timer läuft gleich ab.</string>
+    <string name="reminder_popup_message">Der Timer läuft bald ab.</string>
     <string name="reminder_popup_hint">Popup erscheint %1$d Minuten vor Timer-Ende</string>
     <string name="reminder_popup_hint_short">Zeigt ein Heads-Up-Popup kurz vor Ablauf</string>
 
@@ -113,7 +109,7 @@
     <string name="enabled">Aktiviert</string>
     <string name="disabled">Deaktiviert</string>
     <string name="shake_strength">Schüttelkraft</string>
-    <string name="shake_strength_hint">Handy schütteln, um die Schüttelkraft zu testen</string>
+    <string name="shake_strength_hint">Telefon schütteln, um die Empfindlichkeit zu testen</string>
     <string name="shake_strength_sub">Empfindlichkeit der Erkennung anpassen</string>
     <string name="notification_sound">Benachrichtigungston</string>
     <string name="pick_tone">Ton auswählen</string>
@@ -125,7 +121,7 @@
     <string name="none">Kein Ton</string>
     <string name="unknown_tone">Unbekannter Ton</string>
     <string name="shake_extend_minutes_hint">Verlängerungsschritt: %1$d Minuten</string>
-    <string name="shake_activation_delay_hint">Nach %1$d Minuten nach Start aktiv</string>
+    <string name="shake_activation_delay_hint">Ab %1$d Minuten nach Start aktiv</string>
 
     <!-- Shake Detail -->
     <string name="runtime">Laufzeit</string>
@@ -137,7 +133,7 @@
     <!-- Shake Active -->
     <string name="shake_activation_title">Shake aktivieren nach</string>
     <string name="shake_activation_immediate">Sofort</string>
-    <string name="shake_activation_after_start_label">Nach X Minuten ab Start</string>
+    <string name="shake_activation_after_start_label">Ab X Minuten nach Start</string>
     <string name="shake_activation_after_start">%1$d min nach Start</string>
     <string name="shake_activation_after_start_value">Aktiv nach: %1$d min</string>
     <string name="configure">Einstellen</string>
@@ -159,10 +155,10 @@
     <string name="wifi">WLAN</string>
     <string name="wifi_turn_off">WLAN am Timer-Ende deaktivieren</string>
     <string name="wifi_android_10_removed">Diese Funktion wurde in Android 10 entfernt</string>
-    <string name="tap_for_details">Für Details klicken</string>
+    <string name="tap_for_details">Für Details tippen</string>
     <string name="display_and_language">Darstellung &amp; Sprache</string>
     <string name="notifications_extend_title">Verlängerung</string>
-    <string name="notifications_progress_hint">Zeigt den Fortschritt in der Statusbar</string>
+    <string name="notifications_progress_hint">Zeigt den Fortschritt in der Statusleiste</string>
 
 
     <!-- PREMIUM -->
@@ -189,12 +185,12 @@
 
     <!-- WIDGET -->
     <string name="widget_quick_start_title">Schnellstart</string>
-    <string name="widget_quick_start_subtitle">Startet mit deinen aktuellen Einstellungen</string>
+    <string name="widget_quick_start_subtitle">Steuert den Timer mit deinen aktuellen Einstellungen</string>
     <string name="widget_config_title">Widget konfigurieren</string>
     <string name="widget_config_duration">Dauer (Minuten)</string>
     <string name="widget_add">Hinzufügen</string>
     <string name="premium_required">Premium erforderlich</string>
-    <string name="widget_quick_start_description">widget beschreibung hier</string>
+    <string name="widget_quick_start_description">Steuert den Timer direkt vom Homescreen aus</string>
     <string name="save">Speichern</string>
     <string name="loading">Lade…</string>
     <string name="premium_feature_widget">Widget ist ein Premium-Feature</string>
@@ -229,11 +225,11 @@
 
     <!-- Hinweiskarte -->
     <string name="setup_required_title">Erforderliche Einrichtung fehlt</string>
-    <string name="setup_required_body">Klicken Sie hier, um die erforderlichen Berechtigungen einzurichten, damit die Anwendung im Hintergrund zuverlässig funktioniert (z. B. bei geschlossener App).</string>
+    <string name="setup_required_body">Tippe hier, um die erforderlichen Berechtigungen einzurichten, damit die App im Hintergrund zuverlässig funktioniert (z. B. bei geschlossener App).</string>
 
     <!-- BottomSheet -->
     <string name="setup_sheet_title">Erforderliche Einrichtung</string>
     <string name="setup_sheet_done">Einrichtung abgeschlossen</string>
-    <string name="setup_sheet_instructions">Um eine unterbrechungsfreie Funktion zu gewährleisten, schließen Sie die App von der „Batterieoptimierung“ aus bzw. wählen Sie „Uneingeschränkt“.\n\n1. Tippen Sie auf „Nicht optimiert“ oder „Alle Apps“ auf dem nächsten Bildschirm\n2. Wählen Sie die App aus\n3. Hintergrundnutzung zulassen\n4. Wählen Sie „Uneingeschränkt“ / „Nicht optimieren“ oder deaktivieren Sie die Batterieoptimierung.</string>
+    <string name="setup_sheet_instructions">Damit alles zuverlässig funktioniert, schließe die App von der „Batterieoptimierung“ aus bzw. wähle „Uneingeschränkt“.\n\n1. Tippe auf „Nicht optimiert“ oder „Alle Apps“ auf dem nächsten Bildschirm\n2. Wähle die App aus\n3. Hintergrundnutzung zulassen\n4. „Uneingeschränkt“ wählen oder Batterieoptimierung deaktivieren.</string>
 
 </resources>
