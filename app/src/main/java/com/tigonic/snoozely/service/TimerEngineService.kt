@@ -284,6 +284,41 @@ class TimerEngineService : Service() {
                     return@launch
                 }
 
+
+                // Reminder prüfen und ggf. senden
+                val notificationsEnabled = runCatching {
+                    SettingsPreferenceHelper.getNotificationEnabled(ctx).first()
+                }.getOrDefault(false) // Default sicherheitshalber false (Settings-Default ist false)
+
+                val showReminder = runCatching {
+                    SettingsPreferenceHelper.getShowReminderPopup(ctx).first()
+                }.getOrDefault(false)
+
+                if (notificationsEnabled && showReminder && remaining > 0L) {
+                    val reminderMin = runCatching {
+                        SettingsPreferenceHelper.getReminderMinutes(ctx).first()
+                    }.getOrDefault(5).coerceAtLeast(1)
+
+                    val reminderThresholdMs = reminderMin * 60_000L
+
+                    // Optional: Re-Arm, wenn wieder deutlich über der Schwelle (z. B. > Schwelle + 5s)
+                    if (reminderSentForStartTime == startTime && remaining > reminderThresholdMs + 5_000L) {
+                        reminderSentForStartTime = -1L
+                    }
+
+                    if (remaining <= reminderThresholdMs &&
+                        reminderSentForStartTime != startTime &&
+                        notificationsAllowedForChannel(TimerContracts.CHANNEL_REMINDER)
+                    ) {
+                        startServiceSafe(
+                            Intent(ctx, TimerNotificationService::class.java)
+                                .setAction(TimerContracts.ACTION_NOTIFY_REMINDER)
+                                .putExtra("reminderMinutes", reminderMin)
+                        )
+                        reminderSentForStartTime = startTime
+                    }
+                }
+
                 delay(1000)
             }
         }
@@ -632,7 +667,6 @@ class TimerEngineService : Service() {
 
     /**
      * Aktualisiert NUR das 3x1-„TimerControlWidget“.
-     * Das frühere QuickStart-Widget ist entfernt.
      */
     private fun requestWidgetUpdate() {
         val ctx = applicationContext
