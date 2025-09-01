@@ -200,7 +200,7 @@ fun SettingsScreen(
                 }
 
                 // -------- App / Playback --------
-                SectionHeader(text = stringResource(R.string.app_name))
+                SectionHeader(text = stringResource(R.string.general))
 
                 SettingsRow(
                     icon = Icons.Default.PlayCircleFilled,
