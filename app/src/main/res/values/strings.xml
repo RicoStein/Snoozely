@@ -5,6 +5,12 @@
     <string name="save">Speichern</string>
     <string name="general">Allgemein</string>
 
+    <!-- Legal -->
+    <string name="termsOfUse">Nutzungsbedingungen</string>
+    <string name="privacyPolicy">Datenschutzerklärung</string>
+
+
+
     <!-- Navigation -->
     <string name="back">Zurück</string>
     <string name="cancel">Abbrechen</string>

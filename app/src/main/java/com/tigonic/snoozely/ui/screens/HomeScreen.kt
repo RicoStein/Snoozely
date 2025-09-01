@@ -228,11 +228,40 @@ fun HomeScreen(
                                         onRequestPurchase()
                                     }
                                 )
+                                // Datenschutzerklärung (Website)
                                 DropdownMenuItem(
-                                    text = { Text("Datenschutz-Einstellungen") },
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.privacyPolicy)
+                                        )
+                                    },
                                     onClick = {
                                         overflowOpen = false
-                                        onOpenPrivacyOptions()
+                                        val url = "https://tigoniclabs.com"
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            data = android.net.Uri.parse(url)
+                                            addCategory(Intent.CATEGORY_BROWSABLE)
+                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                        }
+                                        appCtx.startActivity(intent)
+                                    }
+                                )
+                                // Nutzungsbedingungen (Website)
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.termsOfUse)
+                                        )
+                                    },
+                                    onClick = {
+                                        overflowOpen = false
+                                        val url = "https://tigoniclabs.com"
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            data = android.net.Uri.parse(url)
+                                            addCategory(Intent.CATEGORY_BROWSABLE)
+                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                        }
+                                        appCtx.startActivity(intent)
                                     }
                                 )
                             }
