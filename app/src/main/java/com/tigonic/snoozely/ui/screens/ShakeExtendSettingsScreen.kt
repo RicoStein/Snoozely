@@ -116,10 +116,9 @@ fun ShakeExtendSettingsScreen(
         val uri: Uri? = data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
         scope.launch {
             if (uri == null) {
-                SettingsPreferenceHelper.setShakeRingtone(appCtx, "")
-                toneTitle = ctx.getString(R.string.silent)
-                SettingsPreferenceHelper.setShakeSoundMode(appCtx, "tone")
+                // Abgebrochen: nichts ändern – weder Modus noch gespeicherten Ton anfassen
             } else {
+                // Ton wurde ausgewählt: speichern und Modus auf tone
                 SettingsPreferenceHelper.setShakeRingtone(appCtx, uri.toString())
                 SettingsPreferenceHelper.setShakeSoundMode(appCtx, "tone")
                 toneTitle = currentToneTitle(uri.toString())
