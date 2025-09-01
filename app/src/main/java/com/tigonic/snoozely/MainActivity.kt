@@ -120,9 +120,12 @@ class MainActivity : ComponentActivity() {
             val consentType by SettingsPreferenceHelper.getAdsConsentType(this).collectAsState(initial = "Unknown")
 
             nonPersonalized = (consentType == "NonPersonalized") || (consentType == "NoAds")
+
+            // Ads nur zeigen, wenn kein Premium und Consent für Ads vorliegt
             isAdsAllowed = !premium && consentResolved && (
-                    consentType == "Personalized" || consentType == "NonPersonalized" ||
-                            (BuildConfig.ADGATE_ALLOW_NOADS_IN_DEBUG && consentType == "NoAds")
+                    consentType == "Personalized" ||
+                            consentType == "NonPersonalized"
+                    // Optional nur in Debug/Tests: (BuildConfig.ADGATE_ALLOW_NOADS_IN_DEBUG && consentType == "NoAds")
                     )
 
             // InterstitialManager lazy initialisieren und „vorwärmen“

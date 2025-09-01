@@ -195,7 +195,7 @@ class PremiumManager(
     }
 
     object BillingConfig {
-        const val PREMIUM_INAPP = "premium_unlock"          // Deine INAPP-ID (Play Console)
+        const val PREMIUM_INAPP = "snoozely_premium"          // Deine INAPP-ID (Play Console)
         const val PREMIUM_SUBS = "premium_subscription"     // SUBS-ID (falls genutzt)
     }
 }
