@@ -4,6 +4,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 
+/**
+ * Kleine, widget-spezifische SharedPreferences-Helfer.
+ * Jeder Eintrag ist pro AppWidgetId gespeichert, damit mehrere Instanzen
+ * unabhängig voneinander konfigurierbar sind.
+ */
 private const val PREFS = "widget_prefs"
 private fun prefs(ctx: Context): SharedPreferences = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 

@@ -29,22 +29,42 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tigonic.snoozely.R
+import com.tigonic.snoozely.ui.components.VerticalScrollbar
 import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.ui.theme.ThemeRegistry
+import com.tigonic.snoozely.util.BatteryOptimizationHelper
 import com.tigonic.snoozely.util.LocaleHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
-import com.tigonic.snoozely.ui.components.VerticalScrollbar
-import com.tigonic.snoozely.util.BatteryOptimizationHelper
-import com.tigonic.snoozely.util.SetupHintPrefs
 
-// ---- Helper: Context -> Activity
+/**
+ * Einstellungen-Screen
+ *
+ * Bereiche:
+ * - App/Playback (Stop Audio + Fade-Out)
+ * - Screen/Device Admin (Bildschirm ausschalten)
+ * - Radios (Bluetooth/WiFi bei älteren Android-Versionen)
+ * - Benachrichtigungen (Navigation in Detail)
+ * - Shake-to-extend (Navigation in Detail)
+ * - Sprache & Theme
+ * - Battery-Optimierungs-Setup-Hinweise (Karte + BottomSheet)
+ */
+
+// ---------------------------
+// Helpers
+// ---------------------------
+
+/** Extrahiert eine Activity aus einem Context, falls möglich. */
 private tailrec fun Context.asActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.asActivity()
     else -> null
 }
+
+// ---------------------------
+// Screen
+// ---------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,22 +104,21 @@ fun SettingsScreen(
         val now = dpm.isAdminActive(admin)
         isAdmin = now
         scope.launch { SettingsPreferenceHelper.setScreenOff(app, now) }
-        Toast.makeText(app, if (now) app.getString(R.string.device_admin_enabled) else app.getString(R.string.device_admin_failed), Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            app,
+            if (now) app.getString(R.string.device_admin_enabled) else app.getString(R.string.device_admin_failed),
+            Toast.LENGTH_SHORT
+        ).show()
     }
     var showRemoveAdminDialog by remember { mutableStateOf(false) }
 
-
-    // Nutzerpräferenz: Hinweis dauerhaft ausblenden?
-    var suppressHint by remember { mutableStateOf(SetupHintPrefs.getSuppressSetupHint(ctx)) }
-
-    // Aktueller Systemstatus: „uneingeschränkt“?
-    var isUnrestricted by remember { mutableStateOf(BatteryOptimizationHelper.isUnrestricted(ctx)) }
-
-    // Sheet-Visibility
+    // --- Battery Optimization Setup-Hinweis
+    val suppressSetupHint by SettingsPreferenceHelper.getSuppressSetupHint(ctx).collectAsState(initial = false)
+    var isBatteryUnrestrictedState by remember { mutableStateOf(BatteryOptimizationHelper.isUnrestricted(ctx)) }
     var showSetupSheet by remember { mutableStateOf(false) }
 
-    // Nur anzeigen, wenn nicht unterdrückt und Systemstatus nicht „uneingeschränkt“
-    val showHint = !suppressHint && !isUnrestricted
+    // Hinweis-Karte anzeigen, wenn nicht unterdrückt und System nicht uneingeschränkt
+    val showHint: Boolean = !suppressSetupHint && !isBatteryUnrestrictedState
 
     // Admin-Status mit Switch synchron halten
     LaunchedEffect(screenOff) {
@@ -114,7 +133,11 @@ fun SettingsScreen(
                 title = { Text(stringResource(R.string.settings), color = extra.menu) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = extra.menu)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                            tint = extra.menu
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -149,37 +172,34 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
+                // -------- Battery-Setup Hinweis --------
                 if (showHint) {
                     SetupHintCard(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { showSetupSheet = true }
                     )
                 }
-
                 if (showSetupSheet) {
                     SetupBottomSheet(
                         onDismiss = {
-                            // Beim Schließen neu prüfen, ob der Nutzer umgestellt hat
-                            isUnrestricted = BatteryOptimizationHelper.isUnrestricted(ctx)
-                            if (isUnrestricted) {
-                                // Wenn jetzt uneingeschränkt, Karte automatisch verschwinden lassen
-                                suppressHint = SetupHintPrefs.getSuppressSetupHint(ctx) // belasse Nutzerpräferenz
-                            }
+                            // Beim Schließen neu prüfen (evtl. hat der Nutzer umgestellt)
+                            isBatteryUnrestrictedState = BatteryOptimizationHelper.isUnrestricted(ctx)
                             showSetupSheet = false
                         },
                         onDontShowAgain = { suppress ->
-                            SetupHintPrefs.setSuppressSetupHint(ctx, suppress)
-                            suppressHint = suppress
+                            // State in DataStore speichern; UI aktualisiert sich über den Flow
+                            scope.launch {
+                                SettingsPreferenceHelper.setSuppressSetupHint(ctx, suppress)
+                            }
                         },
                         onOpenSettings = {
-                            // Öffnet die passenden Systemseiten, dort „Uneingeschränkt/Nicht optimieren“ setzen
                             BatteryOptimizationHelper.openBatterySettings(ctx)
                         },
-                        isCompleted = isUnrestricted
+                        isCompleted = isBatteryUnrestrictedState
                     )
                 }
 
-                // ===== App / Playback =====
+                // -------- App / Playback --------
                 SectionHeader(text = stringResource(R.string.app_name))
 
                 SettingsRow(
@@ -192,8 +212,16 @@ fun SettingsScreen(
 
                 // Fade-Out
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(R.string.fade_out_duration), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.seconds, fadeOut.toInt()), color = extra.infoText, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.fade_out_duration),
+                        color = cs.onBackground,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        stringResource(R.string.seconds, fadeOut.toInt()),
+                        color = extra.infoText,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                     Slider(
                         value = fadeOut,
                         onValueChange = { v -> scope.launch { SettingsPreferenceHelper.setFadeOut(app, v) } },
@@ -210,7 +238,7 @@ fun SettingsScreen(
                     )
                 }
 
-                // ===== Screen / Admin =====
+                // -------- Screen / Admin --------
                 SettingsRow(
                     icon = Icons.Default.Brightness2,
                     title = stringResource(R.string.screen),
@@ -221,7 +249,10 @@ fun SettingsScreen(
                             if (!isAdmin && activity != null) {
                                 val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
                                     putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-                                    putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, app.getString(R.string.device_admin_explanation))
+                                    putExtra(
+                                        DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                        app.getString(R.string.device_admin_explanation)
+                                    )
                                 }
                                 adminLauncher.launch(intent)
                             } else {
@@ -245,19 +276,21 @@ fun SettingsScreen(
                         title = { Text(stringResource(R.string.remove_admin_title)) },
                         text = { Text(stringResource(R.string.remove_admin_message)) },
                         confirmButton = {
-                            TextButton(onClick = {
-                                showRemoveAdminDialog = false
-                                runCatching { dpm.removeActiveAdmin(admin) }
-                                isAdmin = false
-                                scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
-                                Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
-                            }) { Text(stringResource(R.string.remove_admin_confirm_button)) }
+                            TextButton(
+                                onClick = {
+                                    showRemoveAdminDialog = false
+                                    runCatching { dpm.removeActiveAdmin(admin) }
+                                    isAdmin = false
+                                    scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
+                                    Toast.makeText(app, app.getString(R.string.device_admin_disabled), Toast.LENGTH_SHORT).show()
+                                }
+                            ) { Text(stringResource(R.string.remove_admin_confirm_button)) }
                         },
                         dismissButton = { TextButton(onClick = { showRemoveAdminDialog = false }) { Text(stringResource(R.string.cancel)) } }
                     )
                 }
 
-                // ===== Radios =====
+                // -------- Radios --------
                 SettingsRow(
                     icon = Icons.Default.BluetoothDisabled,
                     title = stringResource(R.string.bluetooth),
@@ -276,7 +309,7 @@ fun SettingsScreen(
                     enabled = supportsWifiToggle
                 )
 
-                // ===== Notifications =====
+                // -------- Notifications --------
                 SectionHeader(text = stringResource(R.string.notification))
                 Row(
                     modifier = Modifier
@@ -292,7 +325,11 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(text = stringResource(R.string.notification), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = stringResource(R.string.notification),
+                            color = cs.onBackground,
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         Text(
                             text = if (notificationEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
                             color = extra.infoText,
@@ -302,7 +339,7 @@ fun SettingsScreen(
                     Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
                 }
 
-                // ===== Shake to extend =====
+                // -------- Shake to extend --------
                 SectionHeader(text = stringResource(R.string.shake_to_extend))
                 Row(
                     modifier = Modifier
@@ -318,7 +355,11 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(text = stringResource(R.string.shake_to_extend), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = stringResource(R.string.shake_to_extend),
+                            color = cs.onBackground,
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         Text(
                             text = if (shakedEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
                             color = extra.infoText,
@@ -328,8 +369,9 @@ fun SettingsScreen(
                     Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = cs.onSurfaceVariant)
                 }
 
-                // ===== Sprache / Theme =====
+                // -------- Sprache / Theme --------
                 SectionHeader(text = stringResource(R.string.display_and_language))
+
                 LanguageDropdown(
                     selectedLangCode = language,
                     onSelect = { code ->
@@ -341,10 +383,11 @@ fun SettingsScreen(
                 )
 
                 ThemeSection()
+
                 Spacer(Modifier.height(12.dp))
             }
 
-            // <- Scrollbar MUSS innerhalb der Box liegen, damit align() funktioniert
+            // Scrollbar innerhalb der Box ausrichten
             VerticalScrollbar(
                 scrollState = scrollState,
                 modifier = Modifier
@@ -356,14 +399,16 @@ fun SettingsScreen(
     }
 }
 
-// ---- Building blocks (farblich 100% aus ThemeSystem) ----
+// ---------------------------
+// Building blocks
+// ---------------------------
 
 @Composable
 private fun SectionHeader(text: String) {
     val extra = LocalExtraColors.current
     Text(
         text = text,
-        color = extra.heading, // zentral über ThemeSystem steuerbar
+        color = extra.heading,
         fontWeight = FontWeight.Bold,
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 12.dp, bottom = 0.dp)
@@ -394,12 +439,17 @@ private fun SettingsRow(
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(text = title, color = if (enabled) cs.onBackground else cs.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = title,
+                color = if (enabled) cs.onBackground else cs.onSurfaceVariant,
+                style = MaterialTheme.typography.titleMedium
+            )
             Text(text = subtitle, color = extra.infoText, style = MaterialTheme.typography.bodySmall)
         }
+        // Immer ein Lambda übergeben (kein Boolean)
         Switch(
             checked = checked,
-            onCheckedChange = if (enabled) onCheckedChange else null,
+            onCheckedChange = { value -> if (enabled) onCheckedChange(value) },
             enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = extra.toggle,
@@ -442,10 +492,13 @@ private fun LanguageDropdown(
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { (code, label) ->
-                DropdownMenuItem(text = { Text(label) }, onClick = {
-                    expanded = false
-                    onSelect(code)
-                })
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        expanded = false
+                        onSelect(code)
+                    }
+                )
             }
         }
     }
@@ -496,8 +549,8 @@ private fun iconTint(active: Boolean, enabled: Boolean = true): Color {
     val extra = LocalExtraColors.current
     val target = when {
         !enabled -> cs.onSurfaceVariant.copy(alpha = 0.5f)
-        active   -> extra.icon
-        else     -> cs.onSurfaceVariant
+        active -> extra.icon
+        else -> cs.onSurfaceVariant
     }
     val animated by animateColorAsState(targetValue = target, label = "iconTint")
     return animated
@@ -550,7 +603,7 @@ private fun SetupBottomSheet(
         Column(
             Modifier
                 .fillMaxWidth()
-                .verticalScroll(scrollState)      // <- macht den Inhalt scrollbar
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Text(
@@ -607,9 +660,9 @@ private fun SetupBottomSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = dontShow,
-                    onCheckedChange = {
-                        dontShow = it
-                        onDontShowAgain(it)
+                    onCheckedChange = { checked ->
+                        dontShow = checked
+                        onDontShowAgain(checked)
                     }
                 )
                 Spacer(Modifier.width(8.dp))

@@ -41,6 +41,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
+/**
+ * Konfigurations-Activity für das 3x1-Steuerungs-Widget.
+ *
+ * Features:
+ * - Timerdauer per Wheel festlegen
+ * - Farbstil des Widgets (Hintergrund in RGBA, Text) per HSV-Slider konfigurieren
+ * - Speichert Einstellungen widget-spezifisch in SharedPreferences (siehe WidgetPrefs.kt)
+ * - Paywall: nur für Premium-Nutzer zugänglich
+ */
 class TimerControlWidgetConfigActivity : ComponentActivity() {
 
     private var appWidgetId: Int = AppWidgetManager.INVALID_APPWIDGET_ID
@@ -48,8 +57,10 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Default = abgebrochen (falls etwas schiefgeht oder Activity vorzeitig beendet wird)
         setResult(Activity.RESULT_CANCELED)
 
+        // Extract AppWidgetId aus Intent
         appWidgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID
@@ -59,6 +70,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
             finish(); return
         }
 
+        // Premium prüfen – Konfig nur mit Premium
         lifecycleScope.launch {
             val isPremium = SettingsPreferenceHelper.getPremiumActive(applicationContext).first()
             if (!isPremium) {
@@ -67,13 +79,20 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                     putExtra("showPaywall", true)
                 }
                 startActivity(intent)
-                Toast.makeText(applicationContext, getString(R.string.premium_feature_widget), Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    applicationContext,
+                    getString(R.string.premium_feature_widget),
+                    Toast.LENGTH_LONG
+                ).show()
                 finish(); return@launch
             }
             setupContent()
         }
     }
 
+    /**
+     * Baut die Compose-Oberfläche und stellt Theme/Insets ein.
+     */
     private fun setupContent() {
         if (ThemeRegistry.themes.isEmpty()) registerDefaultThemes()
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -91,22 +110,25 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                 val defaultText = if (night) Color.White else Color.Black
                 val defaultAlpha = 0.30f
 
+                // Initialwerte aus Prefs lesen
                 val initialMinutes = remember { getWidgetDuration(ctx, appWidgetId, 15) }
                 var minutes by remember { mutableStateOf(initialMinutes) }
 
-                var bgAlpha by remember { mutableStateOf(getWidgetBgAlpha(ctx, appWidgetId, defaultAlpha).coerceIn(0f, 1f)) }
+                var bgAlpha by remember {
+                    mutableStateOf(getWidgetBgAlpha(ctx, appWidgetId, defaultAlpha).coerceIn(0f, 1f))
+                }
 
-                // HSV für Hintergrund
+                // Hintergrundfarbe (HSV)
                 var bgHue by remember { mutableStateOf(210f) } // 0..360
                 var bgSat by remember { mutableStateOf(0.2f) }  // 0..1
                 var bgVal by remember { mutableStateOf(1.0f) }  // 0..1
 
-                // HSV für Text
+                // Textfarbe (HSV)
                 var txtHue by remember { mutableStateOf(0f) }
                 var txtSat by remember { mutableStateOf(0f) }
                 var txtVal by remember { mutableStateOf(if (night) 1f else 0f) }
 
-                // Vorhandene Farben in HSV mappen
+                // Vorhandene Farben -> HSV mappen
                 LaunchedEffect(Unit) {
                     val currentBg = Color(getWidgetBgColor(ctx, appWidgetId, defaultBg.toArgb()))
                     val currentTxt = Color(getWidgetTextColor(ctx, appWidgetId, defaultText.toArgb()))
@@ -131,12 +153,14 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // Abbrechen
                                 FilledTonalButton(
                                     onClick = { setResult(Activity.RESULT_CANCELED); finishAndRemoveTask() },
                                     modifier = Modifier.weight(1f).height(52.dp),
                                     shape = MaterialTheme.shapes.extraLarge
                                 ) { Text(stringResource(R.string.cancel)) }
 
+                                // Speichern & Widget aktualisieren
                                 Button(
                                     onClick = {
                                         scope.launch {
@@ -161,13 +185,12 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(inner)
-                            //.statusBarsPadding()
                             .padding(horizontal = 20.dp)
                             .verticalScroll(scroll),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(22.dp)
                     ) {
-                        // Appname + Infotext
+                        // Kopf
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineLarge,
@@ -182,35 +205,21 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                             textAlign = TextAlign.Center
                         )
 
-                        // WheelSlider (eigener Block)
+                        // Wheel: Minuten wählen
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .height(280.dp)
-                                .fillMaxWidth()
+                            modifier = Modifier.height(280.dp).fillMaxWidth()
                         ) {
                             WheelSlider(value = minutes, onValueChange = { v -> minutes = max(1, v) }, minValue = 1)
                             TimerCenterText(minutes = minutes, seconds = 0, showLabel = true)
                         }
-
-                        // Deutlicher Abstand nach dem Wheel
                         Spacer(Modifier.height(24.dp))
 
-                        // Hintergrund: Überschrift mit Padding, dann Hue, dann Sat/Helligkeit nebeneinander
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.background),
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-                            )
+                        // Hintergrundfarbe
+                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(text = stringResource(R.string.background), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 4.dp))
                             HueSlider(hue = bgHue, onHueChange = { bgHue = it })
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(stringResource(R.string.saturation), style = MaterialTheme.typography.labelLarge)
                                     Slider(value = bgSat, onValueChange = { bgSat = it.coerceIn(0f, 1f) })
@@ -222,23 +231,11 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-
-
-                        // Textfarbe: Überschrift mit Padding, dann Hue, dann Sat/Helligkeit nebeneinander
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.text),
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-                            )
+                        // Textfarbe
+                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(text = stringResource(R.string.text), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 4.dp))
                             HueSlider(hue = txtHue, onHueChange = { txtHue = it })
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(stringResource(R.string.saturation), style = MaterialTheme.typography.labelLarge)
                                     Slider(value = txtSat, onValueChange = { txtSat = it.coerceIn(0f, 1f) })
@@ -250,7 +247,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        // Live Vorschau: Icon | mm:ss | − | Play/Pause | +
+                        // Live-Vorschauzeile des Widgets
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -286,7 +283,9 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
     }
 }
 
-/** Hue-Slider mit sichtbarem Farbverlauf (0..360°) */
+/**
+ * Farbbalken für Hue (0..360°). Slider-Wert wird linear abgebildet.
+ */
 @Composable
 private fun HueSlider(hue: Float, onHueChange: (Float) -> Unit) {
     val hueGradient = Brush.horizontalGradient(
@@ -313,6 +312,9 @@ private fun HueSlider(hue: Float, onHueChange: (Float) -> Unit) {
     }
 }
 
+/**
+ * Minimaler Themen-Wrapper, der ThemeRegistry respektiert und ExtraColors bereitstellt.
+ */
 @Composable
 private fun ConfigTheme(useDark: Boolean, content: @Composable () -> Unit) {
     val spec = com.tigonic.snoozely.ui.theme.ThemeRegistry.byId(if (useDark) "dark" else "light")
@@ -332,7 +334,9 @@ private fun ConfigTheme(useDark: Boolean, content: @Composable () -> Unit) {
     }
 }
 
-// HSV <-> Color
+/**
+ * HSV->RGB und RGB->HSV Hilfsfunktionen für Compose-Color.
+ */
 private fun hsvToColor(h: Float, s: Float, v: Float): Color {
     val c = (v * s)
     val x = c * (1 - kotlin.math.abs((h / 60f) % 2 - 1))

@@ -6,11 +6,19 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.appwidget.AppWidgetManager
-import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
@@ -24,19 +32,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import android.media.AudioAttributes
-import android.media.Ringtone
-import android.media.RingtoneManager
-import android.net.Uri
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import android.provider.Settings
-import android.util.Log
 import com.tigonic.snoozely.shake.ShakeDetector
-import com.tigonic.snoozely.widget.TimerQuickStartWidgetProvider
 import kotlin.math.roundToInt
 
+/**
+ * TimerEngineService
+ *
+ * Verantwortlich für:
+ * - Start/Stop/Extend/Reduce Logik des Sleeptimers
+ * - Periodische Ticks (1 Hz) mit Berechnung der Restzeit
+ * - Triggern von Audio-Fade, Haptics/Screen-Lock am Ende
+ * - Anzeigen/Aktualisieren der Fortschrittsbenachrichtigung
+ * - Broadcast der Ticks an UI/Widgets
+ *
+ * Wichtig:
+ * - Läuft im Vordergrund (Low-Importance-Channel), sobald Progress-Notifications erlaubt sind.
+ * - Widget-Updates betreffen ausschließlich das 3x1 Control-Widget.
+ */
 class TimerEngineService : Service() {
 
     companion object {
@@ -57,7 +69,6 @@ class TimerEngineService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var tickerJob: Job? = null
-
     @Volatile private var reminderSentForStartTime: Long = -1L
     @Volatile private var lastStartMinutesCache: Int? = null
 
@@ -68,8 +79,16 @@ class TimerEngineService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        ensureChannel(TimerContracts.CHANNEL_RUNNING, getString(R.string.notification_channel_running), NotificationManager.IMPORTANCE_LOW)
-        ensureChannel(TimerContracts.CHANNEL_REMINDER, getString(R.string.notification_channel_reminder), NotificationManager.IMPORTANCE_HIGH)
+        ensureChannel(
+            TimerContracts.CHANNEL_RUNNING,
+            getString(R.string.notification_channel_running),
+            NotificationManager.IMPORTANCE_LOW
+        )
+        ensureChannel(
+            TimerContracts.CHANNEL_REMINDER,
+            getString(R.string.notification_channel_reminder),
+            NotificationManager.IMPORTANCE_HIGH
+        )
     }
 
     override fun onDestroy() {
@@ -126,15 +145,14 @@ class TimerEngineService : Service() {
                 serviceScope.launch {
                     val ctx = applicationContext
                     val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
-                    if (running) {
-                        startTickerIfNeeded()
-                    }
+                    if (running) startTickerIfNeeded()
                 }
                 return START_REDELIVER_INTENT
             }
         }
     }
 
+    /** Startet eine minimale Vordergrund-Notification, falls noch nicht aktiv. */
     private fun ensureForegroundOnce() {
         if (isForeground) return
         val minimal = NotificationCompat.Builder(this, TimerContracts.CHANNEL_RUNNING)
@@ -148,23 +166,21 @@ class TimerEngineService : Service() {
             startForeground(NOTIF_ID_RUNNING, minimal)
             isForeground = true
         } catch (_: Throwable) {
-            getSystemService(NotificationManager::class.java)
-                .notify(NOTIF_ID_RUNNING, minimal)
+            // Fallback: Notification ohne echten FGS, um Abstürze zu verhindern
+            getSystemService(NotificationManager::class.java).notify(NOTIF_ID_RUNNING, minimal)
             isForeground = true
         }
     }
 
     private fun stopForegroundCompat() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION") stopForeground(true)
-            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) stopForeground(STOP_FOREGROUND_REMOVE)
+            else @Suppress("DEPRECATION") stopForeground(true)
         } catch (_: Throwable) { /* ignore */ }
         isForeground = false
     }
 
+    /** Notification-Channel sicherstellen (Neu-Anlage bei Namens-/Importance-Änderung). */
     private fun ensureChannel(id: String, name: String, importance: Int) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = getSystemService(NotificationManager::class.java)
@@ -180,23 +196,22 @@ class TimerEngineService : Service() {
             return
         }
         val blocked = existing.importance == NotificationManager.IMPORTANCE_NONE
-        theLoop@ run {
-            val tooLow = existing.importance < importance &&
-                    existing.importance != NotificationManager.IMPORTANCE_UNSPECIFIED
-            val renamed = existing.name?.toString() != name
-            if (blocked || tooLow || renamed) {
-                runCatching { nm.deleteNotificationChannel(id) }
-                nm.createNotificationChannel(
-                    NotificationChannel(id, name, importance).apply {
-                        description = name
-                        setShowBadge(false)
-                        lockscreenVisibility = Notification.VISIBILITY_PRIVATE
-                    }
-                )
-            }
+        val tooLow = existing.importance < importance &&
+                existing.importance != NotificationManager.IMPORTANCE_UNSPECIFIED
+        val renamed = existing.name?.toString() != name
+        if (blocked || tooLow || renamed) {
+            runCatching { nm.deleteNotificationChannel(id) }
+            nm.createNotificationChannel(
+                NotificationChannel(id, name, importance).apply {
+                    description = name
+                    setShowBadge(false)
+                    lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+                }
+            )
         }
     }
 
+    /** Startet den Ticker-Loop (1 Hz), berechnet Restzeit, triggert Fade/Notifs/Widget-Update. */
     private fun startTickerIfNeeded() {
         if (tickerJob?.isActive == true) return
         tickerJob = serviceScope.launch {
@@ -211,6 +226,7 @@ class TimerEngineService : Service() {
                     return@launch
                 }
 
+                // Shake-Detector je nach Einstellung aktivieren
                 val shakeEnabled = SettingsPreferenceHelper.getShakeEnabled(ctx).first()
                 if (shakeEnabled) {
                     val shakeStrength = SettingsPreferenceHelper.getShakeStrength(ctx).first()
@@ -231,7 +247,7 @@ class TimerEngineService : Service() {
 
                 if (stopAudio && fadeSec > 0) {
                     if (remaining <= thresholdMs && !fadeStarted) {
-                        // Start Fade ONLY (keine Pause)
+                        // Fade einleiten (Pause + Stop erfolgt separat am Ende)
                         startServiceSafe(
                             Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_AND_STOP)
                         )
@@ -253,13 +269,16 @@ class TimerEngineService : Service() {
                     }
                 }
 
+                // App-weite Tick-Broadcasts (z. B. für UI)
                 sendBroadcast(Intent(TimerContracts.ACTION_TICK).apply {
                     putExtra(TimerContracts.EXTRA_TOTAL_MS, totalMs)
                     putExtra(TimerContracts.EXTRA_REMAINING_MS, remaining)
                 })
 
+                // Benachrichtigung + Widget updaten
                 sendRunningUpdateNow()
                 requestWidgetUpdate()
+
                 if (remaining <= 0L) {
                     onTimerFinished()
                     return@launch
@@ -270,6 +289,7 @@ class TimerEngineService : Service() {
         }
     }
 
+    /** Startet/aktualisiert ShakeDetector im Service-Kontext. */
     private fun ensureServiceShakeDetector(enabled: Boolean, strength: Int) {
         if (enabled) {
             if (shakeDetector == null) {
@@ -278,7 +298,7 @@ class TimerEngineService : Service() {
                     context = applicationContext,
                     strengthPercent = strength,
                     onShake = { serviceScope.launch { onShakeTriggered() } },
-                    cooldownMs = 3000L,
+                    cooldownMs = SHAKE_COOLDOWN_MS,
                     hitsToTrigger = 1,
                     overFactor = 1.0f
                 ).also { it.start() }
@@ -297,6 +317,8 @@ class TimerEngineService : Service() {
         val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
         val enabled = SettingsPreferenceHelper.getShakeEnabled(ctx).first()
         if (!running || !enabled) return
+
+        // Aktivierungsfenster prüfen
         val mode = SettingsPreferenceHelper.getShakeActivationMode(ctx).first()
         val delayMin = SettingsPreferenceHelper.getShakeActivationDelayMinutes(ctx).first()
         val start = TimerPreferenceHelper.getTimerStartTime(ctx).first()
@@ -306,11 +328,15 @@ class TimerEngineService : Service() {
             else -> true
         }
         if (!isActive) return
+
         val extendBy = SettingsPreferenceHelper.getShakeExtendMinutes(ctx).first()
         extendTimerBy(extendBy)
+
+        // Audiofeedback
         val soundMode = SettingsPreferenceHelper.getShakeSoundMode(ctx).first()
         val uri  = SettingsPreferenceHelper.getShakeRingtone(ctx).first()
         playShakeFeedback(soundMode, uri)
+
         shakeCooldownUntil = now + SHAKE_COOLDOWN_MS
     }
 
@@ -319,6 +345,7 @@ class TimerEngineService : Service() {
         val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
         val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
         if (!running || start == 0L) return
+
         val minutes = TimerPreferenceHelper.getTimer(ctx).first()
         val now       = System.currentTimeMillis()
         val elapsed   = now - start
@@ -355,7 +382,7 @@ class TimerEngineService : Service() {
                     }
                 } catch (_: Throwable) { /* ignore */ }
             }
-            "silent" -> { }
+            "silent" -> { /* no-op */ }
             else -> {
                 try {
                     shakeRingtone?.stop()
@@ -409,24 +436,17 @@ class TimerEngineService : Service() {
         tickerJob = null
         val ctx = applicationContext
 
-        val base = runCatching { kotlinx.coroutines.runBlocking {
-            TimerPreferenceHelper.getTimerUserBase(ctx).first()
-        } }.getOrDefault(0)
+        val base = runCatching { kotlinx.coroutines.runBlocking { TimerPreferenceHelper.getTimerUserBase(ctx).first() } }.getOrDefault(0)
         val cached = lastStartMinutesCache
-        val current = runCatching { kotlinx.coroutines.runBlocking {
-            TimerPreferenceHelper.getTimer(ctx).first()
-        } }.getOrDefault(5)
+        val current = runCatching { kotlinx.coroutines.runBlocking { TimerPreferenceHelper.getTimer(ctx).first() } }.getOrDefault(5)
         val fallback = (if (base > 0) base else (cached ?: current)).coerceAtLeast(1)
-        kotlinx.coroutines.runBlocking {
-            TimerPreferenceHelper.stopTimer(ctx, fallback)
-        }
+
+        kotlinx.coroutines.runBlocking { TimerPreferenceHelper.stopTimer(ctx, fallback) }
 
         // Audio-Fade aufräumen
         if (!timerFinished) {
             // Manuell gestoppt: Fade abbrechen und Lautstärke wiederherstellen
-            runCatching {
-                startServiceSafe(Intent(applicationContext, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE))
-            }
+            runCatching { startServiceSafe(Intent(applicationContext, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)) }
             runCatching { stopService(Intent(applicationContext, AudioFadeService::class.java)) }
         }
         fadeStarted = false
@@ -446,6 +466,7 @@ class TimerEngineService : Service() {
         stopSelf()
     }
 
+    /** Baut und liefert die laufende Fortschritts-Notification. */
     private fun buildRunningNotification(
         remainingMs: Long,
         totalMs: Long,
@@ -509,6 +530,7 @@ class TimerEngineService : Service() {
             .build()
     }
 
+    /** Aktualisiert die Fortschritts-Notification sofort. */
     private fun sendRunningUpdateNow() {
         serviceScope.launch {
             val ctx = applicationContext
@@ -516,16 +538,14 @@ class TimerEngineService : Service() {
             val startTime = TimerPreferenceHelper.getTimerStartTime(ctx).first()
             val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
             if (!running || startTime <= 0L || minutes < 1) return@launch
-            val notificationsEnabled = runCatching {
-                SettingsPreferenceHelper.getNotificationEnabled(ctx).first()
-            }.getOrDefault(true)
-            val showProgress = runCatching {
-                SettingsPreferenceHelper.getShowProgressNotification(ctx).first()
-            }.getOrDefault(true)
+
+            val notificationsEnabled = runCatching { SettingsPreferenceHelper.getNotificationEnabled(ctx).first() }.getOrDefault(true)
+            val showProgress = runCatching { SettingsPreferenceHelper.getShowProgressNotification(ctx).first() }.getOrDefault(true)
             if (!(notificationsEnabled && showProgress)) {
                 try { getSystemService(NotificationManager::class.java).cancel(NOTIF_ID_RUNNING) } catch (_: Throwable) {}
                 return@launch
             }
+
             val totalMs   = minutes * 60_000L
             val remaining = (totalMs - (System.currentTimeMillis() - startTime)).coerceAtLeast(0)
             startServiceSafe(
@@ -544,8 +564,7 @@ class TimerEngineService : Service() {
             val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
             if (!running || start == 0L) return@launch
             val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
-            val extend    = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }
-                .getOrDefault(5).coerceAtLeast(1)
+            val extend    = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }.getOrDefault(5).coerceAtLeast(1)
             val now       = System.currentTimeMillis()
             val elapsed   = now - start
             val totalMs   = minutes * 60_000L
@@ -563,8 +582,7 @@ class TimerEngineService : Service() {
             val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
             if (!running || start == 0L) return@launch
             val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
-            val step      = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }
-                .getOrDefault(5).coerceAtLeast(1)
+            val step      = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }.getOrDefault(5).coerceAtLeast(1)
             val now       = System.currentTimeMillis()
             val elapsed   = now - start
             val totalMs   = minutes * 60_000L
@@ -579,16 +597,9 @@ class TimerEngineService : Service() {
     private fun disableBluetooth() {
         kotlin.runCatching {
             val ctx = applicationContext
-            val requested = kotlinx.coroutines.runBlocking {
-                SettingsPreferenceHelper
-                    .getBluetoothDisableRequested(ctx)
-                    .first()
-            }
+            val requested = kotlinx.coroutines.runBlocking { SettingsPreferenceHelper.getBluetoothDisableRequested(ctx).first() }
             if (requested && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
-                val intent = Intent(
-                    ctx,
-                    BluetoothService::class.java
-                ).setAction(BluetoothService.ACTION_DISABLE_BT)
+                val intent = Intent(ctx, BluetoothService::class.java).setAction(BluetoothService.ACTION_DISABLE_BT)
                 ctx.startService(intent)
             }
         }
@@ -597,24 +608,17 @@ class TimerEngineService : Service() {
     private fun disableWifi() {
         kotlin.runCatching {
             val ctx = applicationContext
-            val requested = kotlinx.coroutines.runBlocking {
-                SettingsPreferenceHelper
-                    .getWifiDisableRequested(ctx)
-                    .first()
-            }
+            val requested = kotlinx.coroutines.runBlocking { SettingsPreferenceHelper.getWifiDisableRequested(ctx).first() }
             if (requested && android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
                 WifiControlService.start(ctx)
             }
         }
     }
 
+    /** Startet einen Service „sicher“ (schluckt Exceptions, kein FGS-Zwang). */
     private fun startServiceSafe(intent: Intent) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startService(intent)
-            } else {
-                startService(intent)
-            }
+            startService(intent)
         } catch (_: Throwable) { /* swallow to avoid crash */ }
     }
 
@@ -626,31 +630,24 @@ class TimerEngineService : Service() {
         return ch.importance != NotificationManager.IMPORTANCE_NONE
     }
 
+    /**
+     * Aktualisiert NUR das 3x1-„TimerControlWidget“.
+     * Das frühere QuickStart-Widget ist entfernt.
+     */
     private fun requestWidgetUpdate() {
-        // QuickStart
-        val intent1 = Intent(this, com.tigonic.snoozely.widget.TimerQuickStartWidgetProvider::class.java).apply {
-            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            val awm = AppWidgetManager.getInstance(applicationContext)
-            val ids = awm.getAppWidgetIds(
-                android.content.ComponentName(applicationContext, com.tigonic.snoozely.widget.TimerQuickStartWidgetProvider::class.java)
-            )
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        val ctx = applicationContext
+        val awm = AppWidgetManager.getInstance(ctx)
+        val ids = awm.getAppWidgetIds(
+            ComponentName(ctx, com.tigonic.snoozely.widget.TimerControlWidgetProvider::class.java)
+        )
+        if (ids.isNotEmpty()) {
+            val intent = Intent(ctx, com.tigonic.snoozely.widget.TimerControlWidgetProvider::class.java).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            }
+            sendBroadcast(intent)
         }
-        sendBroadcast(intent1)
-
-        // Control (3x1)
-        val intent2 = Intent(this, com.tigonic.snoozely.widget.TimerControlWidgetProvider::class.java).apply {
-            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            val awm = AppWidgetManager.getInstance(applicationContext)
-            val ids = awm.getAppWidgetIds(
-                android.content.ComponentName(applicationContext, com.tigonic.snoozely.widget.TimerControlWidgetProvider::class.java)
-            )
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-        }
-        sendBroadcast(intent2)
     }
-
-
 
     private fun flagImmutable(): Int =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0

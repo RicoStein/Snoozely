@@ -61,6 +61,12 @@ private val BannerReserve       = 72.dp
 private const val TAG = "HomeScreenAds"
 private const val TEST_BANNER = "ca-app-pub-3940256099942544/6300978111"
 
+/**
+ * Home / Dashboard:
+ * - Einstiegspunkt der App
+ * - Zeigt ggf. Timer-Status und Navigation zu Kernfunktionen
+ * Hinweis: Dieser Screen ist exemplarisch; füge hier deine echte Home-UI ein.
+ */
 @SuppressLint("ContextCastToActivity")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

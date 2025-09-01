@@ -49,26 +49,25 @@ import kotlinx.coroutines.launch
 fun ShakeExtendSettingsScreen(
     onBack: () -> Unit,
     onNavigateShakeStrength: () -> Unit,
-    onPickSound: () -> Unit
+    onPickSound: () -> Unit // bleibt für künftige externe Picker, aktuell nutzen wir internen
 ) {
     val appCtx = LocalContext.current.applicationContext
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
 
+    // Settings State
     val enabled by SettingsPreferenceHelper.getShakeEnabled(appCtx).collectAsState(initial = false)
     val extendMin by SettingsPreferenceHelper.getShakeExtendMinutes(appCtx).collectAsState(initial = 10)
     val activationMode by SettingsPreferenceHelper.getShakeActivationMode(appCtx).collectAsState(initial = "immediate")
     val activationDelay by SettingsPreferenceHelper.getShakeActivationDelayMinutes(appCtx).collectAsState(initial = 3)
-
     val mode by SettingsPreferenceHelper.getShakeSoundMode(appCtx).collectAsState(initial = "tone")
     val ringtoneUriStr by SettingsPreferenceHelper.getShakeRingtone(appCtx).collectAsState(initial = "")
 
+    // Berechtigungen (für Ton-Auswahl ab Android 13 READ_MEDIA_AUDIO, darunter READ_EXTERNAL_STORAGE)
     val audioPermission =
-        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO
-        else Manifest.permission.READ_EXTERNAL_STORAGE
+        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
 
     var audioPermGranted by remember {
         mutableStateOf(
@@ -82,20 +81,24 @@ fun ShakeExtendSettingsScreen(
 
     fun ensureAudioPermission(onGranted: () -> Unit) {
         if (Build.VERSION.SDK_INT >= 33 && audioPermission == Manifest.permission.READ_EXTERNAL_STORAGE) {
+            // Ab T: READ_EXTERNAL_STORAGE ist obsolet für Audio; weiter ohne Prompt
             onGranted(); return
         }
         if (ContextCompat.checkSelfPermission(ctx, audioPermission) == PackageManager.PERMISSION_GRANTED) {
-            audioPermGranted = true; onGranted()
+            audioPermGranted = true
+            onGranted()
         } else {
             requestAudioPermLauncher.launch(audioPermission)
         }
     }
 
+    // System-Volume-Vorschau (Notification-Stream)
     val audioManager = remember { appCtx.getSystemService(AudioManager::class.java) }
     val maxVol = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION).coerceAtLeast(1) }
     val curVolStart = remember { audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION) }
     var sysVol by remember { mutableStateOf(curVolStart.toFloat() / maxVol) }
 
+    // Aktueller Klingeltontitel
     fun currentToneTitle(uriStr: String): String {
         if (uriStr.isEmpty()) return ctx.getString(R.string.silent)
         return runCatching {
@@ -105,6 +108,7 @@ fun ShakeExtendSettingsScreen(
     }
     var toneTitle by remember(ringtoneUriStr) { mutableStateOf(currentToneTitle(ringtoneUriStr)) }
 
+    // Ringtone Picker
     val ringtoneLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
@@ -122,6 +126,7 @@ fun ShakeExtendSettingsScreen(
             }
         }
     }
+
     fun openRingtonePicker() {
         if (!enabled) return
         ensureAudioPermission {
@@ -138,8 +143,8 @@ fun ShakeExtendSettingsScreen(
         }
     }
 
+    // Vorschau (Ton) und Vibration
     var preview: Ringtone? by remember { mutableStateOf(null) }
-
     fun chosenOrDefaultTone(): Uri? =
         if (ringtoneUriStr.isNotEmpty()) Uri.parse(ringtoneUriStr) else Settings.System.DEFAULT_NOTIFICATION_URI
 
@@ -187,14 +192,16 @@ fun ShakeExtendSettingsScreen(
                 @Suppress("DEPRECATION")
                 ctx.getSystemService(Vibrator::class.java)?.vibrate(600L)
             }
-        } catch (_: Throwable) { }
+        } catch (_: Throwable) { /* ignore */ }
     }
 
+    // Lifecycle für Preview stoppen und Startvolumen initialisieren
     DisposableEffect(Unit) { onDispose { runCatching { preview?.stop() } } }
     LaunchedEffect(Unit) {
         sysVol = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION).toFloat() / maxVol
     }
 
+    // UI-Farben & Alpha
     val sliderColors = SliderDefaults.colors(
         activeTrackColor = extra.slider,
         inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
@@ -202,15 +209,13 @@ fun ShakeExtendSettingsScreen(
         activeTickColor = Color.Transparent,
         inactiveTickColor = Color.Transparent
     )
-
     val sectionAlpha = if (enabled) 1f else 0.5f
 
-    // Dialog-UI State
+    // Dialog-State: Aktivierungsfenster
     var showActivationDialog by remember { mutableStateOf(false) }
     var draftMode by remember(activationMode) { mutableStateOf(activationMode) } // "immediate" | "after_start"
-    var draftDelay by remember(activationDelay) { mutableStateOf(activationDelay.coerceIn(1,30)) }
+    var draftDelay by remember(activationDelay) { mutableStateOf(activationDelay.coerceIn(1, 30)) }
 
-    // Label für aktuelle Auswahl
     val activationLabel = remember(activationMode, activationDelay) {
         if (activationMode == "after_start") {
             ctx.getString(R.string.shake_activation_after_start, activationDelay)
@@ -251,7 +256,7 @@ fun ShakeExtendSettingsScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // 1) Master
+                // 1) Master-Schalter
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -277,14 +282,14 @@ fun ShakeExtendSettingsScreen(
                 }
                 HorizontalDivider(color = extra.divider)
 
-                // NEU) Aktivierungsfenster
+                // 2) Aktivierungsfenster (Neu)
                 Spacer(Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .alpha(if (enabled) 1f else 0.5f)
                         .clickable(enabled = enabled) { showActivationDialog = true }
-                        .padding(vertical = 10.dp), // gleiche vertikale Padding wie bei den anderen Items
+                        .padding(vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -294,12 +299,11 @@ fun ShakeExtendSettingsScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = activationLabel, // z. B. „Sofort“ oder „3 min nach Start“
+                            text = activationLabel,
                             color = cs.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                    // Rechts das Icon, gleiche Farbe und vertikal mittig wie die Pfeile
                     IconButton(
                         enabled = enabled,
                         onClick = { showActivationDialog = true },
@@ -314,8 +318,7 @@ fun ShakeExtendSettingsScreen(
                 }
                 HorizontalDivider(color = extra.divider)
 
-
-                // 2) Schüttelkraft
+                // 3) Schüttelstärke
                 Spacer(Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
@@ -341,7 +344,7 @@ fun ShakeExtendSettingsScreen(
                 }
                 HorizontalDivider(color = extra.divider)
 
-                // 3) Verlängerungstimer
+                // 4) Verlängerungs-Minuten
                 Spacer(Modifier.height(6.dp))
                 Text(
                     stringResource(R.string.notifications_extend_title),
@@ -373,7 +376,7 @@ fun ShakeExtendSettingsScreen(
                 )
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = extra.divider)
 
-                // 4) Benachrichtigungston
+                // 5) Benachrichtigungston
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -394,7 +397,7 @@ fun ShakeExtendSettingsScreen(
                 }
                 HorizontalDivider(color = extra.divider)
 
-                // 5) Vibration
+                // 6) Vibration statt Ton
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -443,7 +446,7 @@ fun ShakeExtendSettingsScreen(
                 )
                 HorizontalDivider(color = extra.divider)
 
-                // 6) Lautstärke
+                // 7) Vorschau-Lautstärke
                 Text(
                     stringResource(R.string.notification_volume),
                     color = cs.onBackground,
@@ -501,7 +504,7 @@ fun ShakeExtendSettingsScreen(
 
             // MODAL: Aktivierungsfenster
             if (showActivationDialog) {
-                // Hintergrund abdunkeln
+                // Abdunkeln
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -512,6 +515,7 @@ fun ShakeExtendSettingsScreen(
                         ) { /* consume */ }
                 )
 
+                // Dialogoberfläche
                 Box(
                     modifier = Modifier
                         .fillMaxSize(),
@@ -537,7 +541,7 @@ fun ShakeExtendSettingsScreen(
                             )
                             Spacer(Modifier.height(8.dp))
 
-                            // Radio: Sofort
+                            // Sofort
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -553,7 +557,7 @@ fun ShakeExtendSettingsScreen(
                                 Text(stringResource(R.string.shake_activation_immediate), style = MaterialTheme.typography.bodyMedium)
                             }
 
-                            // Radio: Nach X Minuten
+                            // Nach X Minuten
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -570,25 +574,20 @@ fun ShakeExtendSettingsScreen(
                             }
 
                             if (draftMode == "after_start") {
-                                Spacer(Modifier.height(6.dp))
+                                Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = stringResource(R.string.shake_activation_after_start_value, draftDelay),
-                                    color = cs.onSurfaceVariant,
+                                    text = stringResource(R.string.shake_activation_delay_hint, draftDelay),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Slider(
                                     value = draftDelay.toFloat(),
-                                    onValueChange = { v ->
-                                        draftDelay = v.coerceIn(1f, 30f).toInt()
-                                    },
+                                    onValueChange = { v -> draftDelay = v.coerceIn(1f, 30f).toInt() },
                                     valueRange = 1f..30f,
                                     steps = 0,
                                     colors = SliderDefaults.colors(
                                         activeTrackColor = extra.slider,
                                         inactiveTrackColor = extra.slider.copy(alpha = 0.30f),
-                                        thumbColor = extra.slider,
-                                        activeTickColor = Color.Transparent,
-                                        inactiveTickColor = Color.Transparent
+                                        thumbColor = extra.slider
                                     ),
                                     modifier = Modifier.padding(horizontal = 4.dp)
                                 )
@@ -596,19 +595,28 @@ fun ShakeExtendSettingsScreen(
 
                             Spacer(Modifier.height(12.dp))
                             Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Button(onClick = {
-                                    scope.launch {
-                                        SettingsPreferenceHelper.setShakeActivationMode(appCtx, draftMode)
-                                        if (draftMode == "after_start") {
+                                OutlinedButton(
+                                    onClick = { showActivationDialog = false },
+                                    modifier = Modifier.weight(1f),
+                                    shape = MaterialTheme.shapes.extraLarge
+                                ) {
+                                    Text(stringResource(R.string.cancel))
+                                }
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            SettingsPreferenceHelper.setShakeActivationMode(appCtx, draftMode)
                                             SettingsPreferenceHelper.setShakeActivationDelayMinutes(appCtx, draftDelay)
                                         }
-                                    }
-                                    showActivationDialog = false
-                                }) {
-                                    Text(stringResource(R.string.close))
+                                        showActivationDialog = false
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = MaterialTheme.shapes.extraLarge
+                                ) {
+                                    Text(stringResource(R.string.save))
                                 }
                             }
                         }

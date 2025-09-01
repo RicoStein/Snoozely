@@ -125,6 +125,7 @@
     <string name="none">Kein Ton</string>
     <string name="unknown_tone">Unbekannter Ton</string>
     <string name="shake_extend_minutes_hint">Verlängerungsschritt: %1$d Minuten</string>
+    <string name="shake_activation_delay_hint">Nach %1$d Minuten nach Start aktiv</string>
 
     <!-- Shake Detail -->
     <string name="runtime">Laufzeit</string>
