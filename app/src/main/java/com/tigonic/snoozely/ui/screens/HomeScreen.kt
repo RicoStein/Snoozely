@@ -191,9 +191,6 @@ fun HomeScreen(
                                 scope.launch {
                                     val current = SettingsPreferenceHelper.getPremiumActive(appCtx).first()
                                     SettingsPreferenceHelper.setPremiumActive(appCtx, !current)
-                                    android.widget.Toast
-                                        .makeText(appCtx, if (!current) "Premium AN" else "Premium AUS", android.widget.Toast.LENGTH_SHORT)
-                                        .show()
                                 }
                             }
                         )
