@@ -235,7 +235,7 @@ fun SettingsScreen(
 
                 // -------- Screen / Admin --------
                 SettingsRow(
-                    icon = Icons.Default.Brightness2,
+                    icon = Icons.Default.ScreenLockPortrait,
                     title = stringResource(R.string.screen),
                     subtitle = if (isAdmin) stringResource(R.string.turn_off_screen) else stringResource(R.string.admin_permission_required),
                     checked = screenOff && isAdmin,
