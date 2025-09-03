@@ -24,8 +24,9 @@ import kotlinx.coroutines.launch
 class PremiumManager(
     context: Context,
     private val productInappId: String = BillingConfig.PREMIUM_INAPP,
-    private val productSubsId: String? = null,           // optional: falls Premium via Abo
-    private val onPremiumChanged: (Boolean) -> Unit = {} // Callback in deine App (setzt z. B. Preferences)
+    private val productSubsId: String? = null,
+    private val onPremiumChanged: (Boolean) -> Unit = {},
+    private val donationProductIds: List<String> = BillingConfig.DONATION_INAPPS
 ) : PurchasesUpdatedListener {
 
     private val appContext = context.applicationContext
@@ -35,6 +36,9 @@ class PremiumManager(
     private var productDetailsInapp: ProductDetails? = null
     private var productDetailsSubs: ProductDetails? = null
 
+    private val donationDetails = mutableMapOf<String, ProductDetails>()
+    val donationDetailsSnapshot: Map<String, ProductDetails> get() = donationDetails.toMap()
+
     private val _isPremium = MutableStateFlow(false)
     val isPremium = _isPremium.asStateFlow()
 
@@ -42,9 +46,8 @@ class PremiumManager(
         if (billingClient != null) return
         billingClient = BillingClient.newBuilder(appContext)
             .enablePendingPurchases(
-                PendingPurchasesParams
-                    .newBuilder()
-                    .enableOneTimeProducts()  // für Einmalkäufe (INAPP)
+                PendingPurchasesParams.newBuilder()
+                    .enableOneTimeProducts() // INAPP
                     .build()
             )
             .setListener(this)
@@ -59,9 +62,8 @@ class PremiumManager(
                     }
                 }
             }
-
             override fun onBillingServiceDisconnected() {
-                // Reconnect erfolgt beim nächsten Bedarf (z. B. bei launchPurchase/restoreEntitlements)
+                // Reconnect erfolgt beim nächsten Bedarf
             }
         })
     }
@@ -75,13 +77,13 @@ class PremiumManager(
         val client = billingClient ?: return
         val products = mutableListOf<QueryProductDetailsParams.Product>()
 
-        // INAPP (Einmalkauf)
+        // Premium INAPP
         products += QueryProductDetailsParams.Product.newBuilder()
             .setProductId(productInappId)
             .setProductType(BillingClient.ProductType.INAPP)
             .build()
 
-        // SUBS (optional)
+        // SUBS optional
         productSubsId?.let {
             products += QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(it)
@@ -89,20 +91,33 @@ class PremiumManager(
                 .build()
         }
 
+        // Spenden INAPPs
+        donationProductIds.forEach { pid ->
+            products += QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(pid)
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        }
+
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(products)
             .build()
 
-        val result = client.queryProductDetails(params) // suspend
+        val result = client.queryProductDetails(params)
+
         productDetailsInapp = result.productDetailsList?.firstOrNull { it.productId == productInappId }
         productDetailsSubs = result.productDetailsList?.firstOrNull { it.productId == productSubsId }
+
+        donationDetails.clear()
+        result.productDetailsList.orEmpty()
+            .filter { it.productType == BillingClient.ProductType.INAPP && donationProductIds.contains(it.productId) }
+            .forEach { donationDetails[it.productId] = it }
     }
 
     fun launchPurchase(activity: Activity, preferSubscription: Boolean = false) {
         val client = billingClient ?: return
 
-        // Falls ProductDetails noch nicht geladen sind (z. B. schneller Klick), versuche neu zu laden.
-        if (productDetailsInapp == null && productSubsId != null && productDetailsSubs == null) {
+        if (productDetailsInapp == null && (productSubsId == null || productDetailsSubs == null)) {
             scope.launch { queryProductDetails() }
         }
 
@@ -118,7 +133,21 @@ class PremiumManager(
                     val offerToken = pd.subscriptionOfferDetails?.firstOrNull()?.offerToken
                     if (offerToken != null) setOfferToken(offerToken)
                 }
-            }
+            }.build()
+
+        val flowParams = BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(listOf(productParams))
+            .build()
+
+        client.launchBillingFlow(activity, flowParams)
+    }
+
+    fun launchDonation(activity: Activity, productId: String) {
+        val client = billingClient ?: return
+        val pd = donationDetails[productId] ?: return
+
+        val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
+            .setProductDetails(pd)
             .build()
 
         val flowParams = BillingFlowParams.newBuilder()
@@ -130,24 +159,20 @@ class PremiumManager(
 
     override fun onPurchasesUpdated(result: BillingResult, purchases: MutableList<Purchase>?) {
         when (result.responseCode) {
-            BillingClient.BillingResponseCode.OK -> {
-                purchases?.forEach { handlePurchase(it) }
-            }
-            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
-                // Falls Nutzer bereits gekauft hat, Rechte wiederherstellen.
-                restoreEntitlements()
-            }
-            else -> {
-                // Cancel/Fehler: nichts tun
-            }
+            BillingClient.BillingResponseCode.OK -> purchases?.forEach { handlePurchase(it) }
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> restoreEntitlements()
+            else -> { /* cancel/fehler */ }
         }
     }
 
     private fun handlePurchase(purchase: Purchase) {
         if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) return
 
-        // Optional: Serverseitige Verifikation (nicht enthalten)
-        grantPremium(true)
+        // Premium freischalten, wenn Premium-Produkt dabei ist
+        if (purchase.products.contains(productInappId)) {
+            grantPremium(true)
+        }
+        // Spenden: keine Feature-Änderung (optional: Danke-Logik)
 
         if (!purchase.isAcknowledged) {
             val params = AcknowledgePurchaseParams.newBuilder()
@@ -195,7 +220,9 @@ class PremiumManager(
     }
 
     object BillingConfig {
-        const val PREMIUM_INAPP = "snoozely_premium"          // Deine INAPP-ID (Play Console)
-        const val PREMIUM_SUBS = "premium_subscription"     // SUBS-ID (falls genutzt)
+        const val PREMIUM_INAPP = "snoozely_premium"
+        const val PREMIUM_SUBS = "premium_subscription"
+        // Passe die IDs an deine Play-Console-Produkte an:
+        val DONATION_INAPPS = listOf("snoozely_donate_small", "snoozely_donate_medium", "snoozely_donate_large", "snoozely_donate_extra")
     }
 }

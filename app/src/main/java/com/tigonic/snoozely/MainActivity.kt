@@ -32,6 +32,7 @@ import com.tigonic.snoozely.ads.InterstitialManager
 import com.tigonic.snoozely.core.premium.PremiumManager
 import com.tigonic.snoozely.service.TimerEngineService
 import com.tigonic.snoozely.ui.NotificationSettingsScreen
+import com.tigonic.snoozely.ui.components.DonationUiItem
 import com.tigonic.snoozely.ui.components.PremiumPaywallDialog
 import com.tigonic.snoozely.ui.screens.HomeScreen
 import com.tigonic.snoozely.ui.screens.SettingsScreen
@@ -48,12 +49,6 @@ import kotlinx.coroutines.launch
 private const val TAG_ADS = "MainActivityAds"
 private const val TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/1033173712"
 
-/**
- * App-Einstieg/Navigation:
- * - Initialisiert Ads/Consent, PremiumManager und Themes
- * - Hält InterstitialManager konditioniert auf Consent/Premium bereit
- * - Startet TimerEngineService neu, falls Timer im Hintergrund bereits läuft
- */
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
@@ -67,13 +62,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var premiumManager: PremiumManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Google Mobile Ads
         MobileAds.initialize(this) { Log.d(TAG_ADS, "MobileAds.initialize completed") }
 
         installSplashScreen().apply { setKeepOnScreenCondition { viewModel.isLoading.value } }
         super.onCreate(savedInstanceState)
 
-        // Ersteinrichtungs-Dialog für Akku-Optimierungen (nur einmal)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             lifecycleScope.launch {
                 val handled = SettingsPreferenceHelper.getBatteryOptPromptHandled(applicationContext).first()
@@ -110,25 +103,22 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            // Theme
             val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
             val dynamic by SettingsPreferenceHelper.getThemeDynamic(this).collectAsState(initial = true)
 
-            // Premium/Ads
             val premium by SettingsPreferenceHelper.getPremiumActive(this).collectAsState(initial = false)
             val consentResolved by SettingsPreferenceHelper.getAdsConsentResolved(this).collectAsState(initial = false)
             val consentType by SettingsPreferenceHelper.getAdsConsentType(this).collectAsState(initial = "Unknown")
 
             nonPersonalized = (consentType == "NonPersonalized") || (consentType == "NoAds")
 
-            // Ads nur zeigen, wenn kein Premium und Consent für Ads vorliegt
+            // Produktive Gate-Logik: keine Ads bei Premium, Consent erforderlich
             isAdsAllowed = !premium && consentResolved && (
                     consentType == "Personalized" ||
                             consentType == "NonPersonalized"
-                    // Optional nur in Debug/Tests: (BuildConfig.ADGATE_ALLOW_NOADS_IN_DEBUG && consentType == "NoAds")
                     )
 
-            // InterstitialManager lazy initialisieren und „vorwärmen“
+            // Interstitial-Manager initialisieren
             LaunchedEffect(isAdsAllowed, nonPersonalized) {
                 if (isAdsAllowed) {
                     if (interstitialManager == null) {
@@ -196,17 +186,20 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (showPaywall) {
+                        val donationItems by remember {
+                            mutableStateOf(buildDonationUi(premiumManager))
+                        }
                         PremiumPaywallDialog(
-                            isPremium = premium, // zeigt Spendenbereich bei aktivem Premium
+                            isPremium = premium,
                             onClose = { showPaywall = false },
                             onPurchase = {
                                 premiumManager.launchPurchase(this@MainActivity)
                                 showPaywall = false
                             },
-                            onDonateClick = {
-                                val url = "https://buymeacoffee.com/DEIN_LINK" // TODO: eigene URL
-                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                            }
+                            onDonateProduct = { productId ->
+                                premiumManager.launchDonation(this@MainActivity, productId)
+                            },
+                            donationProducts = donationItems
                         )
                     }
                 }
@@ -218,27 +211,32 @@ class MainActivity : ComponentActivity() {
             productInappId = PremiumManager.BillingConfig.PREMIUM_INAPP,
             productSubsId = null,
             onPremiumChanged = { isPremium ->
-                lifecycleScope.launch { SettingsPreferenceHelper.setPremiumActive(applicationContext, isPremium) }
-            }
+                lifecycleScope.launch {
+                    SettingsPreferenceHelper.setPremiumActive(applicationContext, isPremium)
+                }
+            },
+            donationProductIds = PremiumManager.BillingConfig.DONATION_INAPPS
         )
         premiumManager.start()
     }
 
-    /**
-     * Zeigt (zufällig) Interstitial und ruft danach die Aktion auf.
-     */
+    private fun buildDonationUi(manager: PremiumManager): List<DonationUiItem> {
+        // Reihenfolge gemäß BillingConfig.DONATION_INAPPS
+        return PremiumManager.BillingConfig.DONATION_INAPPS.map { pid ->
+            val pd = manager.donationDetailsSnapshot[pid]
+            val price = pd?.oneTimePurchaseOfferDetails?.formattedPrice ?: "—"
+            DonationUiItem(pid, price)
+        }
+    }
+
     fun showInterstitialThenStart(onAfter: () -> Unit) {
         val roll = (1..100).random()
         val shouldShowAd = isAdsAllowed && roll > 70
-        android.util.Log.d("Interstitial", "randomRoll=$roll shouldShowAd=$shouldShowAd")
-
         val manager = interstitialManager
         if (!shouldShowAd || manager == null) {
             onAfter(); return
         }
-
         manager.showOrFallback {
-            android.util.Log.d("Interstitial", "After/fallback -> start now")
             onAfter()
         }
         manager.warmPreload(nonPersonalized = nonPersonalized)
@@ -253,9 +251,6 @@ class MainActivity : ComponentActivity() {
         intent?.let { if (it.getBooleanExtra("showPaywall", false)) this.showPaywall = true }
     }
 
-    /**
-     * Falls TimerStatus „running“: Engine-Service im Vordergrund starten (z. B. nach App-Neustart).
-     */
     private suspend fun maybeStartEngineIfTimerRunning() {
         val ctx = applicationContext
         val running = TimerPreferenceHelper.getTimerRunning(ctx).first()

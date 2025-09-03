@@ -16,13 +16,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.tigonic.snoozely.R
 
+data class DonationUiItem(
+    val productId: String,
+    val priceText: String
+)
+
 @Composable
 fun PremiumPaywallDialog(
     isPremium: Boolean = false,
     onClose: () -> Unit,
     onPurchase: () -> Unit,
-    onDonate: (Int) -> Unit = {},
-    onDonateClick: (() -> Unit)? = null
+    onDonateProduct: (String) -> Unit,
+    donationProducts: List<DonationUiItem> = emptyList()
 ) {
     val cs = MaterialTheme.colorScheme
 
@@ -67,7 +72,6 @@ fun PremiumPaywallDialog(
                 }
 
                 if (!isPremium) {
-                    // Kauf-CTA
                     Button(
                         onClick = onPurchase,
                         modifier = Modifier.fillMaxWidth(),
@@ -78,48 +82,38 @@ fun PremiumPaywallDialog(
                         Text(stringResource(R.string.premium_buy_with_google_play))
                     }
                 } else {
-                    // Spendenbereich
-                    OutlinedCard(
-                        colors = CardDefaults.outlinedCardColors(containerColor = cs.surface),
-                        shape = MaterialTheme.shapes.large,
-                        border = CardDefaults.outlinedCardBorder()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Filled.Favorite,
-                                    contentDescription = null,
-                                    tint = cs.onSurfaceVariant
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = stringResource(R.string.donate_title),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = cs.onSurface
-                                )
-                            }
-                            Text(
-                                text = stringResource(R.string.premium_thanks),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = cs.onSurfaceVariant
-                            )
-                            Button(
-                                onClick = { onDonateClick?.invoke() ?: onDonate(0) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.extraLarge
-                            ) {
-                                Text(stringResource(R.string.donate))
-                            }
+                    Text(
+                        text = stringResource(R.string.donate_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = cs.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.premium_thanks),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = cs.onSurfaceVariant
+                    )
+
+                    val items = donationProducts.take(4).ifEmpty {
+                        listOf(
+                            DonationUiItem("snoozely_donate_small", "€0,99"),
+                            DonationUiItem("snoozely_donate_medium", "€2,99"),
+                            DonationUiItem("snoozely_donate_large", "€4,99"),
+                            DonationUiItem("snoozely_donate_extra", "€9,99")
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            DonationButton(items[0], onDonateProduct, Modifier.weight(1f))
+                            DonationButton(items[1], onDonateProduct, Modifier.weight(1f))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            DonationButton(items[2], onDonateProduct, Modifier.weight(1f))
+                            DonationButton(items[3], onDonateProduct, Modifier.weight(1f))
                         }
                     }
                 }
 
-                // Schließen
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -133,5 +127,22 @@ fun PremiumPaywallDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DonationButton(
+    item: DonationUiItem,
+    onDonateProduct: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = { onDonateProduct(item.productId) },
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraLarge
+    ) {
+        Icon(Icons.Filled.Favorite, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(item.priceText)
     }
 }
