@@ -144,7 +144,9 @@ class AudioFadeService : Service() {
 
             // Ton auf 0, dann Pause, dann wiederherstellen
             setVolume(0)
+            kotlinx.coroutines.delay(500L)
             sendMediaPauseCommand()
+            kotlinx.coroutines.delay(500L)
             setVolume(backupOriginal)
             Log.d(TAG, "Finalize done: media paused, volume restored to $backupOriginal")
         } catch (t: Throwable) {
