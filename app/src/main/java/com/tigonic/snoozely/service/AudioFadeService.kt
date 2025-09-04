@@ -11,14 +11,28 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
+/**
+ * Service zum sanften Herunterregeln (Fade) der Medienlautstärke und
+ * finalem Pausieren der Wiedergabe mit sauberem Restore.
+ *
+ * Actions:
+ * - ACTION_FADE_AND_STOP: startet NUR den Fade (kein Pause/Restore)
+ * - ACTION_CANCEL_FADE  : bricht Fade ab und regelt Lautstärke sanft wieder hoch
+ * - ACTION_FADE_FINALIZE: setzt Volume=0 -> (kleine Warte) -> Pause -> (kleine Warte) -> Volume Restore
+ */
 class AudioFadeService : Service() {
 
     companion object {
         private const val TAG = "AudioFadeService"
-        // Bestehende Actions weiterverwenden
-        const val ACTION_FADE_AND_STOP = "com.tigonic.snoozely.action.FADE_AND_STOP" // hier: Fade ONLY (ohne Stop)
-        const val ACTION_CANCEL_FADE = "com.tigonic.snoozely.action.CANCEL_FADE"
+
+        // Bestehende IDs beibehalten (kompatibel zu Aufrufern)
+        const val ACTION_FADE_AND_STOP = "com.tigonic.snoozely.action.FADE_AND_STOP" // Fade ONLY
+        const val ACTION_CANCEL_FADE   = "com.tigonic.snoozely.action.CANCEL_FADE"
         const val ACTION_FADE_FINALIZE = "com.tigonic.snoozely.action.FADE_FINALIZE" // Pause + Restore
+
+        private const val RAMP_UP_MS_DEFAULT = 600L
+        private const val FINALIZE_DELAY_BEFORE_PAUSE_MS = 500L
+        private const val FINALIZE_DELAY_AFTER_PAUSE_MS  = 500L
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -37,7 +51,7 @@ class AudioFadeService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_FADE_AND_STOP -> {
-                // Bedeutet hier: Fade ONLY (nicht pausieren); Pause erfolgt bei Timer-Ende via ACTION_FADE_FINALIZE
+                // Fade ONLY; Finalisierung erfolgt separat (siehe FINALIZE)
                 serviceScope.launch { startFadeOnly() }
             }
             ACTION_CANCEL_FADE -> {
@@ -45,6 +59,9 @@ class AudioFadeService : Service() {
             }
             ACTION_FADE_FINALIZE -> {
                 serviceScope.launch { finalizePauseAndRestore() }
+            }
+            else -> {
+                Log.d(TAG, "Unknown action=${intent?.action}")
             }
         }
         return START_NOT_STICKY
@@ -61,11 +78,10 @@ class AudioFadeService : Service() {
 
         // Ursprungslautstärke nur einmal merken
         if (originalVolume < 0) {
-            originalVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            originalVolume = getCurrentVolume()
         }
 
-        val startVol = (originalVolume.takeIf { it >= 0 } ?: audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
-            .coerceAtLeast(0)
+        val startVol = (originalVolume.takeIf { it >= 0 } ?: getCurrentVolume()).coerceAtLeast(0)
 
         isFading = true
         fadeJob = serviceScope.launch {
@@ -75,21 +91,20 @@ class AudioFadeService : Service() {
                     val totalMs = fadeDurationSec * 1000L
                     val delayPerStep = (totalMs / steps).coerceAtLeast(10L)
                     for (vol in startVol downTo 0) {
+                        ensureActive()
                         setVolume(vol)
                         delay(delayPerStep)
-                        if (!isActive) return@launch
                     }
                 } else {
                     setVolume(0)
                 }
-                // Wichtig: hier NICHT pausieren und NICHT Lautstärke zurücksetzen.
-                // Der Service bleibt aktiv, damit originalVolume erhalten bleibt, bis FINALIZE oder CANCEL kommt.
+                // Kein Pause/Restore hier; wir warten auf FINALIZE/CANCEL.
                 Log.d(TAG, "Fade finished (no pause). Waiting for finalize or cancel.")
             } catch (t: Throwable) {
                 Log.e(TAG, "Error during fade", t)
             } finally {
                 isFading = false
-                // Service bewusst NICHT beenden, wir warten auf FINALIZE/CANCEL.
+                // Service bewusst NICHT beenden: wir warten auf FINALIZE/CANCEL.
             }
         }
     }
@@ -100,25 +115,24 @@ class AudioFadeService : Service() {
         fadeJob = null
         isFading = false
 
-        val target = originalVolume.takeIf { it >= 0 }
-            ?: audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val target = originalVolume.takeIf { it >= 0 } ?: getCurrentVolume()
+        val current = getCurrentVolume()
 
-        val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-
-        // Sanftes Hochregeln (400–800ms)
+        // Sanftes Hochregeln
         rampUpJob?.cancel()
         rampUpJob = serviceScope.launch {
             try {
-                val durationMs = 600L
+                val durationMs = RAMP_UP_MS_DEFAULT
                 val steps = (target - current).coerceAtLeast(1)
                 val stepDelay = if (steps > 0) (durationMs / steps) else 0L
                 for (vol in current..target) {
+                    ensureActive()
                     setVolume(vol)
                     if (stepDelay > 0) delay(stepDelay)
-                    if (!isActive) return@launch
                 }
-            } catch (_: Throwable) { /* ignore */ }
-            finally {
+            } catch (_: Throwable) {
+                // ignore
+            } finally {
                 // Reset State
                 originalVolume = -1
                 stopSelf()
@@ -131,7 +145,7 @@ class AudioFadeService : Service() {
         runCatching { fadeJob?.cancelAndJoin() }
         fadeJob = null
         isFading = false
-        // Ramp-Up abbrechen, falls noch aktiv (wir steuern gleich gezielt)
+        // Laufendes Ramp-Up abbrechen, falls aktiv
         runCatching { rampUpJob?.cancelAndJoin() }
         rampUpJob = null
 
@@ -139,14 +153,18 @@ class AudioFadeService : Service() {
             // Falls keine Ursprungslautstärke gemerkt war, aktuellen Wert sichern bevor wir auf 0 setzen
             var backupOriginal = originalVolume
             if (backupOriginal < 0) {
-                backupOriginal = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                backupOriginal = getCurrentVolume()
             }
 
-            // Ton auf 0, dann Pause, dann wiederherstellen
+            // 1) Lautstärke auf 0
             setVolume(0)
-            kotlinx.coroutines.delay(500L)
+            // 2) kurze Wartezeit: ältere Player pausieren asynchron
+            delay(FINALIZE_DELAY_BEFORE_PAUSE_MS)
+            // 3) Pause senden
             sendMediaPauseCommand()
-            kotlinx.coroutines.delay(500L)
+            // 4) erneut kurz warten, bis Pause „greift“
+            delay(FINALIZE_DELAY_AFTER_PAUSE_MS)
+            // 5) Lautstärke wiederherstellen
             setVolume(backupOriginal)
             Log.d(TAG, "Finalize done: media paused, volume restored to $backupOriginal")
         } catch (t: Throwable) {
@@ -157,9 +175,13 @@ class AudioFadeService : Service() {
         }
     }
 
+    private fun getCurrentVolume(): Int =
+        try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Throwable) { 0 }
+
     private fun setVolume(volume: Int) {
         try {
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume.coerceAtLeast(0), 0)
+            val v = volume.coerceAtLeast(0)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set volume", e)
         }
@@ -167,12 +189,20 @@ class AudioFadeService : Service() {
 
     private fun sendMediaPauseCommand() {
         try {
-            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
-            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
-            audioManager.dispatchMediaKeyEvent(downEvent)
-            audioManager.dispatchMediaKeyEvent(upEvent)
+            // Bevorzugt: explizites Pause-Event
+            val downPause = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
+            val upPause   = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,   android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
+            audioManager.dispatchMediaKeyEvent(downPause)
+            audioManager.dispatchMediaKeyEvent(upPause)
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to send media pause command", t)
+            Log.w(TAG, "Failed MEDIA_PAUSE, try PLAY_PAUSE fallback", t)
+            // Fallback für Player, die nur Play/Pause-Toggle verstehen
+            runCatching {
+                val down = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                val up   = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,   android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                audioManager.dispatchMediaKeyEvent(down)
+                audioManager.dispatchMediaKeyEvent(up)
+            }
         }
     }
 
@@ -182,7 +212,6 @@ class AudioFadeService : Service() {
         fadeJob = null
         rampUpJob = null
         isFading = false
-        // Kein automatisches Restore hier (wird durch CANCEL oder FINALIZE gemacht)
         serviceScope.cancel()
         super.onDestroy()
     }
