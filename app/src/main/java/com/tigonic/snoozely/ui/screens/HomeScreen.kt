@@ -356,7 +356,7 @@ fun HomeScreen(
                         .zIndex(1f)
                 ) {
                     HomeBanner(
-                        isAdsAllowed = true,
+                        isAdsAllowed = adsGateIsAllowed,
                         adUnitId = TEST_BANNER,
                         nonPersonalized = adsGateIsNonPersonalized
                     )

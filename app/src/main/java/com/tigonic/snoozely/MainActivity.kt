@@ -110,13 +110,17 @@ class MainActivity : ComponentActivity() {
             val consentResolved by SettingsPreferenceHelper.getAdsConsentResolved(this).collectAsState(initial = false)
             val consentType by SettingsPreferenceHelper.getAdsConsentType(this).collectAsState(initial = "Unknown")
 
-            nonPersonalized = (consentType == "NonPersonalized") || (consentType == "NoAds")
+            //nonPersonalized = (consentType == "NonPersonalized") || (consentType == "NoAds")
 
             // Produktive Gate-Logik: keine Ads bei Premium, Consent erforderlich
-            isAdsAllowed = !premium && consentResolved && (
+            /*isAdsAllowed = !premium && consentResolved && (
                     consentType == "Personalized" ||
                             consentType == "NonPersonalized"
                     )
+                    */
+
+            nonPersonalized = consentType != "Personalized"  // Fallback auf NPA
+            isAdsAllowed = !premium
 
             // Interstitial-Manager initialisieren
             LaunchedEffect(isAdsAllowed, nonPersonalized) {
