@@ -138,7 +138,8 @@ class TimerEngineService : Service() {
                 return START_REDELIVER_INTENT
             }
             TimerContracts.ACTION_STOP -> {
-                stopEverything(timerFinished = false)
+                // WICHTIG: nicht blockierend; alles in Coroutine erledigen
+                serviceScope.launch { stopEverything(timerFinished = false) }
                 return START_NOT_STICKY
             }
             else -> {
@@ -216,112 +217,116 @@ class TimerEngineService : Service() {
         if (tickerJob?.isActive == true) return
         tickerJob = serviceScope.launch {
             while (isActive) {
-                val ctx = applicationContext
-                val running   = TimerPreferenceHelper.getTimerRunning(ctx).first()
-                val startTime = TimerPreferenceHelper.getTimerStartTime(ctx).first()
-                val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
+                try {
+                    val ctx = applicationContext
+                    val running   = TimerPreferenceHelper.getTimerRunning(ctx).first()
+                    val startTime = TimerPreferenceHelper.getTimerStartTime(ctx).first()
+                    val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
 
-                if (!running || startTime <= 0L || minutes < 1) {
-                    stopEverything(timerFinished = false)
-                    return@launch
-                }
-
-                refreshForegroundBySettings()
-
-                // Shake-Detector je nach Einstellung aktivieren
-                val shakeEnabled = SettingsPreferenceHelper.getShakeEnabled(ctx).first()
-                if (shakeEnabled) {
-                    val shakeStrength = SettingsPreferenceHelper.getShakeStrength(ctx).first()
-                    ensureServiceShakeDetector(true, shakeStrength)
-                } else {
-                    ensureServiceShakeDetector(false, 0)
-                }
-
-                val totalMs   = minutes * 60_000L
-                val now       = System.currentTimeMillis()
-                val elapsed   = now - startTime
-                val remaining = (totalMs - elapsed).coerceAtLeast(0)
-
-                // Audio Fade Triggering
-                val stopAudio = runCatching { SettingsPreferenceHelper.getStopAudio(ctx).first() }.getOrDefault(true)
-                val fadeSec = runCatching { SettingsPreferenceHelper.getFadeOut(ctx).first().roundToInt() }.getOrDefault(30)
-                val thresholdMs = (fadeSec.coerceAtLeast(0) * 1000L)
-
-                if (stopAudio && fadeSec > 0) {
-                    if (remaining <= thresholdMs && !fadeStarted) {
-                        // Fade einleiten (Pause + Stop erfolgt separat am Ende)
-                        startServiceSafe(
-                            Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_AND_STOP)
-                        )
-                        fadeStarted = true
-                    } else if (fadeStarted && remaining > thresholdMs) {
-                        // Timer verlängert: Fade abbrechen und Lautstärke wieder hochregeln
-                        startServiceSafe(
-                            Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)
-                        )
-                        fadeStarted = false
-                    }
-                } else {
-                    // Stop-Audio deaktiviert -> laufenden Fade abbrechen
-                    if (fadeStarted) {
-                        startServiceSafe(
-                            Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)
-                        )
-                        fadeStarted = false
-                    }
-                }
-
-                // App-weite Tick-Broadcasts (z. B. für UI)
-                sendBroadcast(Intent(TimerContracts.ACTION_TICK).apply {
-                    putExtra(TimerContracts.EXTRA_TOTAL_MS, totalMs)
-                    putExtra(TimerContracts.EXTRA_REMAINING_MS, remaining)
-                })
-
-                // Benachrichtigung + Widget updaten
-                sendRunningUpdateNow()
-                requestWidgetUpdate()
-
-                if (remaining <= 0L) {
-                    onTimerFinished()
-                    return@launch
-                }
-
-
-                // Reminder prüfen und ggf. senden
-                val notificationsEnabled = runCatching {
-                    SettingsPreferenceHelper.getNotificationEnabled(ctx).first()
-                }.getOrDefault(false) // Default sicherheitshalber false (Settings-Default ist false)
-
-                val showReminder = runCatching {
-                    SettingsPreferenceHelper.getShowReminderPopup(ctx).first()
-                }.getOrDefault(false)
-
-                if (notificationsEnabled && showReminder && remaining > 0L) {
-                    val reminderMin = runCatching {
-                        SettingsPreferenceHelper.getReminderMinutes(ctx).first()
-                    }.getOrDefault(5).coerceAtLeast(1)
-
-                    val reminderThresholdMs = reminderMin * 60_000L
-
-                    // Optional: Re-Arm, wenn wieder deutlich über der Schwelle (z. B. > Schwelle + 5s)
-                    if (reminderSentForStartTime == startTime && remaining > reminderThresholdMs + 5_000L) {
-                        reminderSentForStartTime = -1L
+                    if (!running || startTime <= 0L || minutes < 1) {
+                        stopEverything(timerFinished = false)
+                        return@launch
                     }
 
-                    if (remaining <= reminderThresholdMs &&
-                        reminderSentForStartTime != startTime &&
-                        notificationsAllowedForChannel(TimerContracts.CHANNEL_REMINDER)
-                    ) {
-                        startServiceSafe(
-                            Intent(ctx, TimerNotificationService::class.java)
-                                .setAction(TimerContracts.ACTION_NOTIFY_REMINDER)
-                                .putExtra("reminderMinutes", reminderMin)
-                        )
-                        reminderSentForStartTime = startTime
-                    }
-                }
+                    // Foreground-State nach Settings ausrichten
+                    refreshForegroundBySettings()
 
-                delay(1000)
+                    // Shake-Detector je nach Einstellung aktivieren
+                    val shakeEnabled = SettingsPreferenceHelper.getShakeEnabled(ctx).first()
+                    if (shakeEnabled) {
+                        val shakeStrength = SettingsPreferenceHelper.getShakeStrength(ctx).first()
+                        ensureServiceShakeDetector(true, shakeStrength)
+                    } else {
+                        ensureServiceShakeDetector(false, 0)
+                    }
+
+                    val totalMs   = minutes * 60_000L
+                    val now       = System.currentTimeMillis()
+                    val elapsed   = now - startTime
+                    val remaining = (totalMs - elapsed).coerceAtLeast(0)
+
+                    // Audio-Fade Triggering
+                    val stopAudio = runCatching { SettingsPreferenceHelper.getStopAudio(ctx).first() }.getOrDefault(true)
+                    val fadeSec = runCatching { SettingsPreferenceHelper.getFadeOut(ctx).first().roundToInt() }.getOrDefault(30)
+                    val thresholdMs = (fadeSec.coerceAtLeast(0) * 1000L)
+
+                    if (stopAudio && fadeSec > 0) {
+                        if (remaining <= thresholdMs && !fadeStarted) {
+                            // Fade einleiten (Pause + Stop erfolgt separat am Ende)
+                            startServiceSafe(
+                                Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_AND_STOP)
+                            )
+                            fadeStarted = true
+                        } else if (fadeStarted && remaining > thresholdMs) {
+                            // Timer verlängert: Fade abbrechen und Lautstärke wieder hochregeln
+                            startServiceSafe(
+                                Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)
+                            )
+                            fadeStarted = false
+                        }
+                    } else {
+                        // Stop-Audio deaktiviert -> laufenden Fade abbrechen
+                        if (fadeStarted) {
+                            startServiceSafe(
+                                Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)
+                            )
+                            fadeStarted = false
+                        }
+                    }
+
+                    // App-weite Tick-Broadcasts (z. B. für UI)
+                    sendBroadcast(Intent(TimerContracts.ACTION_TICK).apply {
+                        putExtra(TimerContracts.EXTRA_TOTAL_MS, totalMs)
+                        putExtra(TimerContracts.EXTRA_REMAINING_MS, remaining)
+                    })
+
+                    // Benachrichtigung + Widget updaten
+                    sendRunningUpdateNow()
+                    requestWidgetUpdate()
+
+                    if (remaining <= 0L) {
+                        onTimerFinished()
+                        return@launch
+                    }
+
+                    // Reminder prüfen und ggf. senden
+                    val notificationsEnabled = runCatching {
+                        SettingsPreferenceHelper.getNotificationEnabled(ctx).first()
+                    }.getOrDefault(false)
+
+                    val showReminder = runCatching {
+                        SettingsPreferenceHelper.getShowReminderPopup(ctx).first()
+                    }.getOrDefault(false)
+
+                    if (notificationsEnabled && showReminder && remaining > 0L) {
+                        val reminderMin = runCatching {
+                            SettingsPreferenceHelper.getReminderMinutes(ctx).first()
+                        }.getOrDefault(5).coerceAtLeast(1)
+
+                        val reminderThresholdMs = reminderMin * 60_000L
+
+                        // Optional: Re-Arm, wenn wieder deutlich über der Schwelle
+                        if (reminderSentForStartTime == startTime && remaining > reminderThresholdMs + 5_000L) {
+                            reminderSentForStartTime = -1L
+                        }
+
+                        if (remaining <= reminderThresholdMs &&
+                            reminderSentForStartTime != startTime &&
+                            notificationsAllowedForChannel(TimerContracts.CHANNEL_REMINDER)
+                        ) {
+                            startServiceSafe(
+                                Intent(ctx, TimerNotificationService::class.java)
+                                    .setAction(TimerContracts.ACTION_NOTIFY_REMINDER)
+                                    .putExtra("reminderMinutes", reminderMin)
+                            )
+                            reminderSentForStartTime = startTime
+                        }
+                    }
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Ticker iteration failed", t)
+                } finally {
+                    delay(1000)
+                }
             }
         }
     }
@@ -459,26 +464,27 @@ class TimerEngineService : Service() {
     private fun onTimerFinished() {
         serviceScope.launch {
             val ctx = applicationContext
-            // Haptics / Screen lock
+            // ZUERST: Audio sauber pausieren und Volume restaurieren
+            startServiceSafe(Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_FINALIZE))
+            // DANN: Haptics / Screen lock
             startServiceSafe(Intent(ctx, HapticsService::class.java).setAction("END"))
             startServiceSafe(Intent(ctx, ScreenLockService::class.java))
-            // Jetzt erst: Pause und Lautstärke wiederherstellen
-            startServiceSafe(Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_FINALIZE))
+            // Aufräumen
             stopEverything(timerFinished = true)
         }
     }
 
-    private fun stopEverything(timerFinished: Boolean) {
+    private suspend fun stopEverything(timerFinished: Boolean) {
         tickerJob?.cancel()
         tickerJob = null
         val ctx = applicationContext
 
-        val base = runCatching { kotlinx.coroutines.runBlocking { TimerPreferenceHelper.getTimerUserBase(ctx).first() } }.getOrDefault(0)
+        val base = runCatching { TimerPreferenceHelper.getTimerUserBase(ctx).first() }.getOrDefault(0)
         val cached = lastStartMinutesCache
-        val current = runCatching { kotlinx.coroutines.runBlocking { TimerPreferenceHelper.getTimer(ctx).first() } }.getOrDefault(5)
+        val current = runCatching { TimerPreferenceHelper.getTimer(ctx).first() }.getOrDefault(5)
         val fallback = (if (base > 0) base else (cached ?: current)).coerceAtLeast(1)
 
-        kotlinx.coroutines.runBlocking { TimerPreferenceHelper.stopTimer(ctx, fallback) }
+        runCatching { TimerPreferenceHelper.stopTimer(ctx, fallback) }
 
         // Audio-Fade aufräumen
         if (!timerFinished) {
@@ -488,12 +494,12 @@ class TimerEngineService : Service() {
         }
         fadeStarted = false
 
-        try {
+        runCatching {
             getSystemService(NotificationManager::class.java).apply {
                 cancel(TimerNotificationService.NOTIFICATION_ID_RUNNING)
                 cancel(TimerNotificationService.NOTIFICATION_ID_REMINDER)
             }
-        } catch (_: Throwable) {}
+        }
 
         disableBluetooth()
         disableWifi()
@@ -595,59 +601,55 @@ class TimerEngineService : Service() {
         }
     }
 
-    private fun extendTimer() {
+    private suspend fun extendTimer() {
         val ctx = applicationContext
-        serviceScope.launch {
-            val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
-            val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
-            if (!running || start == 0L) return@launch
-            val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
-            val extend    = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }.getOrDefault(5).coerceAtLeast(1)
-            val now       = System.currentTimeMillis()
-            val elapsed   = now - start
-            val totalMs   = minutes * 60_000L
-            val remaining = (totalMs - elapsed).coerceAtLeast(0)
-            val newTotal   = remaining + extend * 60_000L
-            val newMinutes = (((newTotal) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
-            TimerPreferenceHelper.setTimer(ctx, newMinutes)
-        }
+        val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
+        val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
+        if (!running || start == 0L) return
+        val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
+        val extend    = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }.getOrDefault(5).coerceAtLeast(1)
+        val now       = System.currentTimeMillis()
+        val elapsed   = now - start
+        val totalMs   = minutes * 60_000L
+        val remaining = (totalMs - elapsed).coerceAtLeast(0)
+        val newTotal   = remaining + extend * 60_000L
+        val newMinutes = (((newTotal) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
+        TimerPreferenceHelper.setTimer(ctx, newMinutes)
     }
 
-    private fun reduceTimer() {
+    private suspend fun reduceTimer() {
         val ctx = applicationContext
-        serviceScope.launch {
-            val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
-            val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
-            if (!running || start == 0L) return@launch
-            val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
-            val step      = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }.getOrDefault(5).coerceAtLeast(1)
-            val now       = System.currentTimeMillis()
-            val elapsed   = now - start
-            val totalMs   = minutes * 60_000L
-            val remaining = (totalMs - elapsed).coerceAtLeast(0)
-            val newTotalMs = (remaining - step * 60_000L).coerceAtLeast(60_000L)
-            val newMinutes = (((newTotalMs) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
-            TimerPreferenceHelper.setTimer(ctx, newMinutes)
-            requestWidgetUpdate()
-        }
+        val running = TimerPreferenceHelper.getTimerRunning(ctx).first()
+        val start   = TimerPreferenceHelper.getTimerStartTime(ctx).first()
+        if (!running || start == 0L) return
+        val minutes   = TimerPreferenceHelper.getTimer(ctx).first()
+        val step      = runCatching { SettingsPreferenceHelper.getProgressExtendMinutes(ctx).first() }.getOrDefault(5).coerceAtLeast(1)
+        val now       = System.currentTimeMillis()
+        val elapsed   = now - start
+        val totalMs   = minutes * 60_000L
+        val remaining = (totalMs - elapsed).coerceAtLeast(0)
+        val newTotalMs = (remaining - step * 60_000L).coerceAtLeast(60_000L)
+        val newMinutes = (((newTotalMs) + elapsed) / 60_000L).toInt().coerceAtLeast(1)
+        TimerPreferenceHelper.setTimer(ctx, newMinutes)
+        requestWidgetUpdate()
     }
 
-    private fun disableBluetooth() {
-        kotlin.runCatching {
+    private suspend fun disableBluetooth() {
+        runCatching {
             val ctx = applicationContext
-            val requested = kotlinx.coroutines.runBlocking { SettingsPreferenceHelper.getBluetoothDisableRequested(ctx).first() }
-            if (requested && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            val requested = SettingsPreferenceHelper.getBluetoothDisableRequested(ctx).first()
+            if (requested && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 val intent = Intent(ctx, BluetoothService::class.java).setAction(BluetoothService.ACTION_DISABLE_BT)
                 ctx.startService(intent)
             }
         }
     }
 
-    private fun disableWifi() {
-        kotlin.runCatching {
+    private suspend fun disableWifi() {
+        runCatching {
             val ctx = applicationContext
-            val requested = kotlinx.coroutines.runBlocking { SettingsPreferenceHelper.getWifiDisableRequested(ctx).first() }
-            if (requested && android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+            val requested = SettingsPreferenceHelper.getWifiDisableRequested(ctx).first()
+            if (requested && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
                 WifiControlService.start(ctx)
             }
         }
@@ -671,24 +673,24 @@ class TimerEngineService : Service() {
     private suspend fun refreshForegroundBySettings() {
         val ctx = applicationContext
         val notificationsEnabled = runCatching {
-            com.tigonic.snoozely.util.SettingsPreferenceHelper.getNotificationEnabled(ctx).first()
+            SettingsPreferenceHelper.getNotificationEnabled(ctx).first()
         }.getOrDefault(false)
         val showProgress = runCatching {
-            com.tigonic.snoozely.util.SettingsPreferenceHelper.getShowProgressNotification(ctx).first()
+            SettingsPreferenceHelper.getShowProgressNotification(ctx).first()
         }.getOrDefault(false)
 
         val allowProgress = notificationsEnabled && showProgress
 
         if (allowProgress) {
             // Falls nicht schon FG: Foreground sicherstellen
-            ensureForegroundOnce()  // nutzt NOTIF_ID_RUNNING intern【10-9】
+            ensureForegroundOnce()
         } else {
             // Sofort aus Foreground aussteigen und sichtbare Notification weg
-            stopForegroundCompat()  // entfernt die FGS-Notification zuverlässig【10-9】
-            // Fallback: cancel, falls Gerät sich „zickig“ verhält (sollte nicht nötig sein)
+            stopForegroundCompat()
+            // Fallback: cancel
             try {
-                getSystemService(android.app.NotificationManager::class.java)
-                    .cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_RUNNING)
+                getSystemService(NotificationManager::class.java)
+                    .cancel(TimerNotificationService.NOTIFICATION_ID_RUNNING)
             } catch (_: Throwable) {}
         }
     }
