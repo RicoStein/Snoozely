@@ -37,6 +37,7 @@ import com.tigonic.snoozely.util.LocaleHelper
 import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
+import com.tigonic.snoozely.ui.components.AdminRemovalDialog
 
 /**
  * Einstellungen-Screen
@@ -264,21 +265,14 @@ fun SettingsScreen(
                 )
 
                 if (showRemoveAdminDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showRemoveAdminDialog = false },
-                        title = { Text(stringResource(R.string.remove_admin_title)) },
-                        text = { Text(stringResource(R.string.remove_admin_message)) },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    showRemoveAdminDialog = false
-                                    runCatching { dpm.removeActiveAdmin(admin) }
-                                    isAdmin = false
-                                    scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
-                                }
-                            ) { Text(stringResource(R.string.remove_admin_confirm_button)) }
-                        },
-                        dismissButton = { TextButton(onClick = { showRemoveAdminDialog = false }) { Text(stringResource(R.string.cancel)) } }
+                    com.tigonic.snoozely.ui.components.AdminRemovalDialog(
+                        onDismiss = { showRemoveAdminDialog = false },
+                        onConfirmRemove = {
+                            showRemoveAdminDialog = false
+                            runCatching { dpm.removeActiveAdmin(admin) }
+                            isAdmin = false
+                            scope.launch { SettingsPreferenceHelper.setScreenOff(app, false) }
+                        }
                     )
                 }
 
