@@ -226,6 +226,8 @@ class TimerEngineService : Service() {
                     return@launch
                 }
 
+                refreshForegroundBySettings()
+
                 // Shake-Detector je nach Einstellung aktivieren
                 val shakeEnabled = SettingsPreferenceHelper.getShakeEnabled(ctx).first()
                 if (shakeEnabled) {
@@ -577,6 +579,7 @@ class TimerEngineService : Service() {
             val notificationsEnabled = runCatching { SettingsPreferenceHelper.getNotificationEnabled(ctx).first() }.getOrDefault(true)
             val showProgress = runCatching { SettingsPreferenceHelper.getShowProgressNotification(ctx).first() }.getOrDefault(true)
             if (!(notificationsEnabled && showProgress)) {
+                stopForegroundCompat()
                 try { getSystemService(NotificationManager::class.java).cancel(NOTIF_ID_RUNNING) } catch (_: Throwable) {}
                 return@launch
             }
@@ -663,6 +666,31 @@ class TimerEngineService : Service() {
         if (!nm.areNotificationsEnabled()) return false
         val ch = nm.getNotificationChannel(id) ?: return true
         return ch.importance != NotificationManager.IMPORTANCE_NONE
+    }
+
+    private suspend fun refreshForegroundBySettings() {
+        val ctx = applicationContext
+        val notificationsEnabled = runCatching {
+            com.tigonic.snoozely.util.SettingsPreferenceHelper.getNotificationEnabled(ctx).first()
+        }.getOrDefault(false)
+        val showProgress = runCatching {
+            com.tigonic.snoozely.util.SettingsPreferenceHelper.getShowProgressNotification(ctx).first()
+        }.getOrDefault(false)
+
+        val allowProgress = notificationsEnabled && showProgress
+
+        if (allowProgress) {
+            // Falls nicht schon FG: Foreground sicherstellen
+            ensureForegroundOnce()  // nutzt NOTIF_ID_RUNNING intern【10-9】
+        } else {
+            // Sofort aus Foreground aussteigen und sichtbare Notification weg
+            stopForegroundCompat()  // entfernt die FGS-Notification zuverlässig【10-9】
+            // Fallback: cancel, falls Gerät sich „zickig“ verhält (sollte nicht nötig sein)
+            try {
+                getSystemService(android.app.NotificationManager::class.java)
+                    .cancel(com.tigonic.snoozely.service.TimerNotificationService.NOTIFICATION_ID_RUNNING)
+            } catch (_: Throwable) {}
+        }
     }
 
     /**
