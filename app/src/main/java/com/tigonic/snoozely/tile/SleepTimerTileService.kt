@@ -1,33 +1,54 @@
-// app/src/main/java/.../SleepTimerTileService.kt
 package com.tigonic.snoozely.tile
 
+import android.app.PendingIntent
 import android.content.Intent
-import android.service.quicksettings.Tile
+import android.os.Build
 import android.service.quicksettings.TileService
-import com.tigonic.snoozely.MainActivity // oder dein Entry-Activity
+import com.tigonic.snoozely.MainActivity
 
 class SleepTimerTileService : TileService() {
-
-    override fun onStartListening() {
-        super.onStartListening()
-        // Kachelzustand updaten (aktiv/inaktiv)
-        qsTile.state = Tile.STATE_INACTIVE
-        qsTile.label = "Snoozely"
-        qsTile.updateTile()
-    }
 
     override fun onClick() {
         super.onClick()
 
-        // App öffnen:
-        val launch = Intent(this, MainActivity::class.java).apply {
+        // Wenn du die App beim Tippen öffnen willst:
+        openAppSafely()
+        // Wenn du stattdessen nur etwas toggeln/starten willst (Service), lass openAppSafely() weg
+        // und sende hier deinen Start/Stop-Intent an den TimerEngineService.
+    }
+
+    private fun openAppSafely() {
+        val activityIntent = Intent(this, MainActivity::class.java).apply {
+            // Passe Flags nach Bedarf an
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
-        startActivityAndCollapse(launch) // schließt Quick Settings und öffnet Activity
 
-        // ODER: direkt eine Aktion triggern (z. B. Timer starten/stoppen)
-        // val intent = Intent(this, TimerEngineService::class.java)
-        //     .setAction(TimerContracts.ACTION_TOGGLE) // oder ACTION_START/STOP/EXTEND
-        // startForegroundService(intent)
+        // Ab Android 14+ die PendingIntent-Variante verwenden
+        val pending = PendingIntent.getActivity(
+            this,
+            0,
+            activityIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        if (isLocked) {
+            // Gerät entsperren und dann starten
+            unlockAndRun {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startActivityAndCollapse(pending)
+                } else {
+                    // Fallback für ältere Systeme
+                    @Suppress("DEPRECATION")
+                    startActivityAndCollapse(activityIntent)
+                }
+            }
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startActivityAndCollapse(pending)
+            } else {
+                @Suppress("DEPRECATION")
+                startActivityAndCollapse(activityIntent)
+            }
+        }
     }
 }
