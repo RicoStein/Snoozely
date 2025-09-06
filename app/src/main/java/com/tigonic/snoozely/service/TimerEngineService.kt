@@ -240,25 +240,26 @@ class TimerEngineService : Service() {
                         ensureServiceShakeDetector(false, 0)
                     }
 
-                    val totalMs   = minutes * 60_000L
-                    val now       = System.currentTimeMillis()
-                    val elapsed   = now - startTime
+                    val totalMs = minutes * 60_000L
+                    val now = System.currentTimeMillis()
+                    val elapsed = now - startTime
                     val remaining = (totalMs - elapsed).coerceAtLeast(0)
 
-                    // Audio-Fade Triggering
                     val stopAudio = runCatching { SettingsPreferenceHelper.getStopAudio(ctx).first() }.getOrDefault(true)
                     val fadeSec = runCatching { SettingsPreferenceHelper.getFadeOut(ctx).first().roundToInt() }.getOrDefault(30)
                     val thresholdMs = (fadeSec.coerceAtLeast(0) * 1000L)
 
                     if (stopAudio && fadeSec > 0) {
                         if (remaining <= thresholdMs && !fadeStarted) {
-                            // Fade einleiten (Pause + Stop erfolgt separat am Ende)
+                            // NEU: verbleibende Zeit an den Fade übergeben
+                            val fadeWindow = remaining.coerceAtMost(thresholdMs)
                             startServiceSafe(
-                                Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_FADE_AND_STOP)
+                                Intent(ctx, AudioFadeService::class.java)
+                                    .setAction(AudioFadeService.ACTION_FADE_AND_STOP)
+                                    .putExtra("fadeWindowMs", fadeWindow) // <— NEU
                             )
                             fadeStarted = true
                         } else if (fadeStarted && remaining > thresholdMs) {
-                            // Timer verlängert: Fade abbrechen und Lautstärke wieder hochregeln
                             startServiceSafe(
                                 Intent(ctx, AudioFadeService::class.java).setAction(AudioFadeService.ACTION_CANCEL_FADE)
                             )

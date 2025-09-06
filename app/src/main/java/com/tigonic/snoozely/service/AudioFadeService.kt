@@ -52,7 +52,8 @@ class AudioFadeService : Service() {
         when (intent?.action) {
             ACTION_FADE_AND_STOP -> {
                 // Fade ONLY; Finalisierung erfolgt separat (siehe FINALIZE)
-                serviceScope.launch { startFadeOnly() }
+                val windowOverride = intent.getLongExtra("fadeWindowMs", -1L)
+                serviceScope.launch { startFadeOnly(windowOverride) }
             }
             ACTION_CANCEL_FADE -> {
                 cancelFadeAndRampUp()
@@ -67,9 +68,8 @@ class AudioFadeService : Service() {
         return START_NOT_STICKY
     }
 
-    private suspend fun startFadeOnly() {
+    private suspend fun startFadeOnly(windowOverrideMs: Long = -1L) {
         if (isFading || fadeJob?.isActive == true) return
-        // Laufendes Hochregeln stoppen
         rampUpJob?.cancel()
 
         val fadeDurationSec = runCatching {
@@ -80,31 +80,35 @@ class AudioFadeService : Service() {
         if (originalVolume < 0) {
             originalVolume = getCurrentVolume()
         }
-
         val startVol = (originalVolume.takeIf { it >= 0 } ?: getCurrentVolume()).coerceAtLeast(0)
 
         isFading = true
         fadeJob = serviceScope.launch {
             try {
-                if (fadeDurationSec > 0 && startVol > 0) {
+                val configuredTotalMs = fadeDurationSec * 1000L
+                // NEU: Wenn ein Fenster übergeben wurde, in dieses Fenster einpassen
+                val totalMs = if (windowOverrideMs > 0) {
+                    windowOverrideMs.coerceAtMost(configuredTotalMs)
+                } else {
+                    configuredTotalMs
+                }
+
+                if (totalMs > 0 && startVol > 0) {
                     val steps = startVol
-                    val totalMs = fadeDurationSec * 1000L
                     val delayPerStep = (totalMs / steps).coerceAtLeast(10L)
                     for (vol in startVol downTo 0) {
                         ensureActive()
                         setVolume(vol)
-                        delay(delayPerStep)
+                        if (vol > 0) delay(delayPerStep)
                     }
                 } else {
                     setVolume(0)
                 }
-                // Kein Pause/Restore hier; wir warten auf FINALIZE/CANCEL.
-                Log.d(TAG, "Fade finished (no pause). Waiting for finalize or cancel.")
+                // Warten auf FINALIZE/CANCEL; kein Pause/Restore hier
             } catch (t: Throwable) {
-                Log.e(TAG, "Error during fade", t)
+                // logging …
             } finally {
                 isFading = false
-                // Service bewusst NICHT beenden: wir warten auf FINALIZE/CANCEL.
             }
         }
     }
