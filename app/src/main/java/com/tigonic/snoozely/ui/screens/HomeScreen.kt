@@ -1,6 +1,5 @@
 package com.tigonic.snoozely.ui.screens
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -31,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.ads.HomeBanner
 import com.tigonic.snoozely.service.TimerContracts
@@ -45,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 // ==========================
 // ZENTRALE TUNING-KONSTANTEN
@@ -67,7 +68,7 @@ private const val TEST_BANNER = "ca-app-pub-3940256099942544/6300978111"
  * - Zeigt ggf. Timer-Status und Navigation zu Kernfunktionen
  * Hinweis: Dieser Screen ist exemplarisch; füge hier deine echte Home-UI ein.
  */
-@SuppressLint("ContextCastToActivity")
+@Suppress("UnusedParameter")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
@@ -147,7 +148,7 @@ fun HomeScreen(
                 val startIntent = Intent(appCtx, TimerEngineService::class.java)
                     .setAction(TimerContracts.ACTION_START)
                     .putExtra(TimerContracts.EXTRA_MINUTES, sliderMinutes)
-                appCtx.startForegroundServiceCompat(startIntent)
+                appCtx.startServiceCompat(startIntent)
                 TimerPreferenceHelper.startTimer(appCtx, sliderMinutes)
             }
         }
@@ -230,11 +231,7 @@ fun HomeScreen(
                                 )
                                 // Datenschutzerklärung (Website)
                                 DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.privacyPolicy)
-                                        )
-                                    },
+                                    text = { Text(stringResource(R.string.privacyPolicy)) },
                                     onClick = {
                                         overflowOpen = false
                                         val url = "https://tigoniclabs.com"
@@ -248,11 +245,7 @@ fun HomeScreen(
                                 )
                                 // Nutzungsbedingungen (Website)
                                 DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.termsOfUse)
-                                        )
-                                    },
+                                    text = { Text(stringResource(R.string.termsOfUse)) },
                                     onClick = {
                                         overflowOpen = false
                                         val url = "https://tigoniclabs.com"
@@ -325,7 +318,7 @@ fun HomeScreen(
                             scope.launch {
                                 val stopIntent = Intent(appCtx, TimerEngineService::class.java)
                                     .setAction(TimerContracts.ACTION_STOP)
-                                appCtx.startForegroundServiceCompat(stopIntent)
+                                appCtx.startServiceCompat(stopIntent)
                             }
                         }
                     },
@@ -366,31 +359,38 @@ fun HomeScreen(
     }
 }
 
-/** Startet nur als Foreground-Service, wenn Progress-Notifications erlaubt sind. */
-fun Context.startForegroundServiceCompat(intent: Intent) {
+/**
+ * Startet den Service versionssicher:
+ * - Für O+ optional als Foreground-Service (falls Progress-Notification aktiv)
+ * - Für < O normaler startService
+ */
+fun Context.startServiceCompat(intent: Intent) {
     val action = intent.action
-    val baseShould =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-                (action == TimerContracts.ACTION_START ||
-                        action == TimerContracts.ACTION_STOP ||
-                        action == TimerContracts.ACTION_EXTEND)
+    val isOPlus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+    val relevantAction =
+        action == TimerContracts.ACTION_START ||
+                action == TimerContracts.ACTION_STOP ||
+                action == TimerContracts.ACTION_EXTEND
 
-    if (!baseShould) {
-        startService(intent)
-        return
-    }
+    val shouldStartForeground = isOPlus && relevantAction
 
-    val notificationsEnabled = kotlinx.coroutines.runBlocking {
-        com.tigonic.snoozely.util.SettingsPreferenceHelper
-            .getNotificationEnabled(this@startForegroundServiceCompat).first()
-    }
-    val showProgress = kotlinx.coroutines.runBlocking {
-        com.tigonic.snoozely.util.SettingsPreferenceHelper
-            .getShowProgressNotification(this@startForegroundServiceCompat).first()
-    }
+    if (shouldStartForeground) {
+        // Nur wenn Progress-Notification gewünscht, als Foreground starten.
+        val notificationsEnabled = runBlocking {
+            SettingsPreferenceHelper
+                .getNotificationEnabled(this@startServiceCompat).first()
+        }
+        val showProgress = runBlocking {
+            SettingsPreferenceHelper
+                .getShowProgressNotification(this@startServiceCompat).first()
+        }
 
-    if (notificationsEnabled && showProgress) {
-        startForegroundService(intent)
+        if (notificationsEnabled && showProgress) {
+            // ContextCompat ist versionssicher: auf < O fällt es intern auf startService zurück.
+            ContextCompat.startForegroundService(this, intent)
+        } else {
+            startService(intent)
+        }
     } else {
         startService(intent)
     }

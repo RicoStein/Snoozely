@@ -1,30 +1,153 @@
 <resources>
+    <!-- App -->
     <string name="app_name">Snoozely</string>
-    <string name="settings">Paramètres</string>
-    <string name="sleep_timer">Minuteur de sommeil</string>
-    <string name="playback">Lecture</string>
-    <string name="stop_audio_video">Arrêter l’audio et la vidéo</string>
-    <string name="fade_out_duration">Durée du fondu</string>
-    <string name="seconds">%1$d secondes</string>
-    <string name="screen">Écran</string>
-    <string name="turn_off_screen">Éteindreadada</string>
-    <string name="bluetooth">Bluetooth</string>
-    <string name="bluetooth_android_13_removed">Cette foad supprimée sous Android 13</string>
-    <string name="wifi">Wi-Fi</string>
-    <string name="wifi_android_10_removed">Cette fonction a été supprimée par Google depuis Android 10</string>
-    <string name="notification">Notification</string>
-    <string name="enable_notification">Activer la notification</string>
-    <string name="show_remaining_time">Affiche le temps restant et permet des ajustements.</string>
-    <string name="haptic_feedback">Retour haptique</string>
-    <string name="timer">Minuteur</string>
-    <string name="device_vibrate_on_timer">dadad</string>
-    <string name="language">Langue</string>
-    <string name="german">Allemand</string>
-    <string name="english">Anglais</string>
-    <string name="french">Français</string>
+    <string name="save">Speichern</string>
+    <string name="general">Allgemein</string>
+
+    <!-- Legal -->
+    <string name="termsOfUse">Nutzungsbedingungen</string>
+    <string name="privacyPolicy">Datenschutzerklärung</string>
+
+    <!-- Navigation -->
+    <string name="back">Zurück</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="settings">Einstellungen</string>
+
+    <!-- Timer -->
+    <string name="fade_out_duration">Fade-Out-Dauer</string>
+    <string name="minutes">MINUTEN</string>
     <string name="pause">Pause</string>
-    <string name="play">Lecture</string>
-    <string name="back">Retour</string>
-    <string name="minutes">MINUTES</string>
-    <string name="appLoading">Loading...</string>
+    <string name="play">Starten</string>
+    <string name="seconds">%1$d Sekunden</string>
+    <string name="timer_minus_x">- %1$d min</string>
+    <string name="timer_plus_x">+ %1$d min</string>
+    <string name="timer_stop">Stoppen</string>
+
+    <!-- Playback -->
+    <string name="playback">Wiedergabe</string>
+    <string name="stop_audio_video">Audio und Video stoppen</string>
+
+    <!-- Screen -->
+    <string name="screen">Bildschirm</string>
+    <string name="turn_off_screen">Bildschirm ausschalten</string>
+
+    <!-- Device Admin -->
+    <string name="admin_permission_required">Administratorrechte benötigt</string>
+    <string name="device_admin_explanation">Erläuterung der Administratorrechte</string>
+    <string name="admin_remove_body">Wenn du die Adminrechte entfernst, kann die App den Bildschirm nicht mehr automatisch sperren.</string>
+    <string name="open_settings">Geräteeinstellungen öffnen</string>
+    <string name="admin_remove_confirm">Administratorrechte entfernen</string>
+    <string name="admin_remove_note">Du kannst die Berechtigung später jederzeit wieder hinzufügen, um die Bildschirm-ausschalten-Funktion erneut zu nutzen.</string>
+    <string name="admin_remove_title">Adminrechte entfernen?</string>
+
+    <!-- Language -->
+    <string name="english">Englisch</string>
+    <string name="french">Französisch</string>
+    <string name="german">Deutsch</string>
+    <string name="language">Sprache</string>
+
+    <!-- Haptics -->
+    <string name="shake_vibration_hint">Wenn Vibration aktiviert ist, bleibt der Ton stumm.</string>
+    <string name="silent">Stumm</string>
+
+    <!-- Notification -->
+    <string name="notif_perm_needed_body">Du hast die Systemanfrage mehrmals abgelehnt. Um Benachrichtigungen zu aktivieren, öffne bitte die App-Einstellungen und erlaube Benachrichtigungen dort.</string>
+    <string name="notif_perm_needed_title">Benachrichtigungen erlauben</string>
+    <string name="notification">Benachrichtigung</string>
+    <string name="notification_channel_reminder">Timer-Erinnerung</string>
+    <string name="notification_channel_running">Timer läuft</string>
+    <string name="notification_remaining_time">Noch %1$s</string>
+    <string name="notification_timer_running">Timer läuft</string>
+
+    <!-- Notification Settings -->
+    <string name="notifications_extend_minutes">Verlängerungsschritt: %1$d Minuten</string>
+    <string name="notifications_master">Benachrichtigungen aktivieren</string>
+    <string name="notifications_progress_show">Fortschritt anzeigen</string>
+    <string name="notifications_reminder_minutes">%1$d Minuten vorher</string>
+    <string name="notifications_reminder_show">Erinnerung vor Ablauf</string>
+    <string name="settings_notifications">Benachrichtigungen</string>
+
+    <!-- Reminder Popup -->
+    <string name="reminder_popup_message">Der Timer läuft bald ab.</string>
+    <string name="reminder_popup_title">Erinnerung</string>
+
+    <!-- Shake to Extend -->
+    <string name="disabled">Deaktiviert</string>
+    <string name="enabled">Aktiviert</string>
+    <string name="notification_sound">Benachrichtigungston</string>
+    <string name="notification_volume">Benachrichtigungslautstärke</string>
+    <string name="shake_activation_after_start">%1$d min nach Start</string>
+    <string name="shake_activation_after_start_label">Ab X Minuten nach Start</string>
+    <string name="shake_activation_delay_hint">Ab %1$d Minuten nach Start aktiv</string>
+    <string name="shake_activation_immediate">Sofort</string>
+    <string name="shake_activation_title">Shake aktivieren nach</string>
+    <string name="shake_extend_minutes_hint">Verlängerungsschritt: %1$d Minuten</string>
+    <string name="shake_strength">Schüttelkraft</string>
+    <string name="shake_strength_hint">Telefon schütteln, um die Empfindlichkeit zu testen</string>
+    <string name="shake_strength_sub">Empfindlichkeit der Erkennung anpassen</string>
+    <string name="shake_to_extend">Schütteln zum Verlängern</string>
+    <string name="unknown_tone">Unbekannter Ton</string>
+    <string name="vibrate">Vibration</string>
+    <string name="volume_relative_hint">Relativ zur aktuellen Medienlautstärke</string>
+    <string name="theme">Theme</string>
+    <string name="close">Schließen</string>
+    <string name="configure">Einstellen</string>
+
+    <!-- Bluetooth -->
+    <string name="bluetooth">Bluetooth</string>
+    <string name="bluetooth_android_13_removed">Diese Funktion wurde in Android 13 entfernt</string>
+    <string name="bluetooth_turn_off">Bluetooth am Timer-Ende deaktivieren</string>
+
+    <!-- WLAN -->
+    <string name="display_and_language">Darstellung &amp; Sprache</string>
+    <string name="notifications_extend_title">Verlängerung</string>
+    <string name="notifications_progress_hint">Zeigt den Fortschritt in der Statusleiste</string>
+    <string name="wifi">WLAN</string>
+    <string name="wifi_android_10_removed">Diese Funktion wurde in Android 10 entfernt</string>
+    <string name="wifi_turn_off">WLAN am Timer-Ende deaktivieren</string>
+
+    <!-- PREMIUM -->
+    <string name="more">Mehr</string>
+    <string name="premium_activate_q">Premium freischalten</string>
+    <string name="premium_benefit_no_ads">Zukünftig keine Werbung</string>
+    <string name="premium_benefit_support">Unterstütze die Weiterentwicklung</string>
+    <string name="premium_benefit_widget">Quick-Start Widget für den Homescreen</string>
+    <string name="premium_buy_with_google_play">Mit Google Play freischalten</string>
+    <string name="premium_title">Snoozely Premium</string>
+
+    <!-- PREMIUM: UI Texte für aktiven Premium-Status -->
+    <string name="donate_title">Freiwillig spenden</string>
+    <string name="premium_benefits_title">Das bekommst du mit Premium</string>
+    <string name="premium_benefits_title_active">Das hast du mit Premium</string>
+    <string name="premium_thanks">Vielen Dank, für die Unterstützung</string>
+    <string name="premium_user_label">Premium (aktiv) – Spenden</string>
+    <string name="premium_feature_widget">Widget ist ein Premium-Feature</string>
+
+    <!-- Optional: um die aapt-Warnung zu beseitigen -->
+
+    <!-- WIDGET -->
+    <string name="widget_config_title">Widget konfigurieren</string>
+    <string name="widget_timer_controls_title">Snoozely Timer</string>
+
+    <!-- Widget Farbeinstellungen / Picker (Allgemeine Labels) -->
+    <string name="background">Hintergrund</string>
+    <string name="brightness">Helligkeit</string>
+    <string name="saturation">Sättigung</string>
+    <string name="text">Text</string>
+
+    <!-- Battery Optimization -->
+    <!-- Titel/Buttons allgemein -->
+    <string name="dont_show_again">Nicht mehr anzeigen</string>
+
+    <!-- Sektionen, Beispiel -->
+    <string name="open">Öffnen</string>
+
+    <!-- Hinweiskarte -->
+    <string name="setup_required_title">Erforderliche Einrichtung fehlt</string>
+    <string name="setup_required_body">Tippe hier, um die erforderlichen Berechtigungen einzurichten, damit die App im Hintergrund zuverlässig funktioniert (z. B. bei geschlossener App).</string>
+
+    <!-- BottomSheet -->
+    <string name="setup_sheet_title">Erforderliche Einrichtung</string>
+    <string name="setup_sheet_done">Einrichtung abgeschlossen</string>
+    <string name="setup_sheet_instructions">Damit alles zuverlässig funktioniert, schließe die App von der „Batterieoptimierung“ aus bzw. wähle „Uneingeschränkt“.\n\n1. Tippe auf „Nicht optimiert“ oder „Alle Apps“ auf dem nächsten Bildschirm\n2. Wähle die App aus\n3. Hintergrundnutzung zulassen\n4. „Uneingeschränkt“ wählen oder Batterieoptimierung deaktivieren.</string>
 </resources>

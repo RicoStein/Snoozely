@@ -38,7 +38,7 @@ import com.tigonic.snoozely.ui.screens.HomeScreen
 import com.tigonic.snoozely.ui.screens.SettingsScreen
 import com.tigonic.snoozely.ui.screens.ShakeExtendSettingsScreen
 import com.tigonic.snoozely.ui.screens.ShakeStrengthScreen
-import com.tigonic.snoozely.ui.screens.startForegroundServiceCompat
+import com.tigonic.snoozely.ui.screens.startServiceCompat
 import com.tigonic.snoozely.ui.theme.SnoozelyTheme
 import com.tigonic.snoozely.ui.theme.registerDefaultThemes
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
@@ -263,7 +263,7 @@ class MainActivity : ComponentActivity() {
 
         if (running && start > 0L && minutes > 0) {
             val intent = Intent(ctx, TimerEngineService::class.java)
-            ctx.startForegroundServiceCompat(intent)
+            ctx.startServiceCompat (intent)
         }
     }
 

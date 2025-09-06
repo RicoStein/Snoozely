@@ -1,5 +1,6 @@
 package com.tigonic.snoozely.tile
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -17,6 +18,7 @@ class SleepTimerTileService : TileService() {
         // und sende hier deinen Start/Stop-Intent an den TimerEngineService.
     }
 
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     private fun openAppSafely() {
         val activityIntent = Intent(this, MainActivity::class.java).apply {
             // Passe Flags nach Bedarf an
