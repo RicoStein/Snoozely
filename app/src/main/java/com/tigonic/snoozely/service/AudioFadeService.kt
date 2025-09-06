@@ -31,7 +31,6 @@ class AudioFadeService : Service() {
         const val ACTION_FADE_FINALIZE = "com.tigonic.snoozely.action.FADE_FINALIZE" // Pause + Restore
 
         private const val RAMP_UP_MS_DEFAULT = 600L
-        private const val FINALIZE_DELAY_BEFORE_PAUSE_MS = 500L
         private const val FINALIZE_DELAY_AFTER_PAUSE_MS  = 500L
 
         private const val SILENCE_HOLD_MS = 350L       // wie lange 0% gehalten werden soll, bevor Pause kommt
