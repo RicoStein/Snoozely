@@ -33,10 +33,16 @@ class AudioFadeService : Service() {
         private const val RAMP_UP_MS_DEFAULT = 600L
         private const val FINALIZE_DELAY_BEFORE_PAUSE_MS = 500L
         private const val FINALIZE_DELAY_AFTER_PAUSE_MS  = 500L
+
+        private const val SILENCE_HOLD_MS = 350L       // wie lange 0% gehalten werden soll, bevor Pause kommt
+        private const val WAIT_APPLY_MAX_MS = 1500L    // maximale Wartezeit, bis das System die 0 übernommen hat
+        private const val WAIT_APPLY_STEP_MS = 50L     // Poll-Intervall
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var audioManager: AudioManager
+
+
 
     @Volatile private var fadeJob: Job? = null
     @Volatile private var rampUpJob: Job? = null
@@ -144,6 +150,8 @@ class AudioFadeService : Service() {
         }
     }
 
+
+
     private suspend fun finalizePauseAndRestore() {
         // Sicherstellen, dass kein Fade mehr läuft
         runCatching { fadeJob?.cancelAndJoin() }
@@ -162,13 +170,20 @@ class AudioFadeService : Service() {
 
             // 1) Lautstärke auf 0
             setVolume(0)
-            // 2) kurze Wartezeit: ältere Player pausieren asynchron
-            delay(FINALIZE_DELAY_BEFORE_PAUSE_MS)
-            // 3) Pause senden
+
+            // 1a) Aktiv warten, bis 0 wirklich übernommen wurde (asynchrone Routen/BT etc.)
+            waitUntilVolumeZero(maxWaitMs = WAIT_APPLY_MAX_MS, stepMs = WAIT_APPLY_STEP_MS)
+
+            // 1b) Kurze stille Haltezeit
+            delay(SILENCE_HOLD_MS)
+
+            // 2) Pause senden
             sendMediaPauseCommand()
-            // 4) erneut kurz warten, bis Pause „greift“
+
+            // 3) kurze Wartezeit, bis Pause greift
             delay(FINALIZE_DELAY_AFTER_PAUSE_MS)
-            // 5) Lautstärke wiederherstellen
+
+            // 4) Lautstärke wiederherstellen
             setVolume(backupOriginal)
             Log.d(TAG, "Finalize done: media paused, volume restored to $backupOriginal")
         } catch (t: Throwable) {
@@ -177,6 +192,15 @@ class AudioFadeService : Service() {
             originalVolume = -1
             stopSelf()
         }
+    }
+
+    private suspend fun waitUntilVolumeZero(maxWaitMs: Long, stepMs: Long) {
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < maxWaitMs) {
+            if (getCurrentVolume() == 0) return
+            delay(stepMs)
+        }
+        // Timeout: wir machen trotzdem weiter, es wird später evtl. noch auf 0 einschwingen
     }
 
     private fun getCurrentVolume(): Int =
