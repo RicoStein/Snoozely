@@ -18,8 +18,13 @@ object BatteryOptimizationHelper {
     }
 
     fun isBackgroundRestricted(context: Context): Boolean {
-        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        return runCatching { am.isBackgroundRestricted }.getOrDefault(false)
+        val am = context.getSystemService(ActivityManager::class.java) ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            runCatching { am.isBackgroundRestricted }.getOrDefault(false)
+        } else {
+            // Auf älteren APIs gibt es kein direktes Äquivalent – konservativ: false
+            false
+        }
     }
 
     /**

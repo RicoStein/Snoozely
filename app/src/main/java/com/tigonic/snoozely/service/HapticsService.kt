@@ -7,6 +7,8 @@ import android.media.AudioAttributes
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.CoroutineScope
@@ -18,24 +20,28 @@ import kotlinx.coroutines.launch
 
 /**
  * Kurzlebiger Service für haptisches Feedback zum Timer.
- * - Respektiert das Setting „TIMER_VIBRATE“
- * - Unterstützt einfache One-Shot-Vibrationen und Patterns
- * - Beendet sich nach Ausführung selbst (START_NOT_STICKY)
+ * - Respektiert das Setting TIMER_VIBRATE
+ * - Unterstützt One-Shot und Pattern, API-kompatibel fallbackend
+ * - Beendet sich selbst nach Ausführung
  */
 class HapticsService : Service() {
 
+    companion object {
+        private const val TAG = "HapticsService"
+    }
+
     object Actions {
-        const val REMINDER   = "com.tigonic.snoozely.haptics.REMINDER"    // kurzer Hinweis
-        const val PRE_FINISH = "com.tigonic.snoozely.haptics.PRE_FINISH"  // Sequenz „gleich Schluss“
-        const val FINISH     = "com.tigonic.snoozely.haptics.FINISH"      // kräftiger Abschluss
-        const val TEST       = "com.tigonic.snoozely.haptics.TEST"        // Test aus UI
+        const val REMINDER = "com.tigonic.snoozely.haptics.REMINDER"
+        const val PRE_FINISH = "com.tigonic.snoozely.haptics.PRE_FINISH"
+        const val FINISH = "com.tigonic.snoozely.haptics.FINISH"
+        const val TEST = "com.tigonic.snoozely.haptics.TEST"
     }
 
     object Extras {
-        const val EXTRA_AMPLITUDE   = "extra_amplitude"     // 1..255, DEFAULT_AMPLITUDE wenn nicht gesetzt
-        const val EXTRA_DURATION_MS = "extra_duration_ms"   // Dauer in ms für One-Shot
-        const val EXTRA_PATTERN     = "extra_pattern"       // long[] für Waveform
-        const val EXTRA_REPEAT      = "extra_repeat"        // Anzahl Wiederholungen (-1 = keine)
+        const val EXTRA_AMPLITUDE = "extra_amplitude"      // 1..255 (oder DEFAULT_AMPLITUDE)
+        const val EXTRA_DURATION_MS = "extra_duration_ms"  // One-Shot Dauer
+        const val EXTRA_PATTERN = "extra_pattern"          // long[]
+        const val EXTRA_REPEAT = "extra_repeat"            // -1 = keine
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -45,49 +51,58 @@ class HapticsService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         scope.launch {
             try {
-                val action = intent?.action
                 val hapticsEnabled = SettingsPreferenceHelper
                     .getTimerVibrate(applicationContext).first()
-
                 if (!hapticsEnabled) {
                     Log.d(TAG, "Haptics skipped: setting disabled.")
                     stopSelf()
                     return@launch
                 }
 
-                when (action) {
+                when (intent?.action) {
                     Actions.REMINDER -> {
                         vibrateOneShot(
-                            durationMs = intent?.getLongExtra(Extras.EXTRA_DURATION_MS, 80L) ?: 80L,
-                            amplitude  = intent?.getIntExtra(Extras.EXTRA_AMPLITUDE, VibrationEffect.DEFAULT_AMPLITUDE)
-                                ?: VibrationEffect.DEFAULT_AMPLITUDE
+                            durationMs = intent.getLongExtra(Extras.EXTRA_DURATION_MS, 80L),
+                            amplitude = intent.getIntExtra(
+                                Extras.EXTRA_AMPLITUDE,
+                                VibrationEffect.DEFAULT_AMPLITUDE
+                            )
                         )
                     }
                     Actions.PRE_FINISH -> {
                         val defaultPattern = longArrayOf(0, 70, 60, 120)
                         vibratePattern(
-                            pattern = intent?.getLongArrayExtra(Extras.EXTRA_PATTERN) ?: defaultPattern,
-                            repeat  = intent?.getIntExtra(Extras.EXTRA_REPEAT, -1) ?: -1
+                            pattern = intent.getLongArrayExtra(Extras.EXTRA_PATTERN)
+                                ?: defaultPattern,
+                            repeat = intent.getIntExtra(Extras.EXTRA_REPEAT, -1)
                         )
                     }
                     Actions.FINISH -> {
                         vibrateOneShot(
-                            durationMs = intent?.getLongExtra(Extras.EXTRA_DURATION_MS, 220L) ?: 220L,
-                            amplitude  = intent?.getIntExtra(Extras.EXTRA_AMPLITUDE, VibrationEffect.DEFAULT_AMPLITUDE)
-                                ?: VibrationEffect.DEFAULT_AMPLITUDE
+                            durationMs = intent.getLongExtra(Extras.EXTRA_DURATION_MS, 200L),
+                            amplitude = intent.getIntExtra(
+                                Extras.EXTRA_AMPLITUDE,
+                                VibrationEffect.DEFAULT_AMPLITUDE
+                            )
                         )
                     }
                     Actions.TEST -> {
-                        vibratePattern(longArrayOf(0, 60, 50, 60, 50, 120), repeat = -1)
+                        vibrateOneShot(
+                            durationMs = intent.getLongExtra(Extras.EXTRA_DURATION_MS, 120L),
+                            amplitude = intent.getIntExtra(
+                                Extras.EXTRA_AMPLITUDE,
+                                VibrationEffect.DEFAULT_AMPLITUDE
+                            )
+                        )
                     }
                     else -> {
-                        Log.w(TAG, "Unknown action: $action")
+                        // No-op
                     }
                 }
             } catch (t: Throwable) {
-                Log.e(TAG, "HapticsService error", t)
+                Log.e(TAG, "Haptics error", t)
             } finally {
-                stopSelf()
+                stopSelf(startId)
             }
         }
         return START_NOT_STICKY
@@ -98,85 +113,88 @@ class HapticsService : Service() {
         super.onDestroy()
     }
 
-    companion object {
-        private const val TAG = "HapticsService"
+    // --- Haptics helpers -----------------------------------------------------
 
-        // Convenience-Starter aus beliebigem Kontext
-        fun reminder(context: Context, durationMs: Long = 80L) {
-            context.startService(
-                Intent(context, HapticsService::class.java).apply {
-                    action = Actions.REMINDER
-                    putExtra(Extras.EXTRA_DURATION_MS, durationMs)
-                }
-            )
-        }
-
-        fun preFinish(context: Context, pattern: LongArray? = null) {
-            context.startService(
-                Intent(context, HapticsService::class.java).apply {
-                    action = Actions.PRE_FINISH
-                    if (pattern != null) putExtra(Extras.EXTRA_PATTERN, pattern)
-                }
-            )
-        }
-
-        fun finish(context: Context, durationMs: Long = 220L) {
-            context.startService(
-                Intent(context, HapticsService::class.java).apply {
-                    action = Actions.FINISH
-                    putExtra(Extras.EXTRA_DURATION_MS, durationMs)
-                }
-            )
-        }
-
-        fun test(context: Context) {
-            context.startService(Intent(context, HapticsService::class.java).apply {
-                action = Actions.TEST
-            })
+    private fun systemVibrator(): Vibrator? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(VibratorManager::class.java)
+                vm?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+        } catch (_: Throwable) {
+            null
         }
     }
 
-    // --- Vibrations-Abstraktionen ---
+    private fun normalizeAmplitude(amp: Int): Int {
+        // Gültig: 1..255 oder DEFAULT_AMPLITUDE
+        if (amp == VibrationEffect.DEFAULT_AMPLITUDE) return amp
+        return amp.coerceIn(1, 255)
+    }
+
+    private fun audioAttrs(): AudioAttributes? {
+        return try {
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        } catch (_: Throwable) {
+            null
+        }
+    }
 
     private fun vibrateOneShot(durationMs: Long, amplitude: Int) {
+        val vib = systemVibrator() ?: return
+        if (!vib.hasVibrator()) return
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrateEffect(VibrationEffect.createOneShot(durationMs, amplitude))
+            val amp = normalizeAmplitude(amplitude)
+            val effect = VibrationEffect.createOneShot(durationMs.coerceAtLeast(1L), amp)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // Ab O verfügbar; overload mit AudioAttributes ebenfalls ab O
+                    audioAttrs()?.let { attrs ->
+                        vib.vibrate(effect, attrs)
+                        return
+                    }
+                }
+                vib.vibrate(effect)
+            } catch (t: Throwable) {
+                Log.w(TAG, "vibrate(effect) failed, fallback to legacy", t)
+                @Suppress("DEPRECATION")
+                vib.vibrate(durationMs)
+            }
         } else {
             @Suppress("DEPRECATION")
-            (getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator)
-                ?.takeIf { it.hasVibrator() }
-                ?.vibrate(durationMs)
+            vib.vibrate(durationMs)
         }
     }
 
     private fun vibratePattern(pattern: LongArray, repeat: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrateEffect(VibrationEffect.createWaveform(pattern, repeat))
-        } else {
-            @Suppress("DEPRECATION")
-            (getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator)
-                ?.takeIf { it.hasVibrator() }
-                ?.vibrate(pattern, repeat)
-        }
-    }
+        val vib = systemVibrator() ?: return
+        if (!vib.hasVibrator()) return
 
-    private fun vibrateEffect(effect: VibrationEffect) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
-            val vib = vm.defaultVibrator
-            if (!vib.hasVibrator()) return
-            vib.vibrate(
-                effect,
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val safeRepeat = if (repeat >= 0 && repeat < pattern.size) repeat else -1
+            val effect = VibrationEffect.createWaveform(pattern, safeRepeat)
+            try {
+                audioAttrs()?.let { attrs ->
+                    vib.vibrate(effect, attrs)
+                    return
+                }
+                vib.vibrate(effect)
+            } catch (t: Throwable) {
+                Log.w(TAG, "vibrate(waveform) failed, fallback to legacy", t)
+                @Suppress("DEPRECATION")
+                vib.vibrate(pattern, safeRepeat)
+            }
         } else {
+            val safeRepeat = if (repeat >= 0 && repeat < pattern.size) repeat else -1
             @Suppress("DEPRECATION")
-            (getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator)
-                ?.takeIf { it.hasVibrator() }
-                ?.vibrate(effect)
+            vib.vibrate(pattern, safeRepeat)
         }
     }
 }
