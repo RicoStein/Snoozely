@@ -5,7 +5,6 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,83 +12,74 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * UI-freier Shake-Detector mit Live-Level und internem Cooldown.
- *
- * - strengthPercent 0..100 steuert die Schwellwertempfindlichkeit.
- * - onShake wird ausgelöst, wenn mehrere starke Peaks kurz hintereinander auftreten.
- * - level ∈ [0..1] liefert eine geglättete Intensität (über-Schwelle) fürs UI.
- * - magnitudeNorm ∈ [0..1] liefert die absolute Magnitude (0 = Ruhe).
- * - cooldownMs: Sperrzeit nach einem Treffer.
+ * UI-freier Shake-Detector:
+ * - Verwendet TYPE_LINEAR_ACCELERATION (Fallback: Accelerometer mit einfachem Low-Pass).
+ * - strengthPercent (0..100) wird 1:1 auf einen m/s²-Schwellenwert gemappt (minThr..maxThr).
+ * - onShake wird bei ausreichend starken Peaks innerhalb kurzer Zeitfenster ausgelöst.
+ * - magnitudeNorm: absolute Magnitude [0..1] für Visualisierung.
+ * - thresholdNorm: aktuell verwendete Schwelle [0..1] (damit UI exakt dieselbe Linie zeichnen kann).
  */
 class ShakeDetector(
     context: Context,
     strengthPercent: Int = 50,
     private val onShake: () -> Unit,
     private val cooldownMs: Long = 3000L,
-    private val hitsToTrigger: Int = 2,   // Preview: 1, Service: 2
+    private val hitsToTrigger: Int = 1,
     private val overFactor: Float = 1.0f
-
-
 ) : SensorEventListener {
 
-    private val TAG = "ShakeDetector"
-
-    // Peak-Logik
-    private val peakWindowMs = 200L     // Zeitfenster für zusammengehörige Peaks (enger als 250)
-    private val rearmRatio   = 0.70f    // erst unter 70% der Effektiv-Schwelle wieder „scharf“
-    private var canCountPeak = true     // Rising-Edge-Arming
-
-    private val scope = CoroutineScope(Dispatchers.Default + Job())
+    // Sensor
     private val sm: SensorManager = context.getSystemService(SensorManager::class.java)
     private val accel: Sensor? =
         sm.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
             ?: sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-    // Für Accelerometer-Fallback: grobe Schätzung der Gravitation (Low-Pass)
+    // Fallback-Entfernung der Gravitation (low-pass)
     private var gX = 0f; private var gY = 0f; private var gZ = 0f
     private val lpAlpha = 0.8f
 
+    // Coroutine-Scope
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    // Live-States
     private val _active = MutableStateFlow(false)
     val active: StateFlow<Boolean> = _active
 
-    // Live-Level [0..1] über der Schwelle (für „peppige“ UI)
-    private val _level = MutableStateFlow(0f)
-    val level: StateFlow<Float> = _level
-
-    // NEU: absolute Magnitude [0..1] = magnitude / MAX_MAG
     private val _magnitudeNorm = MutableStateFlow(0f)
     val magnitudeNorm: StateFlow<Float> = _magnitudeNorm
 
-    // Empfindlichkeit (m/s²)
+    private val _thresholdNorm = MutableStateFlow(0f)
+    val thresholdNorm: StateFlow<Float> = _thresholdNorm
+
+    // Mapping-Konstanten
+    private val minThr = 8f   // sehr sensibel
+    private val maxThr = 50f  // sehr streng
+    private val maxMag = 25f  // Skalierungsgrundlage für 0..1 Visualisierung
+
+    // Aktuelle Schwelle in m/s²
     @Volatile private var threshold = mapPercentToThreshold(strengthPercent)
 
-    // Peak-Erkennung
+    // Peak-Logik
     private var lastShakeTs = 0L
     private var hitCount = 0
-
-    // Interner Feuercooldown
+    private val peakWindowMs = 250L
+    private val rearmRatio = 0.70f
+    private var canCountPeak = true
     @Volatile private var coolUntil = 0L
-
-    // Konstante Max-Magnitude (Skalierung)
-    private val maxMag = 25f
-
-    fun updateStrength(percent: Int) {
-        threshold = mapPercentToThreshold(percent.coerceIn(0, 100))
-        Log.d(TAG, "updateStrength -> $percent%  (threshold=${"%.2f".format(threshold)} m/s²)")
-    }
 
     fun start() {
         if (accel == null) return
         if (_active.value) return
         sm.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME)
         _active.value = true
+        _thresholdNorm.value = (threshold / maxMag).coerceIn(0f, 1f)
 
-        // sanftes Abklingen im Idle (~60 FPS)
+        // sanfter Decay für UI-Level (~60 FPS)
         scope.launch {
             while (isActive) {
                 delay(16)
-                val decayed = _level.value * 0.90f
-                _level.value = if (decayed < 0.005f) 0f else decayed
+                val decayed = _magnitudeNorm.value * 0.92f
+                _magnitudeNorm.value = if (decayed < 0.004f) 0f else decayed
             }
         }
     }
@@ -98,14 +88,18 @@ class ShakeDetector(
         if (!_active.value) return
         sm.unregisterListener(this)
         _active.value = false
-        _level.value = 0f
         _magnitudeNorm.value = 0f
-        scope.cancel()
+        scope.coroutineContext.cancelChildren()
     }
 
-    override fun onSensorChanged(event: SensorEvent?) {
+    fun updateStrength(percent: Int) {
+        threshold = mapPercentToThreshold(percent.coerceIn(0, 100))
+        _thresholdNorm.value = (threshold / maxMag).coerceIn(0f, 1f)
+    }
+
+    override fun onSensorChanged(event: android.hardware.SensorEvent?) {
         event ?: return
-        val usingLinear = accel?.type == Sensor.TYPE_LINEAR_ACCELERATION
+        val usingLinear = (accel?.type == Sensor.TYPE_LINEAR_ACCELERATION)
 
         val ax: Float; val ay: Float; val az: Float
         if (usingLinear) {
@@ -121,47 +115,38 @@ class ShakeDetector(
 
         val magnitude = sqrt((ax * ax + ay * ay + az * az).toDouble()).toFloat()
 
-        // absolute Magnitude (0..1)
+        // absolute Magnitude 0..1 (für Visualisierung)
         _magnitudeNorm.value = (magnitude / maxMag).coerceIn(0f, 1f)
 
-        // über-Schwelle-Level (für UI)
-        val norm = ((magnitude - threshold) / (maxMag - threshold)).coerceIn(0f, 1f)
-        val smooth = max(norm, _level.value * 0.85f + norm * 0.15f)
-        _level.value = smooth
-
-        // Effektive Auslöseschwelle (Over-Factor)
+        // Trigger-Logik
         val effective = threshold * overFactor
-        val rearm     = effective * rearmRatio
-        val now       = System.currentTimeMillis()
+        val rearm = effective * rearmRatio
+        val now = System.currentTimeMillis()
 
         if (canCountPeak && magnitude >= effective) {
             if (now >= coolUntil) {
                 hitCount = if (now - lastShakeTs <= peakWindowMs) hitCount + 1 else 1
                 lastShakeTs = now
 
-                Log.d(TAG, "PEAK  mag=${"%.2f".format(magnitude)} thr=${"%.2f".format(threshold)} of=$overFactor eff=${"%.2f".format(effective)} hits=$hitCount/$hitsToTrigger")
-
                 if (hitCount >= hitsToTrigger) {
                     hitCount = 0
                     coolUntil = now + cooldownMs
-                    Log.w(TAG, "TRIGGER  mag=${"%.2f".format(magnitude)} thr=${"%.2f".format(threshold)} eff=${"%.2f".format(effective)} cooldown=${cooldownMs}ms")
                     scope.launch { onShake() }
                 }
             }
-            // Bis unter rearm gefallen: keine weiteren Peaks zählen
             canCountPeak = false
         } else if (magnitude < rearm) {
-            // Re-Arm unterhalb der Hysterese
+            // Re-Arm sobald unter Hysterese
             canCountPeak = true
         }
     }
 
-
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
+    private val curveGamma = 1.8f
     private fun mapPercentToThreshold(p: Int): Float {
-        val min = 8f   // sehr sensibel
-        val max = 20f  // sehr streng
-        return min + (p / 100f) * (max - min)
+        val t = (p.coerceIn(0, 100) / 100f).toDouble()
+        val curved = Math.pow(t, curveGamma.toDouble()).toFloat()
+        return minThr + (maxThr - minThr) * curved
     }
 }

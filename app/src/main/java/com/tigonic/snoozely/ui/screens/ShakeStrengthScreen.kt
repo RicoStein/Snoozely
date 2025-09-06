@@ -10,19 +10,15 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.provider.Settings
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,34 +35,38 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.tigonic.snoozely.R
 import com.tigonic.snoozely.shake.ShakeDetector
+import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-import com.tigonic.snoozely.ui.theme.LocalExtraColors // ← für shakeGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShakeStrengthScreen(onBack: () -> Unit) {
-    val appCtx = LocalContext.current.applicationContext
+fun ShakeStrengthScreen(
+    onBack: () -> Unit
+) {
     val ctx = LocalContext.current
+    val appCtx = ctx.applicationContext
     val scope = rememberCoroutineScope()
 
     val cs = MaterialTheme.colorScheme
     val extra = LocalExtraColors.current
 
-    // Physik-Konsistenz: identisch zum Detector
-    val MIN_THR = 8f
-    val MAX_THR = 20f
-    val MAX_MAG = 25f
-    fun mapPercentToThreshold(p: Int): Float = MIN_THR + (p / 100f) * (MAX_THR - MIN_THR)
-
-    // Settings
+    // Audio-Feedback Einstellungen
     val mode by SettingsPreferenceHelper.getShakeSoundMode(appCtx).collectAsState(initial = "tone")
     val ringtoneUriStr by SettingsPreferenceHelper.getShakeRingtone(appCtx).collectAsState(initial = "")
-    val strengthSaved by SettingsPreferenceHelper.getShakeStrength(appCtx).collectAsState(initial = 50)
-    var strength by remember(strengthSaved) { mutableStateOf(strengthSaved.coerceIn(0, 100)) }
 
-    // Audio-Permission (nur für Custom-Ringtone)
+    // 1) Einmalig initial aus DataStore laden – kein collectAsState(initial=50) für die Stärke!
+    var strength by remember { mutableStateOf(50) }
+    var hydrated by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val v = SettingsPreferenceHelper.getShakeStrength(appCtx).first() // echter Wert
+        strength = v.coerceIn(0, 100)
+        hydrated = true
+    }
+
+    // 2) Audio-Permission für Testton
     val audioPermission =
         if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO
         else Manifest.permission.READ_EXTERNAL_STORAGE
@@ -88,18 +88,14 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
         } else requestAudioPermLauncher.launch(audioPermission)
     }
 
-    // Ton/Vibe
-    val modeState by rememberUpdatedState(mode)
-    val ringUriState by rememberUpdatedState(ringtoneUriStr)
+    // 3) Test-Feedback
     var preview: Ringtone? by remember { mutableStateOf(null) }
-
     fun playTestTone() {
-        if (modeState != "tone") return
-        if (ringUriState.isBlank()) return // Silent by default
-
+        if (mode != "tone") return
+        if (ringtoneUriStr.isBlank()) return
         runCatching {
             preview?.stop()
-            val uri = Uri.parse(ringUriState)
+            val uri = Uri.parse(ringtoneUriStr)
             val r = RingtoneManager.getRingtone(ctx, uri)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 r.audioAttributes = AudioAttributes.Builder()
@@ -112,36 +108,42 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
         }
     }
     fun pulseVibrate() {
-        try {
+        runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = ctx.getSystemService(VibratorManager::class.java)
-                vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(600L, VibrationEffect.DEFAULT_AMPLITUDE))
+                vm?.defaultVibrator?.vibrate(
+                    VibrationEffect.createOneShot(500L, VibrationEffect.DEFAULT_AMPLITUDE)
+                )
             } else {
                 @Suppress("DEPRECATION")
-                ctx.getSystemService(Vibrator::class.java)?.vibrate(600L)
+                ctx.getSystemService(Vibrator::class.java)?.vibrate(500L)
             }
-        } catch (_: Throwable) {}
+        }
     }
 
+    // 4) Live-Detector: gleiche Logik wie im Service
     val detector = remember {
         ShakeDetector(
             context = appCtx,
             strengthPercent = strength,
-            onShake = { },
-            cooldownMs = 800L,
-            hitsToTrigger = 1
+            onShake = {
+                when (mode) {
+                    "vibrate" -> pulseVibrate()
+                    "tone" -> if (audioPermGranted) playTestTone() else ensureAudioPermission { playTestTone() }
+                    else -> Unit // silent
+                }
+            },
+            cooldownMs = 600L,
+            hitsToTrigger = 1,
+            overFactor = 1.0f
         )
     }
+    // Detector folgt der UI-Stärke (ohne zurück in den DataStore zu schreiben)
+    LaunchedEffect(strength) { if (hydrated) detector.updateStrength(strength) }
 
     val magnitudeNorm by detector.magnitudeNorm.collectAsState(0f)
-    val uiMagnitude by animateFloatAsState(
-        targetValue = magnitudeNorm,
-        animationSpec = spring(stiffness = 400f),
-        label = "uiMagnitude"
-    )
 
-    LaunchedEffect(strength) { detector.updateStrength(strength) }
-
+    // Lifecycle
     DisposableEffect(Unit) {
         detector.start()
         onDispose {
@@ -150,47 +152,20 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
         }
     }
 
-    // Schwellen-Logik (unverändert)
-    var armed by remember { mutableStateOf(true) }
-    var lastFiredAt by remember { mutableStateOf(0L) }
-    val minIntervalMs = 500L
-    LaunchedEffect(uiMagnitude, strength, modeState, ringUriState) {
-        val thr = strength / 100f
-        val rearmBelow = (thr - 0.08f).coerceAtLeast(0f)
-        val now = System.currentTimeMillis()
-
-        if (!armed && uiMagnitude < rearmBelow) {
-            armed = true
-        }
-
-        if (armed && uiMagnitude >= thr && (now - lastFiredAt) >= minIntervalMs) {
-            when (modeState) {
-                "vibrate" -> {
-                    // einmal kurz vibrieren
-                    pulseVibrate()
-                }
-                "tone" -> {
-                    // Nur spielen, wenn ein Ton gesetzt ist (Silent by default)
-                    if (ringUriState.isNotBlank()) {
-                        ensureAudioPermission { playTestTone() }
-                    }
-                }
-                else -> {
-                    // "silent" -> nichts
-                }
-            }
-            lastFiredAt = now
-            armed = false
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.shake_strength), color = extra.menu) },
+                title = { Text(text = stringResource(R.string.shake_strength), color = extra.menu) },
                 navigationIcon = {
-                    IconButton(onClick = { runCatching { preview?.stop() }; onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = extra.menu)
+                    IconButton(onClick = {
+                        runCatching { preview?.stop() }
+                        onBack()
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = extra.menu
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -223,29 +198,36 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                 var innerTop by remember { mutableStateOf(0f) }
                 var innerHeight by remember { mutableStateOf(0f) }
 
+                fun yToPercent(yPx: Float): Int {
+                    if (innerHeight <= 0f) return strength
+                    val clampedY = yPx.coerceIn(innerTop, innerTop + innerHeight)
+                    val norm = 1f - ((clampedY - innerTop) / innerHeight) // 0..1 (oben=100%)
+                    return (norm * 100f).roundToInt().coerceIn(0, 100)
+                }
+
                 Canvas(
                     modifier = Modifier
                         .width(barWidth)
                         .fillMaxHeight(0.82f)
-                        .pointerInput(Unit) {
-                            detectTapGestures { pos ->
-                                if (innerHeight > 0f) {
-                                    val clampedY = pos.y.coerceIn(innerTop, innerTop + innerHeight)
-                                    val norm = 1f - ((clampedY - innerTop) / innerHeight) // 0..1
-                                    val pct = (norm * 100f).roundToInt().coerceIn(0, 100)
-                                    strength = pct
-                                    scope.launch { SettingsPreferenceHelper.setShakeStrength(appCtx, pct) }
+                        .pointerInput(hydrated) {
+                            // Interaktion erst wenn geladen
+                            if (!hydrated) return@pointerInput
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                // Initial setzen + speichern
+                                val p0 = yToPercent(down.position.y)
+                                if (p0 != strength) {
+                                    strength = p0
+                                    scope.launch { SettingsPreferenceHelper.setShakeStrength(appCtx, p0) }
                                 }
-                            }
-                        }
-                        .pointerInput(Unit) {
-                            detectDragGestures { change, _ ->
-                                if (innerHeight > 0f) {
-                                    val clampedY = change.position.y.coerceIn(innerTop, innerTop + innerHeight)
-                                    val norm = 1f - ((clampedY - innerTop) / innerHeight)
-                                    val pct = (norm * 100f).roundToInt().coerceIn(0, 100)
-                                    strength = pct
-                                    scope.launch { SettingsPreferenceHelper.setShakeStrength(appCtx, pct) }
+                                // Drag verfolgen
+                                drag(down.id) { change ->
+                                    val p = yToPercent(change.position.y)
+                                    if (p != strength) {
+                                        strength = p
+                                        scope.launch { SettingsPreferenceHelper.setShakeStrength(appCtx, p) }
+                                    }
+                                    change.consume()
                                 }
                             }
                         }
@@ -253,7 +235,7 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                     val W = size.width
                     val H = size.height
 
-                    // Rahmen aus Theme
+                    // Rahmen
                     drawRoundRect(
                         color = cs.outlineVariant,
                         size = size,
@@ -261,10 +243,9 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                         cornerRadius = CornerRadius(barCorner.toPx())
                     )
 
-                    // Innenfläche aus Theme
+                    // Innenfläche
                     val innerSize = Size(W - innerPad.toPx() * 2, H - innerPad.toPx() * 2)
                     val innerTopLeft = Offset(innerPad.toPx(), innerPad.toPx())
-
                     innerTop = innerTopLeft.y
                     innerHeight = innerSize.height
 
@@ -275,9 +256,9 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                         cornerRadius = CornerRadius((barCorner - 2.dp).toPx())
                     )
 
-                    // Füllung aus extra.shakeGradient
-                    if (uiMagnitude > 0.002f) {
-                        val fillHeight = innerSize.height * uiMagnitude.coerceIn(0f, 1f)
+                    // Live-Füllung (Magnitude 0..1)
+                    if (magnitudeNorm > 0.002f) {
+                        val fillHeight = innerSize.height * magnitudeNorm.coerceIn(0f, 1f)
                         val top = innerTopLeft.y + innerSize.height - fillHeight
                         val brush = Brush.verticalGradient(
                             colors = extra.shakeGradient,
@@ -292,7 +273,7 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    // Linie bei Schwelle
+                    // Schwellen-Linie (aus Prozentwert)
                     val y = innerTopLeft.y + innerSize.height * (1f - (strength / 100f))
                     drawLine(
                         color = cs.onSurface.copy(alpha = 0.5f),
@@ -304,14 +285,11 @@ fun ShakeStrengthScreen(onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(10.dp))
-
             Text(stringResource(R.string.shake_strength), color = cs.onBackground, style = MaterialTheme.typography.titleMedium)
-            Text("${strength}%", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-
+            Text("$strength%", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.shake_strength_hint), color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(8.dp))
         }
     }
 }
-
