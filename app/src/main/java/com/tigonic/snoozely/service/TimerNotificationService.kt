@@ -255,7 +255,7 @@ class TimerNotificationService : Service() {
     }
 
     private fun flagImmutable(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        PendingIntent.FLAG_IMMUTABLE
 
     companion object {
         private const val REQ_EXTEND = 2002
@@ -272,7 +272,7 @@ class TimerNotificationService : Service() {
 
     private fun pendingStop(): PendingIntent {
         val i = Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_STOP)
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_CANCEL_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -283,7 +283,7 @@ class TimerNotificationService : Service() {
 
     private fun pendingExtend(): PendingIntent {
         val i = Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_EXTEND)
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_CANCEL_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -295,7 +295,7 @@ class TimerNotificationService : Service() {
     // NEU: Minus für laufende Notification
     private fun pendingReduce(): PendingIntent {
         val i = Intent(this, TimerEngineService::class.java).setAction(TimerContracts.ACTION_REDUCE)
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_CANCEL_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -308,7 +308,7 @@ class TimerNotificationService : Service() {
         val i = Intent(this, com.tigonic.snoozely.MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_CANCEL_CURRENT
 
         return PendingIntent.getActivity(this, /*REQ*/ 1001, i, flags)
@@ -319,7 +319,7 @@ class TimerNotificationService : Service() {
             .setAction(TimerContracts.ACTION_EXTEND)
             .setPackage(packageName)
 
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_UPDATE_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -333,7 +333,7 @@ class TimerNotificationService : Service() {
             .setAction(TimerContracts.ACTION_STOP)
             .setPackage(packageName)
 
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_UPDATE_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -348,7 +348,7 @@ class TimerNotificationService : Service() {
             .setAction(TimerContracts.ACTION_REDUCE)
             .setPackage(packageName)
 
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_UPDATE_CURRENT
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)

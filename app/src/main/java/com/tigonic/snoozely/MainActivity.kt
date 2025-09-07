@@ -67,19 +67,17 @@ class MainActivity : ComponentActivity() {
         installSplashScreen().apply { setKeepOnScreenCondition { viewModel.isLoading.value } }
         super.onCreate(savedInstanceState)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            lifecycleScope.launch {
-                val handled = SettingsPreferenceHelper.getBatteryOptPromptHandled(applicationContext).first()
-                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-                val alreadyIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
-                if (!handled && !alreadyIgnoring) {
-                    val ok = runCatching {
-                        startActivity(Intent("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS").apply {
-                            data = Uri.parse("package:$packageName")
-                        })
-                    }.isSuccess
-                    SettingsPreferenceHelper.setBatteryOptPromptHandled(applicationContext, ok || true)
-                }
+        lifecycleScope.launch {
+            val handled = SettingsPreferenceHelper.getBatteryOptPromptHandled(applicationContext).first()
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val alreadyIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
+            if (!handled && !alreadyIgnoring) {
+                val ok = runCatching {
+                    startActivity(Intent("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS").apply {
+                        data = Uri.parse("package:$packageName")
+                    })
+                }.isSuccess
+                SettingsPreferenceHelper.setBatteryOptPromptHandled(applicationContext, ok || true)
             }
         }
 

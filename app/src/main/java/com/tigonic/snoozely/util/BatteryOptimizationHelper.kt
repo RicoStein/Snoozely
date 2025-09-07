@@ -12,7 +12,6 @@ import android.provider.Settings
 object BatteryOptimizationHelper {
 
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         return runCatching { pm.isIgnoringBatteryOptimizations(context.packageName) }.getOrDefault(false)
     }
@@ -61,16 +60,14 @@ object BatteryOptimizationHelper {
 
         // 2) Allgemeine „Nicht optimieren“-Liste (Doze-Whitelist), Action als Literal:
         // "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val ignoreList = Intent("android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS").apply {
-                addFlags(newTask)
-            }
-            try {
-                context.startActivity(ignoreList)
-                return
-            } catch (_: ActivityNotFoundException) {
-                // fallback unten
-            }
+        val ignoreList = Intent("android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS").apply {
+            addFlags(newTask)
+        }
+        try {
+            context.startActivity(ignoreList)
+            return
+        } catch (_: ActivityNotFoundException) {
+            // fallback unten
         }
 
         // 3) App-Detailseite als letzte Instanz (Konstante existiert auf allen compileSdks)
@@ -91,7 +88,6 @@ object BatteryOptimizationHelper {
      * Action als Literal: "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
      */
     fun requestIgnoreBatteryOptimizations(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
         val pkg = context.packageName
         val intent = Intent("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")
             .setData(Uri.parse("package:$pkg"))

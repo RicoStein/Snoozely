@@ -156,12 +156,10 @@ class HapticsService : Service() {
             val amp = normalizeAmplitude(amplitude)
             val effect = VibrationEffect.createOneShot(durationMs.coerceAtLeast(1L), amp)
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    // Ab O verfügbar; overload mit AudioAttributes ebenfalls ab O
-                    audioAttrs()?.let { attrs ->
-                        vib.vibrate(effect, attrs)
-                        return
-                    }
+                // Ab O verfügbar; overload mit AudioAttributes ebenfalls ab O
+                audioAttrs()?.let { attrs ->
+                    vib.vibrate(effect, attrs)
+                    return
                 }
                 vib.vibrate(effect)
             } catch (t: Throwable) {

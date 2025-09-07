@@ -176,8 +176,7 @@ class TimerEngineService : Service() {
 
     private fun stopForegroundCompat() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) stopForeground(STOP_FOREGROUND_REMOVE)
-            else @Suppress("DEPRECATION") stopForeground(true)
+            stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (_: Throwable) { /* ignore */ }
         isForeground = false
     }
@@ -433,12 +432,10 @@ class TimerEngineService : Service() {
                     if (ringtoneUri.isBlank()) return
                     val uri = Uri.parse(ringtoneUri)
                     val r = RingtoneManager.getRingtone(this, uri)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        r.audioAttributes = AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    }
+                    r.audioAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
                     shakeRingtone = r
                     r.play()
                 } catch (_: Throwable) { }
@@ -523,7 +520,7 @@ class TimerEngineService : Service() {
         val seconds = (remainingMs / 1000) % 60
         val timeText = String.format("%02d:%02d", minutes, seconds)
         val progress = if (totalMs > 0) (((totalMs - remainingMs) * 100 / totalMs).toInt()).coerceIn(0, 100) else 0
-        val flags = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or
+        val flags = (PendingIntent.FLAG_IMMUTABLE) or
                 PendingIntent.FLAG_CANCEL_CURRENT
         val extendPi =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -718,5 +715,5 @@ class TimerEngineService : Service() {
     }
 
     private fun flagImmutable(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        PendingIntent.FLAG_IMMUTABLE
 }

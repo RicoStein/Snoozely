@@ -316,7 +316,7 @@ class TimerControlWidgetProvider : AppWidgetProvider() {
                 }
 
                 // Klick-Intents
-                val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or (PendingIntent.FLAG_IMMUTABLE)
                 fun controlPi(act: String, req: Int): PendingIntent =
                     PendingIntent.getBroadcast(
                         context, appWidgetId + req,
