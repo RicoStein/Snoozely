@@ -12,6 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:adjustViewBounds="true"
+        android:contentDescription="background"
         android:scaleType="fitXY"
         android:src="@drawable/bg_widget_preview" />
 
@@ -30,6 +31,7 @@
             android:id="@+id/imgIcon"
             android:layout_width="24dp"
             android:layout_height="24dp"
+            android:contentDescription="logo icon"
             android:src="@drawable/ic_app_logo"
             app:tint="@color/widget_preview_text" />
 
@@ -52,6 +54,7 @@
             android:id="@+id/btnMinusIv"
             android:layout_width="24dp"
             android:layout_height="24dp"
+            android:contentDescription="minus"
             android:paddingLeft="8dp"
             android:src="@drawable/ic_minus_24"
             app:tint="@color/widget_preview_text" />
@@ -60,6 +63,7 @@
             android:id="@+id/btnPlayIv"
             android:layout_width="24dp"
             android:layout_height="24dp"
+            android:contentDescription="play"
             android:paddingLeft="8dp"
             android:src="@drawable/ic_play_24"
             app:tint="@color/widget_preview_text" />
@@ -68,6 +72,7 @@
             android:id="@+id/btnPlusIv"
             android:layout_width="24dp"
             android:layout_height="24dp"
+            android:contentDescription="plus"
             android:paddingLeft="8dp"
             android:src="@drawable/ic_plus_24"
             app:tint="@color/widget_preview_text" />

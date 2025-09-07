@@ -11,6 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:adjustViewBounds="true"
+        android:contentDescription="Controls Widget"
         android:scaleType="fitXY" />
 
     <!-- Inhalt -->
@@ -28,6 +29,7 @@
             android:id="@+id/imgIcon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:contentDescription="Logo icon"
             android:src="@drawable/ic_app_logo" />
 
         <TextView
@@ -48,6 +50,7 @@
             android:id="@+id/btnMinusIv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:contentDescription="play/pause"
             android:paddingLeft="4dp"
             android:src="@drawable/ic_minus_24" />
 
@@ -55,6 +58,7 @@
             android:id="@+id/btnPlayIv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:contentDescription="play"
             android:paddingLeft="4dp"
             android:src="@drawable/ic_play_24" />
 
@@ -62,6 +66,7 @@
             android:id="@+id/btnPlusIv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:contentDescription="plus"
             android:paddingLeft="4dp"
             android:src="@drawable/ic_plus_24" />
     </LinearLayout>

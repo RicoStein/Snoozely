@@ -1,5 +1,6 @@
 package com.tigonic.snoozely.ads
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.util.DisplayMetrics
 import android.util.Log
@@ -38,6 +39,7 @@ private fun findActivity(context: android.content.Context): Activity? {
     return null
 }
 
+@SuppressLint("SetTextI18n")
 @Composable
 fun HomeBanner(
     isAdsAllowed: Boolean,
