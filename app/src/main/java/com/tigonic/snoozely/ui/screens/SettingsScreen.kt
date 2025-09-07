@@ -467,6 +467,7 @@ private fun LanguageDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     // Name in Ziel-Locale (Self-Name) laden
+    @SuppressLint("LocalContextConfigurationRead")
     fun selfName(@StringRes id: Int, tag: String): String {
         val locale = Locale.forLanguageTag(tag)
         val config = Configuration(ctx.resources.configuration).apply { setLocale(locale) }

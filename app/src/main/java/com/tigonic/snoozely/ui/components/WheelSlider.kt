@@ -65,7 +65,7 @@ fun WheelSlider(
 
     // State
     var rounds by remember { mutableIntStateOf(value / stepsPerCircle) }
-    var angleInCircle by remember { mutableStateOf((value % stepsPerCircle) * 360f / stepsPerCircle) }
+    var angleInCircle by remember { mutableFloatStateOf((value % stepsPerCircle) * 360f / stepsPerCircle) }
     var continuousAngleDeg by remember {
         mutableFloatStateOf(((value.toFloat() / stepsPerCircle) * 360f).coerceIn(minAngle, maxAngle))
     }
