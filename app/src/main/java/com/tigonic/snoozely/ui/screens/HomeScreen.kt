@@ -94,7 +94,7 @@ fun HomeScreen(
     val timerStartTime by TimerPreferenceHelper.getTimerStartTime(appCtx).collectAsState(initial = 0L)
     val timerRunning by TimerPreferenceHelper.getTimerRunning(appCtx).collectAsState(initial = false)
 
-    var sliderMinutes by rememberSaveable { mutableStateOf(timerMinutes.coerceAtLeast(1)) }
+    var sliderMinutes by rememberSaveable { mutableIntStateOf(timerMinutes.coerceAtLeast(1)) }
     var persistJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(timerMinutes, timerRunning) {
@@ -103,7 +103,7 @@ fun HomeScreen(
         }
     }
 
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timerRunning, timerStartTime) {
         if (timerRunning && timerStartTime > 0L) {
             while (isActive) {

@@ -58,7 +58,7 @@ fun ShakeStrengthScreen(
     val ringtoneUriStr by SettingsPreferenceHelper.getShakeRingtone(appCtx).collectAsState(initial = "")
 
     // 1) Einmalig initial aus DataStore laden – kein collectAsState(initial=50) für die Stärke!
-    var strength by remember { mutableStateOf(50) }
+    var strength by remember { mutableIntStateOf(50) }
     var hydrated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val v = SettingsPreferenceHelper.getShakeStrength(appCtx).first() // echter Wert
@@ -195,8 +195,8 @@ fun ShakeStrengthScreen(
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-                var innerTop by remember { mutableStateOf(0f) }
-                var innerHeight by remember { mutableStateOf(0f) }
+                var innerTop by remember { mutableFloatStateOf(0f) }
+                var innerHeight by remember { mutableFloatStateOf(0f) }
 
                 fun yToPercent(yPx: Float): Int {
                     if (innerHeight <= 0f) return strength

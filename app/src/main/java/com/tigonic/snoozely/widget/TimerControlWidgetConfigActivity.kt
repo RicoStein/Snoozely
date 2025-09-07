@@ -1,5 +1,6 @@
 package com.tigonic.snoozely.widget
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
@@ -93,6 +94,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
     /**
      * Baut die Compose-Oberfläche und stellt Theme/Insets ein.
      */
+    @SuppressLint("AutoboxingStateCreation")
     private fun setupContent() {
         if (ThemeRegistry.themes.isEmpty()) registerDefaultThemes()
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -112,10 +114,10 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
 
                 // Initialwerte aus Prefs lesen
                 val initialMinutes = remember { getWidgetDuration(ctx, appWidgetId, 15) }
-                var minutes by remember { mutableStateOf(initialMinutes) }
+                var minutes by remember { mutableIntStateOf(initialMinutes) }
 
                 var bgAlpha by remember {
-                    mutableStateOf(getWidgetBgAlpha(ctx, appWidgetId, defaultAlpha).coerceIn(0f, 1f))
+                    mutableFloatStateOf(getWidgetBgAlpha(ctx, appWidgetId, defaultAlpha).coerceIn(0f, 1f))
                 }
 
                 // Hintergrundfarbe (HSV)

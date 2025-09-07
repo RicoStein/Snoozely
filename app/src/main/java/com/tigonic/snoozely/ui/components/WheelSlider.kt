@@ -64,13 +64,13 @@ fun WheelSlider(
     val maxAngle = (maxValue.toFloat() / stepsPerCircle) * 360f
 
     // State
-    var rounds by remember { mutableStateOf(value / stepsPerCircle) }
+    var rounds by remember { mutableIntStateOf(value / stepsPerCircle) }
     var angleInCircle by remember { mutableStateOf((value % stepsPerCircle) * 360f / stepsPerCircle) }
     var continuousAngleDeg by remember {
-        mutableStateOf(((value.toFloat() / stepsPerCircle) * 360f).coerceIn(minAngle, maxAngle))
+        mutableFloatStateOf(((value.toFloat() / stepsPerCircle) * 360f).coerceIn(minAngle, maxAngle))
     }
     var snapMode by remember { mutableStateOf(false) }
-    var lastEmitted by remember { mutableStateOf(value.coerceIn(minValue, maxValue)) }
+    var lastEmitted by remember { mutableIntStateOf(value.coerceIn(minValue, maxValue)) }
     var ignoreDrag by remember { mutableStateOf(false) }
 
     LaunchedEffect(value, minAngle, maxAngle) {

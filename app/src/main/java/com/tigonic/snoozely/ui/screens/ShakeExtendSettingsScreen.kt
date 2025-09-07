@@ -26,7 +26,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -96,7 +95,7 @@ fun ShakeExtendSettingsScreen(
     val audioManager = remember { appCtx.getSystemService(AudioManager::class.java) }
     val maxVol = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION).coerceAtLeast(1) }
     val curVolStart = remember { audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION) }
-    var sysVol by remember { mutableStateOf(curVolStart.toFloat() / maxVol) }
+    var sysVol by remember { mutableFloatStateOf(curVolStart.toFloat() / maxVol) }
 
     // Aktueller Klingeltontitel
     fun currentToneTitle(uriStr: String): String {
@@ -213,7 +212,7 @@ fun ShakeExtendSettingsScreen(
     // Dialog-State: Aktivierungsfenster
     var showActivationDialog by remember { mutableStateOf(false) }
     var draftMode by remember(activationMode) { mutableStateOf(activationMode) } // "immediate" | "after_start"
-    var draftDelay by remember(activationDelay) { mutableStateOf(activationDelay.coerceIn(1, 30)) }
+    var draftDelay by remember(activationDelay) { mutableIntStateOf(activationDelay.coerceIn(1, 30)) }
 
     val activationLabel = remember(activationMode, activationDelay) {
         if (activationMode == "after_start") {
