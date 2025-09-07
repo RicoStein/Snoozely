@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import androidx.core.net.toUri
 
 // ==========================
 // ZENTRALE TUNING-KONSTANTEN
@@ -80,7 +81,7 @@ fun HomeScreen(
     premium: Boolean,
     onOpenPrivacyOptions: () -> Unit,
     onRequestAdThenStart: (onAfter: () -> Unit) -> Unit,
-    onRequestPurchase: () -> Unit
+    onRequestPurchase: () -> Unit,
 ) {
     val appCtx = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
@@ -236,7 +237,7 @@ fun HomeScreen(
                                         overflowOpen = false
                                         val url = "https://tigoniclabs.com"
                                         val intent = Intent(Intent.ACTION_VIEW).apply {
-                                            data = android.net.Uri.parse(url)
+                                            data = url.toUri()
                                             addCategory(Intent.CATEGORY_BROWSABLE)
                                             flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                         }
@@ -250,7 +251,7 @@ fun HomeScreen(
                                         overflowOpen = false
                                         val url = "https://tigoniclabs.com"
                                         val intent = Intent(Intent.ACTION_VIEW).apply {
-                                            data = android.net.Uri.parse(url)
+                                            data = url.toUri()
                                             addCategory(Intent.CATEGORY_BROWSABLE)
                                             flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                         }

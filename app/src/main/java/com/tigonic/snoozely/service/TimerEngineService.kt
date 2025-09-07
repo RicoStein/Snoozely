@@ -35,6 +35,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.tigonic.snoozely.shake.ShakeDetector
 import kotlin.math.roundToInt
+import androidx.core.net.toUri
 
 /**
  * TimerEngineService
@@ -408,7 +409,6 @@ class TimerEngineService : Service() {
                         val vm = getSystemService(VibratorManager::class.java)
                         vm?.defaultVibrator
                     } else {
-                        @Suppress("DEPRECATION")
                         getSystemService(Vibrator::class.java)
                     }
 
@@ -430,7 +430,7 @@ class TimerEngineService : Service() {
                 try {
                     shakeRingtone?.stop()
                     if (ringtoneUri.isBlank()) return
-                    val uri = Uri.parse(ringtoneUri)
+                    val uri = ringtoneUri.toUri()
                     val r = RingtoneManager.getRingtone(this, uri)
                     r.audioAttributes = AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -514,7 +514,7 @@ class TimerEngineService : Service() {
     private fun buildRunningNotification(
         remainingMs: Long,
         totalMs: Long,
-        extendStep: Int
+        extendStep: Int,
     ): Notification {
         val minutes = (remainingMs / 1000) / 60
         val seconds = (remainingMs / 1000) % 60

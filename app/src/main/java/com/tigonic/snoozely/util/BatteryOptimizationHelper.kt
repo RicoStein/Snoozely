@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.net.toUri
 
 object BatteryOptimizationHelper {
 
@@ -47,7 +48,7 @@ object BatteryOptimizationHelper {
         // "android.settings.APP_BATTERY_SETTINGS"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val appBattery = Intent("android.settings.APP_BATTERY_SETTINGS").apply {
-                data = Uri.parse("package:$pkg")
+                data = "package:$pkg".toUri()
                 addFlags(newTask)
             }
             try {
@@ -72,7 +73,7 @@ object BatteryOptimizationHelper {
 
         // 3) App-Detailseite als letzte Instanz (Konstante existiert auf allen compileSdks)
         val appDetails = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.parse("package:$pkg")
+            data = "package:$pkg".toUri()
             addFlags(newTask)
         }
         try {
@@ -90,7 +91,7 @@ object BatteryOptimizationHelper {
     fun requestIgnoreBatteryOptimizations(context: Context) {
         val pkg = context.packageName
         val intent = Intent("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")
-            .setData(Uri.parse("package:$pkg"))
+            .setData("package:$pkg".toUri())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             context.startActivity(intent)

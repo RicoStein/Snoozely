@@ -29,6 +29,7 @@ import com.tigonic.snoozely.ui.components.VerticalScrollbar
 import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,7 +101,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                         } else {
                             act?.startActivity(
                                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                    .setData(android.net.Uri.parse("package:${ctx.packageName}"))
+                                    .setData("package:${ctx.packageName}".toUri())
                             )
                         }
                     }

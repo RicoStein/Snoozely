@@ -45,6 +45,7 @@ import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 private const val TAG_ADS = "MainActivityAds"
 private const val TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/1033173712"
@@ -74,7 +75,7 @@ class MainActivity : ComponentActivity() {
             if (!handled && !alreadyIgnoring) {
                 val ok = runCatching {
                     startActivity(Intent("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS").apply {
-                        data = Uri.parse("package:$packageName")
+                        data = "package:$packageName".toUri()
                     })
                 }.isSuccess
                 SettingsPreferenceHelper.setBatteryOptPromptHandled(applicationContext, ok || true)

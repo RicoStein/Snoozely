@@ -42,13 +42,13 @@ import com.tigonic.snoozely.ui.components.VerticalScrollbar
 import com.tigonic.snoozely.ui.theme.LocalExtraColors
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShakeExtendSettingsScreen(
     onBack: () -> Unit,
     onNavigateShakeStrength: () -> Unit,
-    onPickSound: () -> Unit // bleibt für künftige externe Picker, aktuell nutzen wir internen
 ) {
     val appCtx = LocalContext.current.applicationContext
     val ctx = LocalContext.current
@@ -101,7 +101,7 @@ fun ShakeExtendSettingsScreen(
     fun currentToneTitle(uriStr: String): String {
         if (uriStr.isEmpty()) return ctx.getString(R.string.silent)
         return runCatching {
-            val uri = Uri.parse(uriStr)
+            val uri = uriStr.toUri()
             RingtoneManager.getRingtone(ctx, uri)?.getTitle(ctx) ?: ctx.getString(R.string.unknown_tone)
         }.getOrElse { ctx.getString(R.string.unknown_tone) }
     }
@@ -134,7 +134,7 @@ fun ShakeExtendSettingsScreen(
                 putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
                 putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
                 putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, Settings.System.DEFAULT_NOTIFICATION_URI)
-                val existing = ringtoneUriStr.takeIf { it.isNotEmpty() }?.let { Uri.parse(it) }
+                val existing = ringtoneUriStr.takeIf { it.isNotEmpty() }?.toUri()
                 putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existing)
             }
             ringtoneLauncher.launch(intent)
@@ -144,7 +144,7 @@ fun ShakeExtendSettingsScreen(
     // Vorschau (Ton) und Vibration
     var preview: Ringtone? by remember { mutableStateOf(null) }
     fun chosenOrDefaultTone(): Uri? =
-        if (ringtoneUriStr.isNotEmpty()) Uri.parse(ringtoneUriStr) else Settings.System.DEFAULT_NOTIFICATION_URI
+        if (ringtoneUriStr.isNotEmpty()) ringtoneUriStr.toUri() else Settings.System.DEFAULT_NOTIFICATION_URI
 
     fun playPreviewOnce() {
         if (!enabled) return
@@ -170,7 +170,6 @@ fun ShakeExtendSettingsScreen(
                 val vm = ctx.getSystemService(VibratorManager::class.java)
                 vm?.defaultVibrator?.hasVibrator() == true
             } else {
-                @Suppress("DEPRECATION")
                 (ctx.getSystemService(Vibrator::class.java)?.hasVibrator() == true)
             }
             if (!hasVibrator) return
@@ -181,7 +180,6 @@ fun ShakeExtendSettingsScreen(
                     val vm = ctx.getSystemService(VibratorManager::class.java)
                     vm?.defaultVibrator?.vibrate(effect)
                 } else {
-                    @Suppress("DEPRECATION")
                     ctx.getSystemService(Vibrator::class.java)?.vibrate(effect)
                 }
             } else {

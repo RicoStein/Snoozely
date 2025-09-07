@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import androidx.core.graphics.createBitmap
 
 private const val TAG = "TimerCtrlWidget"
 
@@ -216,7 +217,7 @@ class TimerControlWidgetProvider : AppWidgetProvider() {
 
                 // Hintergrund zeichnen (rundes Rechteck)
                 runCatching {
-                    val bgBmp = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+                    val bgBmp = createBitmap(widthPx, heightPx)
                     val canvas = Canvas(bgBmp)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
                     val radius = heightPx * 0.4f
@@ -385,7 +386,7 @@ class TimerControlWidgetProvider : AppWidgetProvider() {
                 DrawableCompat.setTint(dr, tint)
                 DrawableCompat.setTintMode(dr, PorterDuff.Mode.SRC_IN)
             }
-            val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+            val bmp = createBitmap(sizePx, sizePx)
             val c = Canvas(bmp)
             dr.setBounds(0, 0, sizePx, sizePx)
             dr.draw(c)
