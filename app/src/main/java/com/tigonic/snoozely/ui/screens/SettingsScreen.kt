@@ -481,11 +481,11 @@ private fun LanguageDropdown(
 
     // Codes und String-IDs
     val languages = listOf(
-        "de" to R.string.german,
         "en" to R.string.english,
-        "fr" to R.string.french,
         "es" to R.string.spanish,
         "pt-BR" to R.string.portuguese,
+        "de" to R.string.german,
+        "fr" to R.string.french,
         "it" to R.string.italian
     )
 

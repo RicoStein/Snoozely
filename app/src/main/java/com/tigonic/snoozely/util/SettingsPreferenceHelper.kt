@@ -104,7 +104,7 @@ object SettingsPreferenceHelper {
         ctx.dataStore.data.map { it[FADE_OUT] ?: 30f }
 
     fun getLanguage(ctx: Context): Flow<String> =
-        ctx.dataStore.data.map { it[LANGUAGE] ?: "de" }
+        ctx.dataStore.data.map { it[LANGUAGE] ?: "en" }
 
     fun getShowProgressNotification(ctx: Context): Flow<Boolean> =
         ctx.dataStore.data.map { it[SHOW_PROGRESS_NOTIFICATION] ?: false }
