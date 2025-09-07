@@ -40,11 +40,12 @@ import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShakeStrengthScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val appCtx = ctx.applicationContext
@@ -95,7 +96,7 @@ fun ShakeStrengthScreen(
         if (ringtoneUriStr.isBlank()) return
         runCatching {
             preview?.stop()
-            val uri = Uri.parse(ringtoneUriStr)
+            val uri = ringtoneUriStr.toUri()
             val r = RingtoneManager.getRingtone(ctx, uri)
             r.audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)

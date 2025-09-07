@@ -135,6 +135,16 @@
     <string name="saturation">Sättigung</string>
     <string name="text">Text</string>
 
+    <!-- Widget Description-->
+    <string name="widget_icon">Logo icon</string>
+    <string name="widget_play_pause">play</string>
+    <string name="widget_plus">plus</string>
+    <string name="widget_minus">minus</string>
+    <string name="widget_control">Controls Widget</string>
+    <string name="widget_background">Widget Background</string>
+    <string name="widget_min_time">01:00</string>
+    <string name="widget_general_time">15:00</string>
+
     <!-- Battery Optimization -->
     <!-- Titel/Buttons allgemein -->
     <string name="dont_show_again">Nicht mehr anzeigen</string>

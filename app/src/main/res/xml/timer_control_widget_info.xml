@@ -7,10 +7,8 @@
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_timer_controls"
     android:configure="com.tigonic.snoozely.widget.TimerControlWidgetConfigActivity"
-    android:widgetFeatures="reconfigurable"
     android:resizeMode="horizontal"
     android:widgetCategory="home_screen"
-
+    android:widgetFeatures="reconfigurable"
     android:previewLayout="@layout/widget_timer_controls_preview"
-
     android:autoAdvanceViewId="@+id/txtTime" />

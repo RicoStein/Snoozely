@@ -180,7 +180,6 @@ class MainActivity : ComponentActivity() {
                             ShakeExtendSettingsScreen(
                                 onBack = { navController.popBackStack() },
                                 onNavigateShakeStrength = { navController.navigate("settings/shake/strength") },
-                                onPickSound = { }
                             )
                         }
                         composable("settings/shake/strength") {

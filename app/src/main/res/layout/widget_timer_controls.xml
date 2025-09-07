@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:adjustViewBounds="true"
-        android:contentDescription="Controls Widget"
+        android:contentDescription="@string/widget_control"
         android:scaleType="fitXY" />
 
     <!-- Inhalt -->
@@ -29,7 +29,7 @@
             android:id="@+id/imgIcon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="Logo icon"
+            android:contentDescription="@string/widget_icon"
             android:src="@drawable/ic_app_logo" />
 
         <TextView
@@ -41,7 +41,7 @@
             android:maxLines="1"
             android:singleLine="true"
             android:ellipsize="none"
-            android:text="01:00"
+            android:text="@string/widget_min_time"
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
 
@@ -50,7 +50,7 @@
             android:id="@+id/btnMinusIv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="play/pause"
+            android:contentDescription="@string/widget_minus"
             android:paddingLeft="4dp"
             android:src="@drawable/ic_minus_24" />
 
@@ -58,7 +58,7 @@
             android:id="@+id/btnPlayIv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="play"
+            android:contentDescription="@string/widget_play_pause"
             android:paddingLeft="4dp"
             android:src="@drawable/ic_play_24" />
 
@@ -66,7 +66,7 @@
             android:id="@+id/btnPlusIv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="plus"
+            android:contentDescription="@string/widget_plus"
             android:paddingLeft="4dp"
             android:src="@drawable/ic_plus_24" />
     </LinearLayout>
