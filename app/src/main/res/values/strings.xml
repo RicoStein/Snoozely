@@ -44,6 +44,9 @@
     <string name="english">Englisch</string>
     <string name="french">Französisch</string>
     <string name="german">Deutsch</string>
+    <string name="spanish">Spanisch</string>
+    <string name="portuguese">Portugiesisch</string>
+    <string name="italian">Italienisch</string>
     <string name="language">Sprache</string>
 
     <!-- Haptics -->

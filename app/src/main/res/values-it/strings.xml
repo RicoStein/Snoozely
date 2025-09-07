@@ -1,0 +1,157 @@
+<resources>
+    <!-- App -->
+    <string name="app_name">Snoozely</string>
+    <string name="save">Salva</string>
+    <string name="general">Generale</string>
+
+    <!-- Legal -->
+    <string name="termsOfUse">Termini di utilizzo</string>
+    <string name="privacyPolicy">Informativa sulla privacy</string>
+
+    <!-- Navigation -->
+    <string name="back">Indietro</string>
+    <string name="cancel">Annulla</string>
+    <string name="settings">Impostazioni</string>
+
+    <!-- Timer -->
+    <string name="fade_out_duration">Durata del fade-out</string>
+    <string name="minutes">MINUTI</string>
+    <string name="pause">Pausa</string>
+    <string name="play">Avvia</string>
+    <string name="seconds">%1$d secondi</string>
+    <string name="timer_minus_x">- %1$d min</string>
+    <string name="timer_plus_x">+ %1$d min</string>
+    <string name="timer_stop">Interrompi</string>
+
+    <!-- Playback -->
+    <string name="playback">Riproduzione</string>
+    <string name="stop_audio_video">Interrompi audio e video</string>
+
+    <!-- Screen -->
+    <string name="screen">Schermo</string>
+    <string name="turn_off_screen">Spegni lo schermo</string>
+
+    <!-- Device Admin -->
+    <string name="admin_permission_required">Permessi di amministratore necessari</string>
+    <string name="device_admin_explanation">Spiegazione dei permessi di amministratore</string>
+    <string name="admin_remove_body">Se rimuovi i permessi di amministratore, l\'app non potrà più bloccare automaticamente lo schermo.</string>
+    <string name="open_settings">Apri impostazioni del dispositivo</string>
+    <string name="admin_remove_confirm">Rimuovi permessi di amministratore</string>
+    <string name="admin_remove_note">Puoi concedere di nuovo il permesso in qualsiasi momento per usare la funzione di spegnimento schermo.</string>
+    <string name="admin_remove_title">Rimuovere i permessi di amministratore?</string>
+
+    <!-- Language -->
+    <string name="english">Inglese</string>
+    <string name="french">Francese</string>
+    <string name="german">Tedesco</string>
+    <string name="spanish">Spagnolo</string>
+    <string name="portuguese">Portoghese</string>
+    <string name="italian">Italiano</string>
+    <string name="language">Lingua</string>
+
+    <!-- Haptics -->
+    <string name="shake_vibration_hint">Quando la vibrazione è attiva, l\'audio rimane disattivato.</string>
+    <string name="silent">Silenzioso</string>
+
+    <!-- Notification -->
+    <string name="notif_perm_needed_body">Hai rifiutato più volte la richiesta di sistema. Per attivare le notifiche, apri le impostazioni dell\'app e consenti le notifiche.</string>
+    <string name="notif_perm_needed_title">Consenti notifiche</string>
+    <string name="notification">Notifica</string>
+    <string name="notification_channel_reminder">Promemoria timer</string>
+    <string name="notification_channel_running">Timer in esecuzione</string>
+    <string name="notification_remaining_time">%1$s rimanenti</string>
+    <string name="notification_timer_running">Timer in esecuzione</string>
+
+    <!-- Notification Settings -->
+    <string name="notifications_extend_minutes">Passo di estensione: %1$d minuti</string>
+    <string name="notifications_master">Abilita notifiche</string>
+    <string name="notifications_progress_show">Mostra avanzamento</string>
+    <string name="notifications_reminder_minutes">%1$d minuti prima</string>
+    <string name="notifications_reminder_show">Promemoria prima della scadenza</string>
+    <string name="settings_notifications">Notifiche</string>
+
+    <!-- Reminder Popup -->
+    <string name="reminder_popup_message">Il timer scadrà a breve.</string>
+    <string name="reminder_popup_title">Promemoria</string>
+
+    <!-- Shake to Extend -->
+    <string name="disabled">Disattivato</string>
+    <string name="enabled">Attivato</string>
+    <string name="notification_sound">Suono di notifica</string>
+    <string name="notification_volume">Volume delle notifiche</string>
+    <string name="shake_activation_after_start">%1$d min dopo l\'avvio</string>
+    <string name="shake_activation_after_start_label">Da X minuti dopo l\'avvio</string>
+    <string name="shake_activation_delay_hint">Attivo da %1$d minuti dopo l\'avvio</string>
+    <string name="shake_activation_immediate">Immediato</string>
+    <string name="shake_activation_title">Attiva scuotimento dopo</string>
+    <string name="shake_extend_minutes_hint">Passo di estensione: %1$d minuti</string>
+    <string name="shake_strength">Intensità dello scuotimento</string>
+    <string name="shake_strength_hint">Scuoti il telefono per testare la sensibilità</string>
+    <string name="shake_strength_sub">Regola la sensibilità di rilevamento</string>
+    <string name="shake_to_extend">Scuoti per estendere</string>
+    <string name="unknown_tone">Tono sconosciuto</string>
+    <string name="vibrate">Vibrazione</string>
+    <string name="volume_relative_hint">Relativo al volume multimediale attuale</string>
+    <string name="theme">Tema</string>
+    <string name="close">Chiudi</string>
+    <string name="configure">Configura</string>
+
+    <!-- Bluetooth -->
+    <string name="bluetooth">Bluetooth</string>
+    <string name="bluetooth_android_13_removed">Questa funzione è stata rimossa in Android 13</string>
+    <string name="bluetooth_turn_off">Disattiva Bluetooth al termine del timer</string>
+
+    <!-- WLAN -->
+    <string name="display_and_language">Aspetto e lingua</string>
+    <string name="notifications_extend_title">Estensione</string>
+    <string name="notifications_progress_hint">Mostra l\'avanzamento nella barra di stato</string>
+    <string name="wifi">Wi‑Fi</string>
+    <string name="wifi_android_10_removed">Questa funzione è stata rimossa in Android 10</string>
+    <string name="wifi_turn_off">Disattiva Wi‑Fi al termine del timer</string>
+
+    <!-- PREMIUM -->
+    <string name="more">Altro</string>
+    <string name="premium_activate_q">Sblocca Premium</string>
+    <string name="premium_benefit_no_ads">Niente annunci in futuro</string>
+    <string name="premium_benefit_support">Supporta lo sviluppo continuo</string>
+    <string name="premium_benefit_widget">Widget di avvio rapido per la schermata Home</string>
+    <string name="premium_buy_with_google_play">Sblocca con Google Play</string>
+    <string name="premium_title">Snoozely Premium</string>
+
+    <!-- PREMIUM: UI for active -->
+    <string name="donate_title">Dona volontariamente</string>
+    <string name="premium_benefits_title">Cosa ottieni con Premium</string>
+    <string name="premium_benefits_title_active">Cosa hai con Premium</string>
+    <string name="premium_thanks">Grazie mille per il tuo supporto</string>
+    <string name="premium_user_label">Premium (attivo) – Donazioni</string>
+    <string name="premium_feature_widget">Il widget è una funzionalità Premium</string>
+
+    <!-- WIDGET -->
+    <string name="widget_config_title">Configura widget</string>
+    <string name="widget_timer_controls_title">Timer Snoozely</string>
+
+    <!-- Widget Color Picker -->
+    <string name="background">Sfondo</string>
+    <string name="brightness">Luminosità</string>
+    <string name="saturation">Saturazione</string>
+    <string name="text">Testo</string>
+
+    <!-- Widget Description -->
+    <string name="widget_icon">Icona del logo</string>
+    <string name="widget_play_pause">play</string>
+    <string name="widget_plus">più</string>
+    <string name="widget_minus">meno</string>
+    <string name="widget_control">Widget di controlli</string>
+    <string name="widget_background">Sfondo del widget</string>
+    <string name="widget_min_time">01:00</string>
+    <string name="widget_general_time">15:00</string>
+
+    <!-- Battery Optimization -->
+    <string name="dont_show_again">Non mostrare più</string>
+    <string name="open">Apri</string>
+    <string name="setup_required_title">Configurazione necessaria mancante</string>
+    <string name="setup_required_body">Tocca qui per configurare i permessi necessari affinché l\'app funzioni in modo affidabile in background (ad es. quando l\'app è chiusa).</string>
+    <string name="setup_sheet_title">Configurazione necessaria</string>
+    <string name="setup_sheet_done">Configurazione completata</string>
+    <string name="setup_sheet_instructions">Per garantire un funzionamento affidabile, escludi l\'app dall\'ottimizzazione della batteria o scegli "Senza restrizioni".\n\n1. Tocca "Non ottimizzate" o "Tutte le app" nella schermata successiva\n2. Seleziona l\'app\n3. Consenti l\'uso in background\n4. Scegli "Senza restrizioni" o disattiva l\'ottimizzazione della batteria.</string>
+</resources>

@@ -482,7 +482,10 @@ private fun LanguageDropdown(
     val languages = listOf(
         "de" to R.string.german,
         "en" to R.string.english,
-        "fr" to R.string.french
+        "fr" to R.string.french,
+        "es" to R.string.spanish,
+        "pt-BR" to R.string.portuguese,
+        "it" to R.string.italian
     )
 
     // Anzeige-Label dynamisch: selected = Self‑Name, andere = aktuelle Locale

@@ -1,0 +1,157 @@
+<resources>
+    <!-- App -->
+    <string name="app_name">Snoozely</string>
+    <string name="save">Salvar</string>
+    <string name="general">Geral</string>
+
+    <!-- Legal -->
+    <string name="termsOfUse">Termos de uso</string>
+    <string name="privacyPolicy">Política de privacidade</string>
+
+    <!-- Navigation -->
+    <string name="back">Voltar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="settings">Configurações</string>
+
+    <!-- Timer -->
+    <string name="fade_out_duration">Duração do fade-out</string>
+    <string name="minutes">MINUTOS</string>
+    <string name="pause">Pausar</string>
+    <string name="play">Iniciar</string>
+    <string name="seconds">%1$d segundos</string>
+    <string name="timer_minus_x">- %1$d min</string>
+    <string name="timer_plus_x">+ %1$d min</string>
+    <string name="timer_stop">Parar</string>
+
+    <!-- Playback -->
+    <string name="playback">Reprodução</string>
+    <string name="stop_audio_video">Parar áudio e vídeo</string>
+
+    <!-- Screen -->
+    <string name="screen">Tela</string>
+    <string name="turn_off_screen">Desligar a tela</string>
+
+    <!-- Device Admin -->
+    <string name="admin_permission_required">Permissões de administrador necessárias</string>
+    <string name="device_admin_explanation">Explicação das permissões de administrador</string>
+    <string name="admin_remove_body">Se você remover as permissões de administrador, o app não poderá mais bloquear a tela automaticamente.</string>
+    <string name="open_settings">Abrir as configurações do dispositivo</string>
+    <string name="admin_remove_confirm">Remover permissões de administrador</string>
+    <string name="admin_remove_note">Você pode conceder a permissão novamente a qualquer momento para usar o recurso de desligar a tela.</string>
+    <string name="admin_remove_title">Remover permissões de administrador?</string>
+
+    <!-- Language -->
+    <string name="english">Inglês</string>
+    <string name="french">Francês</string>
+    <string name="german">Alemão</string>
+    <string name="spanish">Espanhol</string>
+    <string name="portuguese">Português</string>
+    <string name="italian">Italiano</string>
+    <string name="language">Idioma</string>
+
+    <!-- Haptics -->
+    <string name="shake_vibration_hint">Quando a vibração está ativada, o som permanece silenciado.</string>
+    <string name="silent">Silencioso</string>
+
+    <!-- Notification -->
+    <string name="notif_perm_needed_body">Você recusou a solicitação do sistema várias vezes. Para ativar as notificações, abra as configurações do app e permita as notificações lá.</string>
+    <string name="notif_perm_needed_title">Permitir notificações</string>
+    <string name="notification">Notificação</string>
+    <string name="notification_channel_reminder">Lembrete do temporizador</string>
+    <string name="notification_channel_running">Temporizador em execução</string>
+    <string name="notification_remaining_time">%1$s restante</string>
+    <string name="notification_timer_running">Temporizador em execução</string>
+
+    <!-- Notification Settings -->
+    <string name="notifications_extend_minutes">Passo de extensão: %1$d minutos</string>
+    <string name="notifications_master">Ativar notificações</string>
+    <string name="notifications_progress_show">Mostrar progresso</string>
+    <string name="notifications_reminder_minutes">%1$d minutos antes</string>
+    <string name="notifications_reminder_show">Lembrete antes do término</string>
+    <string name="settings_notifications">Notificações</string>
+
+    <!-- Reminder Popup -->
+    <string name="reminder_popup_message">O temporizador terminará em breve.</string>
+    <string name="reminder_popup_title">Lembrete</string>
+
+    <!-- Shake to Extend -->
+    <string name="disabled">Desativado</string>
+    <string name="enabled">Ativado</string>
+    <string name="notification_sound">Som da notificação</string>
+    <string name="notification_volume">Volume das notificações</string>
+    <string name="shake_activation_after_start">%1$d min após o início</string>
+    <string name="shake_activation_after_start_label">A partir de X minutos após o início</string>
+    <string name="shake_activation_delay_hint">Ativo a partir de %1$d minutos após o início</string>
+    <string name="shake_activation_immediate">Imediato</string>
+    <string name="shake_activation_title">Ativar agitar após</string>
+    <string name="shake_extend_minutes_hint">Passo de extensão: %1$d minutos</string>
+    <string name="shake_strength">Intensidade do agito</string>
+    <string name="shake_strength_hint">Agite o telefone para testar a sensibilidade</string>
+    <string name="shake_strength_sub">Ajustar a sensibilidade de detecção</string>
+    <string name="shake_to_extend">Agitar para estender</string>
+    <string name="unknown_tone">Toque desconhecido</string>
+    <string name="vibrate">Vibrar</string>
+    <string name="volume_relative_hint">Relativo ao volume de mídia atual</string>
+    <string name="theme">Tema</string>
+    <string name="close">Fechar</string>
+    <string name="configure">Configurar</string>
+
+    <!-- Bluetooth -->
+    <string name="bluetooth">Bluetooth</string>
+    <string name="bluetooth_android_13_removed">Este recurso foi removido no Android 13</string>
+    <string name="bluetooth_turn_off">Desativar o Bluetooth ao final do temporizador</string>
+
+    <!-- WLAN -->
+    <string name="display_and_language">Aparência e idioma</string>
+    <string name="notifications_extend_title">Extensão</string>
+    <string name="notifications_progress_hint">Mostra o progresso na barra de status</string>
+    <string name="wifi">Wi‑Fi</string>
+    <string name="wifi_android_10_removed">Este recurso foi removido no Android 10</string>
+    <string name="wifi_turn_off">Desativar o Wi‑Fi ao final do temporizador</string>
+
+    <!-- PREMIUM -->
+    <string name="more">Mais</string>
+    <string name="premium_activate_q">Desbloquear Premium</string>
+    <string name="premium_benefit_no_ads">Sem anúncios no futuro</string>
+    <string name="premium_benefit_support">Apoie o desenvolvimento contínuo</string>
+    <string name="premium_benefit_widget">Widget de início rápido para a tela inicial</string>
+    <string name="premium_buy_with_google_play">Desbloquear com o Google Play</string>
+    <string name="premium_title">Snoozely Premium</string>
+
+    <!-- PREMIUM: UI for active -->
+    <string name="donate_title">Doar voluntariamente</string>
+    <string name="premium_benefits_title">O que você obtém com o Premium</string>
+    <string name="premium_benefits_title_active">O que você tem com o Premium</string>
+    <string name="premium_thanks">Muito obrigado pelo seu apoio</string>
+    <string name="premium_user_label">Premium (ativo) – Doações</string>
+    <string name="premium_feature_widget">O widget é um recurso Premium</string>
+
+    <!-- WIDGET -->
+    <string name="widget_config_title">Configurar widget</string>
+    <string name="widget_timer_controls_title">Temporizador Snoozely</string>
+
+    <!-- Widget Color Picker -->
+    <string name="background">Fundo</string>
+    <string name="brightness">Brilho</string>
+    <string name="saturation">Saturação</string>
+    <string name="text">Texto</string>
+
+    <!-- Widget Description -->
+    <string name="widget_icon">Ícone do logotipo</string>
+    <string name="widget_play_pause">reproduzir</string>
+    <string name="widget_plus">mais</string>
+    <string name="widget_minus">menos</string>
+    <string name="widget_control">Widget de controles</string>
+    <string name="widget_background">Fundo do widget</string>
+    <string name="widget_min_time">01:00</string>
+    <string name="widget_general_time">15:00</string>
+
+    <!-- Battery Optimization -->
+    <string name="dont_show_again">Não mostrar novamente</string>
+    <string name="open">Abrir</string>
+    <string name="setup_required_title">Configuração necessária ausente</string>
+    <string name="setup_required_body">Toque aqui para configurar as permissões necessárias para que o app funcione de forma confiável em segundo plano (por exemplo, quando o app estiver fechado).</string>
+    <string name="setup_sheet_title">Configuração necessária</string>
+    <string name="setup_sheet_done">Configuração concluída</string>
+    <string name="setup_sheet_instructions">Para garantir um funcionamento confiável, exclua o app da “otimização de bateria” ou escolha “Sem restrições”.\n\n1. Toque em “Não otimizados” ou “Todos os apps” na próxima tela\n2. Selecione o app\n3. Permita o uso em segundo plano\n4. Escolha “Sem restrições” ou desative a otimização de bateria.</string>
+</resources>
