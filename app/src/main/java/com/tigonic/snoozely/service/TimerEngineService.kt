@@ -476,6 +476,7 @@ class TimerEngineService : Service() {
         }
     }
 
+    @SuppressLint("ImplicitSamInstance")
     private suspend fun stopEverything(timerFinished: Boolean) {
         tickerJob?.cancel()
         tickerJob = null
