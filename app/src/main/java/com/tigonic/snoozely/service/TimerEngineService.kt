@@ -83,7 +83,7 @@ class TimerEngineService : Service() {
         super.onCreate()
         ensureChannel(
             TimerContracts.CHANNEL_RUNNING,
-            getString(R.string.notification_channel_running),
+            getString(R.string.notification_timer_running),
             NotificationManager.IMPORTANCE_LOW
         )
         ensureChannel(

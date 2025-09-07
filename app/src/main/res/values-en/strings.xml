@@ -58,7 +58,6 @@
     <string name="notif_perm_needed_title">Allow notifications</string>
     <string name="notification">Notification</string>
     <string name="notification_channel_reminder">Timer reminder</string>
-    <string name="notification_channel_running">Timer running</string>
     <string name="notification_remaining_time">%1$s remaining</string>
     <string name="notification_timer_running">Timer running</string>
 
@@ -126,8 +125,6 @@
     <string name="premium_user_label">Premium (active) – Donations</string>
     <string name="premium_feature_widget">Widget is a Premium feature</string>
 
-    <!-- Optional: um die aapt-Warnung zu beseitigen -->
-
     <!-- WIDGET -->
     <string name="widget_config_title">Configure widget</string>
     <string name="widget_timer_controls_title">Snoozely Timer</string>
@@ -149,17 +146,10 @@
     <string name="widget_general_time">15:00</string>
 
     <!-- Battery Optimization -->
-    <!-- Titel/Buttons allgemein -->
     <string name="dont_show_again">Don’t show again</string>
-
-    <!-- Sektionen, Beispiel -->
     <string name="open">Open</string>
-
-    <!-- Hinweiskarte -->
     <string name="setup_required_title">Required setup missing</string>
     <string name="setup_required_body">Tap here to set up the required permissions so the app works reliably in the background (e.g., when the app is closed).</string>
-
-    <!-- BottomSheet -->
     <string name="setup_sheet_title">Required setup</string>
     <string name="setup_sheet_done">Setup complete</string>
     <string name="setup_sheet_instructions">To ensure everything works reliably, exclude the app from “Battery optimization” or choose “Unrestricted”.\n\n1. Tap “Not optimized” or “All apps” on the next screen\n2. Select the app\n3. Allow background usage\n4. Choose “Unrestricted” or disable battery optimization.</string>

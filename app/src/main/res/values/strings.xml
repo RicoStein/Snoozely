@@ -58,7 +58,6 @@
     <string name="notif_perm_needed_title">Benachrichtigungen erlauben</string>
     <string name="notification">Benachrichtigung</string>
     <string name="notification_channel_reminder">Timer-Erinnerung</string>
-    <string name="notification_channel_running">Timer läuft</string>
     <string name="notification_remaining_time">Noch %1$s</string>
     <string name="notification_timer_running">Timer läuft</string>
 
@@ -126,8 +125,6 @@
     <string name="premium_user_label">Premium (aktiv) – Spenden</string>
     <string name="premium_feature_widget">Widget ist ein Premium-Feature</string>
 
-    <!-- Optional: um die aapt-Warnung zu beseitigen -->
-
     <!-- WIDGET -->
     <string name="widget_config_title">Widget konfigurieren</string>
     <string name="widget_timer_controls_title">Snoozely Timer</string>
@@ -149,17 +146,10 @@
     <string name="widget_general_time">15:00</string>
 
     <!-- Battery Optimization -->
-    <!-- Titel/Buttons allgemein -->
     <string name="dont_show_again">Nicht mehr anzeigen</string>
-
-    <!-- Sektionen, Beispiel -->
     <string name="open">Öffnen</string>
-
-    <!-- Hinweiskarte -->
     <string name="setup_required_title">Erforderliche Einrichtung fehlt</string>
     <string name="setup_required_body">Tippe hier, um die erforderlichen Berechtigungen einzurichten, damit die App im Hintergrund zuverlässig funktioniert (z. B. bei geschlossener App).</string>
-
-    <!-- BottomSheet -->
     <string name="setup_sheet_title">Erforderliche Einrichtung</string>
     <string name="setup_sheet_done">Einrichtung abgeschlossen</string>
     <string name="setup_sheet_instructions">Damit alles zuverlässig funktioniert, schließe die App von der „Batterieoptimierung“ aus bzw. wähle „Uneingeschränkt“.\n\n1. Tippe auf „Nicht optimiert“ oder „Alle Apps“ auf dem nächsten Bildschirm\n2. Wähle die App aus\n3. Hintergrundnutzung zulassen\n4. „Uneingeschränkt“ wählen oder Batterieoptimierung deaktivieren.</string>

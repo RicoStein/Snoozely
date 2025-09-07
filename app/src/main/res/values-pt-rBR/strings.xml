@@ -58,7 +58,6 @@
     <string name="notif_perm_needed_title">Permitir notificações</string>
     <string name="notification">Notificação</string>
     <string name="notification_channel_reminder">Lembrete do temporizador</string>
-    <string name="notification_channel_running">Temporizador em execução</string>
     <string name="notification_remaining_time">%1$s restante</string>
     <string name="notification_timer_running">Temporizador em execução</string>
 
