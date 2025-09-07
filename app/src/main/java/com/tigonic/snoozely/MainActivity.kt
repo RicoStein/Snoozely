@@ -46,6 +46,8 @@ import com.tigonic.snoozely.util.TimerPreferenceHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
+import com.tigonic.snoozely.util.LocaleHelper
+import androidx.core.content.edit
 
 private const val TAG_ADS = "MainActivityAds"
 private const val TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/1033173712"
@@ -67,6 +69,24 @@ class MainActivity : ComponentActivity() {
 
         installSplashScreen().apply { setKeepOnScreenCondition { viewModel.isLoading.value } }
         super.onCreate(savedInstanceState)
+
+        lifecycleScope.launch {
+            // 1) Falls Sprache noch nicht explizit gesetzt (erste App-Nutzung)
+            val lang = SettingsPreferenceHelper.getLanguage(applicationContext).first()
+            val alreadyApplied = getSharedPreferences("locale_bootstrap", MODE_PRIVATE)
+                .getBoolean("applied_once", false)
+
+            if (!alreadyApplied) {
+                // 2) Stelle sicher, dass die App-Locale wirklich auf en gesetzt wird
+                SettingsPreferenceHelper.setLanguage(applicationContext, lang) // wird "en" sein durch Default
+                // Activity für die neue Locale neu starten
+                LocaleHelper.setAppLocaleAndRestart(this@MainActivity, lang)
+
+                // 3) Markiere, dass der Bootstrap erfolgt ist
+                getSharedPreferences("locale_bootstrap", MODE_PRIVATE)
+                    .edit { putBoolean("applied_once", true) }
+            }
+        }
 
         lifecycleScope.launch {
             val handled = SettingsPreferenceHelper.getBatteryOptPromptHandled(applicationContext).first()

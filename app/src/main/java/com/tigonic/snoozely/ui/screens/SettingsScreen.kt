@@ -95,7 +95,7 @@ fun SettingsScreen(
     val stopAudio by SettingsPreferenceHelper.getStopAudio(app).collectAsState(initial = true)
     val screenOff by SettingsPreferenceHelper.getScreenOff(app).collectAsState(initial = false)
     val fadeOut by SettingsPreferenceHelper.getFadeOut(app).collectAsState(initial = 30f)
-    val language by SettingsPreferenceHelper.getLanguage(app).collectAsState(initial = "de")
+    val language by SettingsPreferenceHelper.getLanguage(app).collectAsState(initial = "en")
     val notificationEnabled by SettingsPreferenceHelper.getNotificationEnabled(app).collectAsState(initial = false)
     val shakedEnabled by SettingsPreferenceHelper.getShakeEnabled(app).collectAsState(initial = false)
     val wifiDisableRequested by SettingsPreferenceHelper.getWifiDisableRequested(app).collectAsState(initial = false)
