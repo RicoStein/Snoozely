@@ -1,5 +1,6 @@
 package com.tigonic.snoozely.ui.screens
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -38,6 +39,9 @@ import com.tigonic.snoozely.util.ScreenOffAdminReceiver
 import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.launch
 import com.tigonic.snoozely.ui.components.AdminRemovalDialog
+import android.content.res.Configuration
+import androidx.annotation.StringRes
+import java.util.Locale
 
 /**
  * Einstellungen-Screen
@@ -361,9 +365,14 @@ fun SettingsScreen(
                 LanguageDropdown(
                     selectedLangCode = language,
                     onSelect = { code ->
-                        activity?.let {
-                            LocaleHelper.setAppLocaleAndRestart(it, code)
-                            scope.launch { SettingsPreferenceHelper.setLanguage(app, code) }
+                        activity?.let { act ->
+                            scope.launch {
+                                // 1) Persistiere die Auswahl
+                                SettingsPreferenceHelper.setLanguage(app, code)
+
+                                // 2) Dann erst neu starten (verhindert das Rennen)
+                                LocaleHelper.setAppLocaleAndRestart(act, code)
+                            }
                         }
                     }
                 )
@@ -453,15 +462,39 @@ private fun LanguageDropdown(
     selectedLangCode: String,
     onSelect: (String) -> Unit
 ) {
+    val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
     var expanded by remember { mutableStateOf(false) }
 
-    val options = listOf(
-        "de" to stringResource(R.string.german),
-        "en" to stringResource(R.string.english),
-        "fr" to stringResource(R.string.french)
+    // Name in Ziel-Locale (Self-Name) laden
+    fun selfName(@StringRes id: Int, tag: String): String {
+        val locale = Locale.forLanguageTag(tag)
+        val config = Configuration(ctx.resources.configuration).apply { setLocale(locale) }
+        val res = ctx.createConfigurationContext(config).resources
+        return res.getString(id)
+    }
+
+    // Name in aktueller App-Locale (normales stringResource)
+    @Composable
+    fun currentLocaleName(@StringRes id: Int): String = stringResource(id)
+
+    // Codes und String-IDs
+    val languages = listOf(
+        "de" to R.string.german,
+        "en" to R.string.english,
+        "fr" to R.string.french
     )
-    val selectedLabel = options.firstOrNull { it.first == selectedLangCode }?.second ?: options.first().second
+
+    // Anzeige-Label dynamisch: selected = Self‑Name, andere = aktuelle Locale
+    val options = languages.map { (code, id) ->
+        val label =
+            if (code == selectedLangCode) selfName(id, code)   // z. B. "Deutsch", "English", "Français"
+            else currentLocaleName(id)                         // z. B. "Englisch" wenn App-Locale DE ist
+        code to label
+    }
+
+    val selectedLabel = options.firstOrNull { it.first == selectedLangCode }?.second
+        ?: stringResource(R.string.language)
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
@@ -489,6 +522,7 @@ private fun LanguageDropdown(
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
