@@ -1,5 +1,6 @@
 package com.tigonic.snoozely.service
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -511,6 +512,7 @@ class TimerEngineService : Service() {
     }
 
     /** Baut und liefert die laufende Fortschritts-Notification. */
+    @SuppressLint("DefaultLocale")
     private fun buildRunningNotification(
         remainingMs: Long,
         totalMs: Long,

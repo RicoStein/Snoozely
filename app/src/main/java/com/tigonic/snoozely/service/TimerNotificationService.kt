@@ -1,5 +1,6 @@
 package com.tigonic.snoozely.service
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -118,6 +119,7 @@ class TimerNotificationService : Service() {
 
     // --- Laufende Timer-Notification (Statusleiste) ---
 
+    @SuppressLint("DefaultLocale")
     private fun showRunningNotification(remainingMs: Long, totalMs: Long) {
         android.util.Log.d("TimerNotif", "showRunningNotification: remaining=$remainingMs total=$totalMs")
         val minutes = (remainingMs / 1000) / 60

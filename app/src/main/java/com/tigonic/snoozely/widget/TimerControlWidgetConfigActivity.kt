@@ -94,7 +94,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
     /**
      * Baut die Compose-Oberfläche und stellt Theme/Insets ein.
      */
-    @SuppressLint("AutoboxingStateCreation")
+    @SuppressLint("AutoboxingStateCreation", "DefaultLocale")
     private fun setupContent() {
         if (ThemeRegistry.themes.isEmpty()) registerDefaultThemes()
         WindowCompat.setDecorFitsSystemWindows(window, false)

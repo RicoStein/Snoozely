@@ -181,7 +181,7 @@ class TimerControlWidgetProvider : AppWidgetProvider() {
         /**
          * Zeichnet Hintergrund, setzt Text/Icon-Größen adaptiv und verknüpft Klick-Intents.
          */
-        @SuppressLint("RemoteViewLayout")
+        @SuppressLint("RemoteViewLayout", "DefaultLocale")
         suspend fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             try {
                 val views = RemoteViews(context.packageName, R.layout.widget_timer_controls)
