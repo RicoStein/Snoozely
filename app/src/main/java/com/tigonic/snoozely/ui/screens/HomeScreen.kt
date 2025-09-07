@@ -186,16 +186,6 @@ fun HomeScreen(
                         fontSize = MaterialTheme.typography.headlineLarge.fontSize,
                         color = extra.menu,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.combinedClickable(
-                            onClick = {},
-                            onLongClick = {
-                                // Debug-Toggle: vorerst beibehalten
-                                scope.launch {
-                                    val current = SettingsPreferenceHelper.getPremiumActive(appCtx).first()
-                                    SettingsPreferenceHelper.setPremiumActive(appCtx, !current)
-                                }
-                            }
-                        )
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onSettingsClick) {
