@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -69,7 +70,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             val isPremium = SettingsPreferenceHelper.getPremiumActive(applicationContext).first()
-            if (isPremium) { // Paywall nur für Nicht-Premium
+            if (!isPremium) { // Paywall nur für Nicht-Premium
                 val intent = Intent(applicationContext, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     putExtra("showPaywall", true)
@@ -94,6 +95,21 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
         setContent {
             val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
             val useDark = when (themeId) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
+
+            // Statusbar-Icons an Theme anpassen (wie im App-Theme gelöst)
+            val view = LocalView.current
+            if (!view.isInEditMode) {
+                SideEffect {
+                    val w = (view.context as Activity).window
+                    // Transparente Systemleisten für Edge-to-Edge
+                    w.statusBarColor = Color.Transparent.toArgb()
+                    w.navigationBarColor = Color.Transparent.toArgb()
+                    // Icons: Light-Theme => dunkle Icons, Dark-Theme => helle Icons
+                    val insets = WindowCompat.getInsetsController(w, view)
+                    insets.isAppearanceLightStatusBars = !useDark
+                    insets.isAppearanceLightNavigationBars = !useDark
+                }
+            }
 
             ConfigTheme(useDark = useDark) {
                 val ctx = applicationContext
@@ -131,7 +147,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                     val (h2, s2, v2) = rgbToHsv(currentTxt)
                     bgHue = h1; bgSat = s1; bgVal = v1
                     txtHue = h2; txtSat = s2; txtVal = v2
-                    txtAlpha = currentTxt.alpha // vorhandene Text-Transparenz übernehmen
+                    txtAlpha = currentTxt.alpha
                 }
 
                 // Compose-Farben aus HSV
@@ -161,7 +177,6 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                                     onClick = {
                                         scope.launch {
                                             saveWidgetDuration(ctx, appWidgetId, minutes)
-                                            // Textfarbe inkl. Alpha speichern
                                             val textArgb = textColor.toArgb()
                                             saveWidgetStyle(ctx, appWidgetId, bgColor.toArgb(), bgAlpha, textArgb)
                                             val awm = AppWidgetManager.getInstance(ctx)
@@ -203,7 +218,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                             textAlign = TextAlign.Center
                         )
 
-                        // Wheel: Minuten wählen
+                        // Wheel
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.height(280.dp).fillMaxWidth()
@@ -236,11 +251,11 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        // Text: identisch aufgebaut (Hue+Alpha kombiniert) + S/V
+                        // Text: identisch (Hue+Alpha kombiniert) + S/V
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
                                 text = stringResource(R.string.text),
-                                style = MaterialTheme.typography.titleMedium,   // <-- hier war der Tippfehler
+                                style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(vertical = 4.dp)
                             )
                             HueAlphaSlider(
@@ -262,7 +277,6 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                                 }
                             }
                         }
-
 
                         // Live-Vorschau
                         val previewBg = bgColor.copy(alpha = bgAlpha)
@@ -303,9 +317,7 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
 }
 
 /**
- * Kombinierter Slider:
- * - Horizontal: Hue (0..360°)
- * - Vertikal: Alpha (0..1)
+ * Kombinierter Slider: Horizontal Hue, vertikal Alpha.
  */
 @Composable
 private fun HueAlphaSlider(
@@ -350,7 +362,6 @@ private fun HueAlphaSlider(
             }
             .padding(horizontal = 2.dp, vertical = 2.dp)
     ) {
-        // Marker
         Canvas(modifier = Modifier.fillMaxSize()) {
             val x = (hue.coerceIn(0f, 360f) / 360f) * size.width.toFloat()
             val y = (1f - alpha.coerceIn(0f, 1f)) * size.height.toFloat()
@@ -361,7 +372,7 @@ private fun HueAlphaSlider(
                 style = Stroke(width = 3f)
             )
             drawCircle(
-                color = Color.White.copy(alpha = 1f),
+                color = Color.White,
                 radius = 15f,
                 center = Offset(x, y),
                 style = Stroke(width = 1.5f)
@@ -371,7 +382,7 @@ private fun HueAlphaSlider(
 }
 
 /**
- * Minimaler Themen-Wrapper, der ThemeRegistry respektiert und ExtraColors bereitstellt.
+ * Minimaler Themen-Wrapper, analog zu deinem Theme-System.
  */
 @Composable
 private fun ConfigTheme(useDark: Boolean, content: @Composable () -> Unit) {
@@ -393,7 +404,7 @@ private fun ConfigTheme(useDark: Boolean, content: @Composable () -> Unit) {
 }
 
 /**
- * HSV<->RGB Hilfsfunktionen.
+ * HSV<->RGB Utils.
  */
 private fun hsvToColor(h: Float, s: Float, v: Float): Color {
     val c = (v * s)
