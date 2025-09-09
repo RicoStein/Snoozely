@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -19,13 +20,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -41,16 +47,8 @@ import com.tigonic.snoozely.util.SettingsPreferenceHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import androidx.compose.foundation.gestures.detectDragGestures
 
-/**
- * Konfigurations-Activity für das 3x1-Steuerungs-Widget.
- *
- * Features:
- * - Timerdauer per Wheel festlegen
- * - Farbstil des Widgets (Hintergrund in RGBA, Text) per HSV-Slider konfigurieren
- * - Speichert Einstellungen widget-spezifisch in SharedPreferences (siehe WidgetPrefs.kt)
- * - Paywall: nur für Premium-Nutzer zugänglich
- */
 class TimerControlWidgetConfigActivity : ComponentActivity() {
 
     private var appWidgetId: Int = AppWidgetManager.INVALID_APPWIDGET_ID
@@ -58,10 +56,8 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Default = abgebrochen (falls etwas schiefgeht oder Activity vorzeitig beendet wird)
         setResult(Activity.RESULT_CANCELED)
 
-        // Extract AppWidgetId aus Intent
         appWidgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID
@@ -71,10 +67,9 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
             finish(); return
         }
 
-        // Premium prüfen – Konfig nur mit Premium
         lifecycleScope.launch {
             val isPremium = SettingsPreferenceHelper.getPremiumActive(applicationContext).first()
-            if (!isPremium) {
+            if (isPremium) { // Paywall nur für Nicht-Premium
                 val intent = Intent(applicationContext, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     putExtra("showPaywall", true)
@@ -91,9 +86,6 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Baut die Compose-Oberfläche und stellt Theme/Insets ein.
-     */
     @SuppressLint("AutoboxingStateCreation", "DefaultLocale")
     private fun setupContent() {
         if (ThemeRegistry.themes.isEmpty()) registerDefaultThemes()
@@ -103,21 +95,6 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
             val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
             val useDark = when (themeId) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
 
-
-            SideEffect {
-                // Statusbar-Hintergrund leicht transparent passend zum Theme
-                val statusColor = if (useDark) Color(0xFF000000) else Color(0xFFFFFFFF)
-                window.statusBarColor = statusColor.copy(alpha = 0.0f).toArgb() // transparent für E2E
-
-                // Ab Android 11+ kann man per InsetsController die Icon-Farbe setzen
-                val w = window
-                val controller = androidx.core.view.WindowCompat.getInsetsController(w, w.decorView)
-                // light status bars = dunkle Icons? Nein: true bedeutet dunkle Icons (für helle Bars).
-                controller.isAppearanceLightStatusBars = !useDark
-                // Optional auch für Navigation-Bar, wenn du sie sichtbar hast:
-                controller.isAppearanceLightNavigationBars = !useDark
-            }
-
             ConfigTheme(useDark = useDark) {
                 val ctx = applicationContext
                 val scope = rememberCoroutineScope()
@@ -125,27 +102,28 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                 val night = useDark
                 val defaultBg = if (night) Color.Black else Color.White
                 val defaultText = if (night) Color.White else Color.Black
-                val defaultAlpha = 0.30f
+                val defaultBgAlpha = 0.30f
 
-                // Initialwerte aus Prefs lesen
+                // Initialwerte
                 val initialMinutes = remember { getWidgetDuration(ctx, appWidgetId, 15) }
                 var minutes by remember { mutableIntStateOf(initialMinutes) }
 
                 var bgAlpha by remember {
-                    mutableFloatStateOf(getWidgetBgAlpha(ctx, appWidgetId, defaultAlpha).coerceIn(0f, 1f))
+                    mutableFloatStateOf(getWidgetBgAlpha(ctx, appWidgetId, defaultBgAlpha).coerceIn(0f, 1f))
                 }
 
-                // Hintergrundfarbe (HSV)
-                var bgHue by remember { mutableStateOf(210f) } // 0..360
-                var bgSat by remember { mutableStateOf(0.2f) }  // 0..1
-                var bgVal by remember { mutableStateOf(1.0f) }  // 0..1
+                // HSV States Hintergrund
+                var bgHue by remember { mutableStateOf(210f) }
+                var bgSat by remember { mutableStateOf(0.2f) }
+                var bgVal by remember { mutableStateOf(1.0f) }
 
-                // Textfarbe (HSV)
+                // HSV States Text
                 var txtHue by remember { mutableStateOf(0f) }
                 var txtSat by remember { mutableStateOf(0f) }
                 var txtVal by remember { mutableStateOf(if (night) 1f else 0f) }
+                var txtAlpha by remember { mutableFloatStateOf(1f) }
 
-                // Vorhandene Farben -> HSV mappen
+                // Aktuelle gespeicherte Farben laden und auf HSV/Alpha mappen
                 LaunchedEffect(Unit) {
                     val currentBg = Color(getWidgetBgColor(ctx, appWidgetId, defaultBg.toArgb()))
                     val currentTxt = Color(getWidgetTextColor(ctx, appWidgetId, defaultText.toArgb()))
@@ -153,10 +131,13 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                     val (h2, s2, v2) = rgbToHsv(currentTxt)
                     bgHue = h1; bgSat = s1; bgVal = v1
                     txtHue = h2; txtSat = s2; txtVal = v2
+                    txtAlpha = currentTxt.alpha // vorhandene Text-Transparenz übernehmen
                 }
 
+                // Compose-Farben aus HSV
                 val bgColor = remember(bgHue, bgSat, bgVal) { hsvToColor(bgHue, bgSat, bgVal) }
-                val textColor = remember(txtHue, txtSat, txtVal) { hsvToColor(txtHue, txtSat, txtVal) }
+                val baseTextColor = remember(txtHue, txtSat, txtVal) { hsvToColor(txtHue, txtSat, txtVal) }
+                val textColor = remember(baseTextColor, txtAlpha) { baseTextColor.copy(alpha = txtAlpha.coerceIn(0f, 1f)) }
 
                 Scaffold(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -170,19 +151,19 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Abbrechen
                                 FilledTonalButton(
                                     onClick = { setResult(Activity.RESULT_CANCELED); finishAndRemoveTask() },
                                     modifier = Modifier.weight(1f).height(52.dp),
                                     shape = MaterialTheme.shapes.extraLarge
                                 ) { Text(stringResource(R.string.cancel)) }
 
-                                // Speichern & Widget aktualisieren
                                 Button(
                                     onClick = {
                                         scope.launch {
                                             saveWidgetDuration(ctx, appWidgetId, minutes)
-                                            saveWidgetStyle(ctx, appWidgetId, bgColor.toArgb(), bgAlpha, textColor.toArgb())
+                                            // Textfarbe inkl. Alpha speichern
+                                            val textArgb = textColor.toArgb()
+                                            saveWidgetStyle(ctx, appWidgetId, bgColor.toArgb(), bgAlpha, textArgb)
                                             val awm = AppWidgetManager.getInstance(ctx)
                                             TimerControlWidgetProvider.updateAppWidget(ctx, awm, appWidgetId)
                                             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -230,47 +211,68 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                             WheelSlider(value = minutes, onValueChange = { v -> minutes = max(1, v) }, minValue = 1)
                             TimerCenterText(minutes = minutes, seconds = 0, showLabel = true)
                         }
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(30.dp))
 
-                        // Hintergrundfarbe
+                        // Hintergrund: Hue+Alpha kombiniert + S/V
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(text = stringResource(R.string.background), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 4.dp))
-                            HueSlider(hue = bgHue, onHueChange = { bgHue = it })
+                            HueAlphaSlider(
+                                hue = bgHue,
+                                alpha = bgAlpha,
+                                onChange = { newHue, newAlpha ->
+                                    bgHue = newHue
+                                    bgAlpha = newAlpha.coerceIn(0f, 1f)
+                                }
+                            )
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(stringResource(R.string.saturation), style = MaterialTheme.typography.labelLarge)
-                                    Slider(value = bgSat, onValueChange = { bgSat = it.coerceIn(0f, 1f) })
+                                    Slider(value = bgSat, onValueChange = { v -> bgSat = v.coerceIn(0f, 1f) })
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(stringResource(R.string.brightness), style = MaterialTheme.typography.labelLarge)
-                                    Slider(value = bgVal, onValueChange = { bgVal = it.coerceIn(0f, 1f) })
+                                    Slider(value = bgVal, onValueChange = { v -> bgVal = v.coerceIn(0f, 1f) })
                                 }
                             }
                         }
 
-                        // Textfarbe
+                        // Text: identisch aufgebaut (Hue+Alpha kombiniert) + S/V
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(text = stringResource(R.string.text), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 4.dp))
-                            HueSlider(hue = txtHue, onHueChange = { txtHue = it })
+                            Text(
+                                text = stringResource(R.string.text),
+                                style = MaterialTheme.typography.titleMedium,   // <-- hier war der Tippfehler
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                            HueAlphaSlider(
+                                hue = txtHue,
+                                alpha = txtAlpha,
+                                onChange = { newHue, newAlpha ->
+                                    txtHue = newHue
+                                    txtAlpha = newAlpha.coerceIn(0f, 1f)
+                                }
+                            )
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(stringResource(R.string.saturation), style = MaterialTheme.typography.labelLarge)
-                                    Slider(value = txtSat, onValueChange = { txtSat = it.coerceIn(0f, 1f) })
+                                    Slider(value = txtSat, onValueChange = { v -> txtSat = v.coerceIn(0f, 1f) })
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(stringResource(R.string.brightness), style = MaterialTheme.typography.labelLarge)
-                                    Slider(value = txtVal, onValueChange = { txtVal = it.coerceIn(0f, 1f) })
+                                    Slider(value = txtVal, onValueChange = { v -> txtVal = v.coerceIn(0f, 1f) })
                                 }
                             }
                         }
 
-                        // Live-Vorschauzeile des Widgets
+
+                        // Live-Vorschau
+                        val previewBg = bgColor.copy(alpha = bgAlpha)
+                        val previewText = textColor
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(64.dp)
                                 .clip(RoundedCornerShape(24.dp))
-                                .background(bgColor.copy(alpha = bgAlpha))
+                                .background(previewBg)
                                 .padding(horizontal = 12.dp),
                             contentAlignment = Alignment.CenterStart
                         ) {
@@ -280,14 +282,14 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Icon(painter = painterResource(R.drawable.ic_app_logo), contentDescription = null, tint = textColor)
-                                    val previewText = String.format("%02d:%02d", minutes, 0)
-                                    Text(text = previewText, color = textColor, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                    Icon(painter = painterResource(R.drawable.ic_app_logo), contentDescription = null, tint = previewText)
+                                    val previewTextStr = String.format("%02d:%02d", minutes, 0)
+                                    Text(text = previewTextStr, color = previewText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    Icon(painter = painterResource(R.drawable.ic_minus_24), contentDescription = null, tint = textColor)
-                                    Icon(painter = painterResource(R.drawable.ic_play_24), contentDescription = null, tint = textColor)
-                                    Icon(painter = painterResource(R.drawable.ic_plus_24), contentDescription = null, tint = textColor)
+                                    Icon(painter = painterResource(R.drawable.ic_minus_24), contentDescription = null, tint = previewText)
+                                    Icon(painter = painterResource(R.drawable.ic_play_24), contentDescription = null, tint = previewText)
+                                    Icon(painter = painterResource(R.drawable.ic_plus_24), contentDescription = null, tint = previewText)
                                 }
                             }
                         }
@@ -301,10 +303,22 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
 }
 
 /**
- * Farbbalken für Hue (0..360°). Slider-Wert wird linear abgebildet.
+ * Kombinierter Slider:
+ * - Horizontal: Hue (0..360°)
+ * - Vertikal: Alpha (0..1)
  */
 @Composable
-private fun HueSlider(hue: Float, onHueChange: (Float) -> Unit) {
+private fun HueAlphaSlider(
+    hue: Float,
+    alpha: Float,
+    onChange: (h: Float, a: Float) -> Unit,
+    modifier: Modifier = Modifier
+        .fillMaxWidth()
+        .height(44.dp)
+        .clip(RoundedCornerShape(10.dp))
+) {
+    var size by remember { mutableStateOf(IntSize.Zero) }
+
     val hueGradient = Brush.horizontalGradient(
         0f to Color(0xFFFF0000),
         0.16f to Color(0xFFFFFF00),
@@ -314,18 +328,45 @@ private fun HueSlider(hue: Float, onHueChange: (Float) -> Unit) {
         0.83f to Color(0xFFFF00FF),
         1f to Color(0xFFFF0000)
     )
+
+    fun updateFromOffset(offset: Offset) {
+        if (size.width <= 0 || size.height <= 0) return
+        val x = offset.x.coerceIn(0f, size.width.toFloat())
+        val y = offset.y.coerceIn(0f, size.height.toFloat())
+        val newHue = (x / size.width.toFloat()) * 360f
+        val newAlpha = 1f - (y / size.height.toFloat())
+        onChange(newHue.coerceIn(0f, 360f), newAlpha.coerceIn(0f, 1f))
+    }
+
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(20.dp)
-            .clip(RoundedCornerShape(10.dp))
+        modifier = modifier
             .background(hueGradient)
+            .onSizeChanged { size = it }
+            .pointerInput(size) {
+                detectDragGestures(
+                    onDragStart = { pos -> updateFromOffset(pos) },
+                    onDrag = { change, _ -> updateFromOffset(change.position) }
+                )
+            }
+            .padding(horizontal = 2.dp, vertical = 2.dp)
     ) {
-        Slider(
-            value = hue.coerceIn(0f, 360f) / 360f,
-            onValueChange = { onHueChange((it * 360f).coerceIn(0f, 360f)) },
-            modifier = Modifier.fillMaxWidth()
-        )
+        // Marker
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val x = (hue.coerceIn(0f, 360f) / 360f) * size.width.toFloat()
+            val y = (1f - alpha.coerceIn(0f, 1f)) * size.height.toFloat()
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.85f),
+                radius = 15f,
+                center = Offset(x, y),
+                style = Stroke(width = 3f)
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 1f),
+                radius = 15f,
+                center = Offset(x, y),
+                style = Stroke(width = 1.5f)
+            )
+        }
     }
 }
 
@@ -352,7 +393,7 @@ private fun ConfigTheme(useDark: Boolean, content: @Composable () -> Unit) {
 }
 
 /**
- * HSV->RGB und RGB->HSV Hilfsfunktionen für Compose-Color.
+ * HSV<->RGB Hilfsfunktionen.
  */
 private fun hsvToColor(h: Float, s: Float, v: Float): Color {
     val c = (v * s)
