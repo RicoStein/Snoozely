@@ -103,6 +103,21 @@ class TimerControlWidgetConfigActivity : ComponentActivity() {
             val themeId by SettingsPreferenceHelper.getThemeMode(this).collectAsState(initial = "system")
             val useDark = when (themeId) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
 
+
+            SideEffect {
+                // Statusbar-Hintergrund leicht transparent passend zum Theme
+                val statusColor = if (useDark) Color(0xFF000000) else Color(0xFFFFFFFF)
+                window.statusBarColor = statusColor.copy(alpha = 0.0f).toArgb() // transparent für E2E
+
+                // Ab Android 11+ kann man per InsetsController die Icon-Farbe setzen
+                val w = window
+                val controller = androidx.core.view.WindowCompat.getInsetsController(w, w.decorView)
+                // light status bars = dunkle Icons? Nein: true bedeutet dunkle Icons (für helle Bars).
+                controller.isAppearanceLightStatusBars = !useDark
+                // Optional auch für Navigation-Bar, wenn du sie sichtbar hast:
+                controller.isAppearanceLightNavigationBars = !useDark
+            }
+
             ConfigTheme(useDark = useDark) {
                 val ctx = applicationContext
                 val scope = rememberCoroutineScope()
